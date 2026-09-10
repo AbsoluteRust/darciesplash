@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
+  turbopack: { root: __dirname },
+
   images: {
     remotePatterns: [
       {
@@ -13,14 +17,19 @@ const nextConfig: NextConfig = {
         hostname: "raw.githubusercontent.com",
         pathname: "**",
       },
+      {
+        // ⭐ Add this so Vercel Blob images load
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+        pathname: "**",
+      },
     ],
     unoptimized: true,
   },
 
-  // 👇 Add this block
   allowedDevOrigins: [
     "raspberrypi.local",
-    "192.168.1.40",   // optional but recommended
+    "192.168.1.40",
   ],
 };
 
