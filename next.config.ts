@@ -17,7 +17,6 @@ const nextConfig: NextConfig = {
         pathname: "**",
       },
       {
-        // ⭐ Add this so Vercel Blob images load
         protocol: "https",
         hostname: "*.public.blob.vercel-storage.com",
         pathname: "**",
