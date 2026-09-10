@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import { kv } from "@vercel/kv";
+
+interface Card {
+  name: string;
+  type: string;
+  collection: string;
+  image: string;
+  description: string;
+  details: string;
+  link: string;
+}
 
 export async function POST(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -15,30 +24,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
-  // Path to cards.json
-  const cardsFile = path.join(process.cwd(), "data", "cards.json");
+  const cards: Card[] = (await kv.get("cards")) || [];
 
-  // Read existing cards
-  const raw = fs.readFileSync(cardsFile, "utf8");
-  const cards = JSON.parse(raw);
+  const newCard: Card = {
+    name: title,
+    type,
+    collection,
+    image: imageUrl,
+    description: about,
+    details: "",
+    link: "",
+  };
 
-  // Create new card
-  const newCard = {
-  name: title,
-  type,
-  collection,   // ⭐ ADD THIS
-  image: imageUrl,
-  description: about,
-  details: "",
-  link: ""
-};
-
-
-  // Add card
   cards.push(newCard);
-
-  // Save file
-  fs.writeFileSync(cardsFile, JSON.stringify(cards, null, 2), "utf8");
+  await kv.set("cards", cards);
 
   return NextResponse.json({ ok: true });
 }
