@@ -114,7 +114,8 @@ body::-webkit-scrollbar {
 
 @media (max-width: 600px) {
   .card-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);   /* was 1fr */
+    gap: 14px;
   }
 }
 
