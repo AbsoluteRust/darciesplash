@@ -23,24 +23,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing title" }, { status: 400 });
   }
 
+  const lowerTitle = title.toLowerCase();
   const cards: Card[] = (await kv.get("cards")) || [];
-  const index = cards.findIndex(c => c.name.toLowerCase() === title.toLowerCase());
+  const deleted: string[] = (await kv.get("deleted")) || [];
 
-  if (index === -1) {
-    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+  let removed: Card | null = null;
+  const index = cards.findIndex(c => c.name.toLowerCase() === lowerTitle);
+
+  if (index !== -1) {
+    [removed] = cards.splice(index, 1);
+    await kv.set("cards", cards);
+
+    // Best-effort: delete the image from Blob
+    if (removed.image && removed.image.includes("blob.vercel-storage.com")) {
+      try {
+        await del(removed.image);
+      } catch (err) {
+        console.error("Failed to delete blob:", err);
+      }
+    }
   }
 
-  const [removed] = cards.splice(index, 1);
-  await kv.set("cards", cards);
-
-  // Best-effort: delete the image from Blob too
-  if (removed.image && removed.image.includes("blob.vercel-storage.com")) {
-    try {
-      await del(removed.image);
-    } catch (err) {
-      console.error("Failed to delete blob:", err);
-      // Don't fail the whole request if the image is already gone
-    }
+  // Record the name as deleted (hides hardcoded cards too)
+  if (!deleted.some(n => n.toLowerCase() === lowerTitle)) {
+    deleted.push(title);
+    await kv.set("deleted", deleted);
   }
 
   return NextResponse.json({ ok: true, removed });
