@@ -211,8 +211,9 @@
     center,
     calc(var(--pointer-x) * 0.01) calc(var(--pointer-y) * 0.01);
   background-blend-mode: color-dodge;
-  filter: brightness(calc(2 - var(--pointer-from-center))) contrast(calc(var(--pointer-from-center) + 2))
-    saturate(calc(0.5 + var(--pointer-from-center)));
+  filter: brightness(calc(1.2 - var(--pointer-from-center) * 0.4))
+          contrast(calc(1 + var(--pointer-from-center) * 0.5))
+          saturate(calc(0.5 + var(--pointer-from-center) * 0.4));
   mix-blend-mode: luminosity;
 }
 
