@@ -39,5 +39,12 @@ export async function POST(req: NextRequest) {
   cards.push(newCard);
   await kv.set("cards", cards);
 
+  // ⭐ Remove this title from the deleted list (if it was there)
+  const deleted: string[] = (await kv.get("deleted")) || [];
+  const filtered = deleted.filter(n => n.toLowerCase() !== title.toLowerCase());
+  if (filtered.length !== deleted.length) {
+    await kv.set("deleted", filtered);
+  }
+
   return NextResponse.json({ ok: true });
 }
