@@ -976,7 +976,8 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
                 avatarUrl={activeEmote.image}
                 showUserInfo={false}
                 enableTilt={false}
-                enableMobileTilt={false}
+                enableMobileTilt={true}
+                mobileTiltSensitivity={10}
                 behindGlowColor={activeEmote.glow || DEFAULT_GLOW}
                 iconUrl={null}
                 behindGlowEnabled
