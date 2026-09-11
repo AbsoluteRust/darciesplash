@@ -25,11 +25,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing title" }, { status: 400 });
   }
 
+  const lowerTitle = title.toLowerCase();
   const cards: Card[] = (await kv.get("cards")) || [];
-  const index = cards.findIndex(c => c.name.toLowerCase() === title.toLowerCase());
+  const index = cards.findIndex(c => c.name.toLowerCase() === lowerTitle);
 
   if (index === -1) {
-    return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    // Not in KV — likely a hardcoded card. Create a KV override entry with
+    // only the fields the user changed. The site merges KV over hardcoded,
+    // so any empty fields fall back to the hardcoded values.
+    const override: Partial<Card> & { name: string } = {
+      name: new_title || title,
+    };
+    if (new_type) override.type = new_type;
+    if (new_collection) override.collection = new_collection;
+    if (new_about) override.description = new_about;
+    if (new_image_url) override.image = new_image_url;
+
+    cards.push(override as Card);
+    await kv.set("cards", cards);
+
+    return NextResponse.json({ ok: true, card: override });
   }
 
   const oldImage = cards[index].image;
@@ -45,7 +60,6 @@ export async function POST(req: NextRequest) {
 
   await kv.set("cards", cards);
 
-  // Best-effort: if the image was replaced, delete the old blob
   if (
     new_image_url &&
     oldImage &&
