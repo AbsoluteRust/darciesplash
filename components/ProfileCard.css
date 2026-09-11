@@ -709,3 +709,40 @@
   object-fit: cover;
   object-position: center; /* adjust if you want to focus on faces */
 }
+
+@media (hover: none) {
+  /* Parent rainbow layer — reduce the blend intensity */
+  .pc-card:hover .pc-shine,
+  .pc-card.active .pc-shine {
+    filter: brightness(0.5) contrast(1.1) saturate(0.35);
+  }
+
+  /* The "white spot + rainbow" layer — the main blowout source */
+  .pc-shine::before {
+    filter: brightness(calc(0.7 - var(--pointer-from-center) * 0.3))
+            contrast(calc(0.9 + var(--pointer-from-center) * 0.3))
+            saturate(calc(0.4 + var(--pointer-from-center) * 0.2));
+  }
+
+  /* Fade the lit layers instead of full opacity on tap */
+  .pc-card:hover .pc-shine::before,
+  .pc-card.active .pc-shine::before {
+    opacity: 0.5;
+  }
+
+  .pc-card:hover .pc-shine::after,
+  .pc-card.active .pc-shine::after {
+    opacity: 0.4;
+  }
+
+  /* Difference-blend layer: reduce contrast so it doesn't invert to white */
+  .pc-shine::after {
+    filter: brightness(0.5) contrast(1.1);
+  }
+
+  /* Glare overlay: reduce strength */
+  .pc-glare {
+    filter: brightness(0.5) contrast(1.0);
+    opacity: 0.6;
+  }
+}
