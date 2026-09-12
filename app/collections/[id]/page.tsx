@@ -1,7 +1,7 @@
 'use client';
 
 import "./page.css";
-import { use, useState, useEffect, useMemo } from "react";
+import { use, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Iridescence from "../../../components/Iridescence";
 import ProfileCard from "@/components/ProfileCard";
 import { ITEMS } from "@/sections/AccordionGallery";
@@ -24,7 +24,6 @@ type Card = {
 
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
-// Fallback glow per collection (used when a KV card has no explicit glow field)
 const COLLECTION_GLOW: Record<string, string> = {
   celestial: "rgba(125, 190, 255, 0.67)",
   madolche: "rgba(255, 180, 220, 0.67)",
@@ -35,7 +34,6 @@ const COLLECTION_GLOW: Record<string, string> = {
 
 const DEFAULT_GLOW = "rgba(125, 190, 255, 0.67)";
 
-// Normalize type strings so "emote" / "Emote" / "EMOTE" all render the same
 const TYPE_DISPLAY: Record<string, string> = {
   emote: "Emote",
   splash: "Splash Art",
@@ -53,17 +51,21 @@ function normalizeType(t: string | undefined): string {
   return TYPE_DISPLAY[t] || t;
 }
 
+const WHEEL_THRESHOLD = 50; // accumulated deltaY before advancing a card
+
 export default function CollectionsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const rawParams = use(params);
   const id = rawParams.id;
 
   const [activeEmote, setActiveEmote] = useState<Card | null>(null);
+  const [modalCollection, setModalCollection] = useState<string | null>(null);
+  const [modalIndex, setModalIndex] = useState<number>(-1);
   const [nudge, setNudge] = useState(0);
   const [kvCards, setKvCards] = useState<Card[]>([]);
   const [deletedNames, setDeletedNames] = useState<string[]>([]);
 
-  // ---- Load KV data on mount ----
+  // ---- Load KV data ----
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -86,33 +88,38 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
     return () => { cancelled = true; };
   }, []);
 
-  // ---- Filter + normalize for the current collection ----
-  const mergedCards = useMemo(() => {
+  // ---- Cards grouped by collection ----
+  const allCardsByCollection = useMemo(() => {
     const deletedSet = new Set(deletedNames.map(n => n.toLowerCase()));
-    const collectionGlow = COLLECTION_GLOW[id] || DEFAULT_GLOW;
+    const map: Record<string, Card[]> = {};
+    for (const coll of COLLECTION_ORDER) {
+      const collGlow = COLLECTION_GLOW[coll] || DEFAULT_GLOW;
+      map[coll] = kvCards
+        .filter(c => c.collection === coll)
+        .filter(c => !deletedSet.has(c.name.toLowerCase()))
+        .map(c => ({
+          ...c,
+          type: normalizeType(c.type),
+          glow: c.glow || collGlow,
+        }));
+    }
+    return map;
+  }, [kvCards, deletedNames]);
 
-    return kvCards
-      .filter(c => c.collection === id)
-      .filter(c => !deletedSet.has(c.name.toLowerCase()))
-      .map(c => ({
-        ...c,
-        type: normalizeType(c.type),
-        glow: c.glow || collectionGlow,
-      }));
-  }, [id, kvCards, deletedNames]);
+  const mergedCards = allCardsByCollection[id] || [];
 
   const art = ITEMS.find(item => item.slug === id);
   const currentIndex = COLLECTION_ORDER.indexOf(id);
   const nextSlug = COLLECTION_ORDER[currentIndex + 1];
   const prevSlug = COLLECTION_ORDER[currentIndex - 1];
 
-  // ---- Overscroll → next/prev collection ----
+  // ---- Page scroll → next/prev collection (only when modal closed) ----
   useEffect(() => {
+    if (activeEmote) return;
     if (!nextSlug && !prevSlug) return;
     let attempts = 0;
 
     const handleWheel = (e: WheelEvent) => {
-      if (activeEmote) return;
       const y = window.scrollY;
       const scrollPos = y + window.innerHeight;
       const pageHeight = document.body.scrollHeight;
@@ -137,24 +144,101 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
 
     window.addEventListener("wheel", handleWheel);
     return () => window.removeEventListener("wheel", handleWheel);
-  }, [nextSlug, prevSlug, router, activeEmote]);
+  }, [activeEmote, nextSlug, prevSlug, router]);
+
+  // ---- Refs so the modal wheel handler reads fresh state without re-attaching ----
+  const activeEmoteRef = useRef(activeEmote);
+  const modalCollectionRef = useRef(modalCollection);
+  const modalIndexRef = useRef(modalIndex);
+  const allCardsByCollectionRef = useRef(allCardsByCollection);
+
+  useEffect(() => { activeEmoteRef.current = activeEmote; }, [activeEmote]);
+  useEffect(() => { modalCollectionRef.current = modalCollection; }, [modalCollection]);
+  useEffect(() => { modalIndexRef.current = modalIndex; }, [modalIndex]);
+  useEffect(() => { allCardsByCollectionRef.current = allCardsByCollection; }, [allCardsByCollection]);
+
+  // ---- Modal scroll → navigate between cards, cross collection at boundaries ----
+  useEffect(() => {
+    let accum = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      const ae = activeEmoteRef.current;
+      const mc = modalCollectionRef.current;
+      const mi = modalIndexRef.current;
+      const byColl = allCardsByCollectionRef.current;
+
+      if (!ae || !mc) return;
+
+      e.preventDefault();
+      accum += e.deltaY;
+      if (Math.abs(accum) < WHEEL_THRESHOLD) return;
+
+      const direction = accum > 0 ? 1 : -1;
+      accum = 0;
+
+      const cards = byColl[mc] || [];
+      if (cards.length === 0) return;
+
+      let nextIdx = mi + direction;
+      let nextColl = mc;
+
+      if (nextIdx >= cards.length) {
+        // Past the last card → jump to first card of next collection
+        const cur = COLLECTION_ORDER.indexOf(mc);
+        const nxt = COLLECTION_ORDER[cur + 1];
+        if (!nxt) return;
+        const nxtCards = byColl[nxt] || [];
+        if (nxtCards.length === 0) return;
+        nextColl = nxt;
+        nextIdx = 0;
+      } else if (nextIdx < 0) {
+        // Before the first card → jump to last card of previous collection
+        const cur = COLLECTION_ORDER.indexOf(mc);
+        const prv = COLLECTION_ORDER[cur - 1];
+        if (!prv) return;
+        const prvCards = byColl[prv] || [];
+        if (prvCards.length === 0) return;
+        nextColl = prv;
+        nextIdx = prvCards.length - 1;
+      }
+
+      const newCards = byColl[nextColl] || [];
+      const newCard = newCards[nextIdx];
+      if (!newCard) return;
+
+      setModalCollection(nextColl);
+      setModalIndex(nextIdx);
+      setActiveEmote(newCard);
+    };
+
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    return () => window.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  // ---- Close modal + sync URL ----
+  const closeModal = useCallback(() => {
+    const coll = modalCollection || id;
+    setActiveEmote(null);
+    setModalCollection(null);
+    setModalIndex(-1);
+    router.push(`/collections/${coll}`, { scroll: false });
+  }, [modalCollection, id, router]);
 
   // ---- ESC navigation ----
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (activeEmote) {
-        setActiveEmote(null);
-        router.push(`/collections/${id}`, { scroll: false });
+        closeModal();
         return;
       }
       router.push("/");
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [activeEmote, router, id]);
+  }, [activeEmote, closeModal, router]);
 
-  // ---- Freeze page when modal is open ----
+  // ---- Freeze page when modal open ----
   useEffect(() => {
     if (!activeEmote) return;
     const y = window.scrollY;
@@ -186,13 +270,27 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     if (!cardParam) return;
+    if (activeEmote) return;
+
     const match = mergedCards.find(
       p => p.name.toLowerCase().replace(/\s+/g, "-") === cardParam.toLowerCase()
     );
     if (match && match.name.toLowerCase() !== "banana") {
+      const idx = mergedCards.findIndex(c => c.name === match.name);
       setActiveEmote(match);
+      setModalCollection(id);
+      setModalIndex(idx);
     }
-  }, [cardParam, mergedCards]);
+  }, [cardParam, mergedCards, id, activeEmote]);
+
+  // ---- Card click opens modal ----
+  const openCard = useCallback((piece: Card, index: number) => {
+    setActiveEmote(piece);
+    setModalCollection(id);
+    setModalIndex(index);
+    const slug = piece.name.toLowerCase().replace(/\s+/g, "-");
+    router.push(`?card=${slug}`, { scroll: false });
+  }, [id, router]);
 
   if (!art) return null;
 
@@ -221,13 +319,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {activeEmote && (
-        <div
-          className="emote-modal-overlay"
-          onClick={() => {
-            setActiveEmote(null);
-            router.push(`/collections/${id}`, { scroll: false });
-          }}
-        >
+        <div className="emote-modal-overlay" onClick={closeModal}>
           <div className="emote-modal emote-layout" onClick={e => e.stopPropagation()}>
             {activeEmote.type === "Emote" && (
               <ProfileCard
@@ -246,7 +338,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
                 behindGlowEnabled
                 innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
                 isModal={true}
-                onContactClick={() => setActiveEmote(null)}
+                onContactClick={closeModal}
               />
             )}
 
@@ -289,9 +381,9 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
               : "transform 80ms ease-out",
           }}
         >
-          {mergedCards.map(piece => (
+          {mergedCards.map((piece, idx) => (
             <ProfileCard
-              key={`${piece.name}|${piece.collection}`}
+              key={`${piece.name}|${idx}`}
               name={piece.name}
               title={piece.type}
               handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
@@ -305,11 +397,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
               iconUrl={null}
               behindGlowEnabled
               innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-              onContactClick={() => {
-                const slugified = piece.name.toLowerCase().replace(/\s+/g, "-");
-                router.push(`?card=${slugified}`, { scroll: false });
-                setActiveEmote(piece);
-              }}
+              onContactClick={() => openCard(piece, idx)}
             />
           ))}
         </div>
