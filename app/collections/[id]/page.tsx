@@ -22,7 +22,7 @@ type Card = {
   collection?: string;
 };
 
-const COLLECTION_ORDER = ["darcie", "celestial", "madolche", "tobi", "halo"];
+const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
 // Fallback glow per collection (used when a KV card has no explicit glow field)
 const COLLECTION_GLOW: Record<string, string> = {
