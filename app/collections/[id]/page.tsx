@@ -202,7 +202,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
 
     window.addEventListener("wheel", handleWheel);
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
-    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
     window.addEventListener("touchend", handleTouchEnd, { passive: true });
     window.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
