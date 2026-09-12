@@ -119,6 +119,8 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     if (activeEmote) return;
     if (!nextSlug && !prevSlug) return;
+
+    // --- Desktop: wheel ---
     let attempts = 0;
 
     const handleWheel = (e: WheelEvent) => {
@@ -144,8 +146,73 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
       setNudge(0);
     };
 
+    // --- Mobile: touch ---
+    let touchActive = false;
+    let touchStartY = 0;
+    let overscroll = 0;
+    const OVERSCROLL_TRIGGER = 220;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchActive = true;
+      touchStartY = e.touches[0].clientY;
+      overscroll = 0;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!touchActive) return;
+
+      const y = window.scrollY;
+      const scrollPos = y + window.innerHeight;
+      const pageHeight = document.body.scrollHeight;
+      const atTop = y <= 2;
+      const atBottom = scrollPos >= pageHeight - 2;
+
+      const currentY = e.touches[0].clientY;
+      const delta = touchStartY - currentY; // positive = finger moved up
+
+      if (atBottom && delta > 0 && nextSlug) {
+        overscroll = delta;
+        setNudge(-Math.min(overscroll / 8, 35));
+        if (overscroll > OVERSCROLL_TRIGGER) {
+          touchActive = false;
+          router.push(`/collections/${nextSlug}`);
+        }
+        return;
+      }
+
+      if (atTop && delta < 0 && prevSlug) {
+        overscroll = -delta;
+        setNudge(Math.min(overscroll / 8, 35));
+        if (overscroll > OVERSCROLL_TRIGGER) {
+          touchActive = false;
+          router.push(`/collections/${prevSlug}`);
+        }
+        return;
+      }
+
+      overscroll = 0;
+      setNudge(0);
+    };
+
+    const handleTouchEnd = () => {
+      touchActive = false;
+      overscroll = 0;
+      setNudge(0);
+    };
+
     window.addEventListener("wheel", handleWheel);
-    return () => window.removeEventListener("wheel", handleWheel);
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    window.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, [activeEmote, nextSlug, prevSlug, router]);
 
   // ---- Refs so the modal handler reads fresh state without re-attaching ----
