@@ -10,7 +10,7 @@ const DEFAULT_ITEMS = [
   { image: '/artpieces/tobi/tobiDrip.png', label: 'The Tobi Collection', slug: "tobi", link: "#" },
   { image: "/artpieces/magiBoom.png", label: "The Madolche Collection", slug: "madolche", link: "#" },
   { image: "/artpieces/lilyStargazer.png", label: "The Celestial Collection", slug: "celestial", link: "#" },
-  { image: '/artpieces/allComms/haloCollection.png', label: 'The Halo Collection', slug: "halo", link: "#" },
+  { image: '/artpieces/allcomms/haloCollection.png', label: 'The Halo Collection', slug: "halo", link: "#" },
 ];
 
 
