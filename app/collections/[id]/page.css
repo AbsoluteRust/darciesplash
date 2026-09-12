@@ -1,10 +1,13 @@
+html, body {
+  overscroll-behavior-y: contain;
+}
+
 /* Keep your existing scroll-behavior if you like */
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
   height: auto;
   min-height: 100%;
-  overscroll-behavior-y: contain;
 }
 
 /* Chrome / Safari: hide scrollbar visuals */
