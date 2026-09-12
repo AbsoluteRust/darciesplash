@@ -51,7 +51,9 @@ function normalizeType(t: string | undefined): string {
   return TYPE_DISPLAY[t] || t;
 }
 
-const WHEEL_THRESHOLD = 50; // accumulated deltaY before advancing a card
+const WHEEL_THRESHOLD = 50;
+const TOUCH_THRESHOLD = 60;
+const TOUCH_SCROLL_TOLERANCE = 8;
 
 export default function CollectionsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -88,7 +90,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
     return () => { cancelled = true; };
   }, []);
 
-  // ---- Cards grouped by collection ----
+  // ---- Group cards by collection ----
   const allCardsByCollection = useMemo(() => {
     const deletedSet = new Set(deletedNames.map(n => n.toLowerCase()));
     const map: Record<string, Card[]> = {};
@@ -146,7 +148,7 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
     return () => window.removeEventListener("wheel", handleWheel);
   }, [activeEmote, nextSlug, prevSlug, router]);
 
-  // ---- Refs so the modal wheel handler reads fresh state without re-attaching ----
+  // ---- Refs so the modal handler reads fresh state without re-attaching ----
   const activeEmoteRef = useRef(activeEmote);
   const modalCollectionRef = useRef(modalCollection);
   const modalIndexRef = useRef(modalIndex);
@@ -157,62 +159,111 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
   useEffect(() => { modalIndexRef.current = modalIndex; }, [modalIndex]);
   useEffect(() => { allCardsByCollectionRef.current = allCardsByCollection; }, [allCardsByCollection]);
 
-  // ---- Modal scroll → navigate between cards, cross collection at boundaries ----
+  // ---- The one true "navigate to next/prev card" function ----
+  const navigateModalCard = useCallback((direction: 1 | -1) => {
+    const ae = activeEmoteRef.current;
+    const mc = modalCollectionRef.current;
+    const mi = modalIndexRef.current;
+    const byColl = allCardsByCollectionRef.current;
+
+    if (!ae || !mc) return;
+
+    const cards = byColl[mc] || [];
+    if (cards.length === 0) return;
+
+    let nextIdx = mi + direction;
+    let nextColl = mc;
+
+    if (nextIdx >= cards.length) {
+      const cur = COLLECTION_ORDER.indexOf(mc);
+      const nxt = COLLECTION_ORDER[cur + 1];
+      if (!nxt) return;
+      const nxtCards = byColl[nxt] || [];
+      if (nxtCards.length === 0) return;
+      nextColl = nxt;
+      nextIdx = 0;
+    } else if (nextIdx < 0) {
+      const cur = COLLECTION_ORDER.indexOf(mc);
+      const prv = COLLECTION_ORDER[cur - 1];
+      if (!prv) return;
+      const prvCards = byColl[prv] || [];
+      if (prvCards.length === 0) return;
+      nextColl = prv;
+      nextIdx = prvCards.length - 1;
+    }
+
+    const newCards = byColl[nextColl] || [];
+    const newCard = newCards[nextIdx];
+    if (!newCard) return;
+
+    setModalCollection(nextColl);
+    setModalIndex(nextIdx);
+    setActiveEmote(newCard);
+
+    // Always reflect the current card in the URL
+    const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
+    router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
+  }, [router]);
+
+  const navigateModalCardRef = useRef(navigateModalCard);
+  useEffect(() => { navigateModalCardRef.current = navigateModalCard; }, [navigateModalCard]);
+
+  // ---- Modal scroll (wheel + touch) → navigate between cards ----
   useEffect(() => {
-    let accum = 0;
+    let wheelAccum = 0;
+    let touchActive = false;
+    let touchStartY = 0;
+    let touchStartScroll = 0;
+
+    const isModalOpen = () => !!activeEmoteRef.current && !!modalCollectionRef.current;
 
     const handleWheel = (e: WheelEvent) => {
-      const ae = activeEmoteRef.current;
-      const mc = modalCollectionRef.current;
-      const mi = modalIndexRef.current;
-      const byColl = allCardsByCollectionRef.current;
-
-      if (!ae || !mc) return;
-
+      if (!isModalOpen()) return;
       e.preventDefault();
-      accum += e.deltaY;
-      if (Math.abs(accum) < WHEEL_THRESHOLD) return;
+      wheelAccum += e.deltaY;
+      if (Math.abs(wheelAccum) < WHEEL_THRESHOLD) return;
+      const direction: 1 | -1 = wheelAccum > 0 ? 1 : -1;
+      wheelAccum = 0;
+      navigateModalCardRef.current(direction);
+    };
 
-      const direction = accum > 0 ? 1 : -1;
-      accum = 0;
-
-      const cards = byColl[mc] || [];
-      if (cards.length === 0) return;
-
-      let nextIdx = mi + direction;
-      let nextColl = mc;
-
-      if (nextIdx >= cards.length) {
-        // Past the last card → jump to first card of next collection
-        const cur = COLLECTION_ORDER.indexOf(mc);
-        const nxt = COLLECTION_ORDER[cur + 1];
-        if (!nxt) return;
-        const nxtCards = byColl[nxt] || [];
-        if (nxtCards.length === 0) return;
-        nextColl = nxt;
-        nextIdx = 0;
-      } else if (nextIdx < 0) {
-        // Before the first card → jump to last card of previous collection
-        const cur = COLLECTION_ORDER.indexOf(mc);
-        const prv = COLLECTION_ORDER[cur - 1];
-        if (!prv) return;
-        const prvCards = byColl[prv] || [];
-        if (prvCards.length === 0) return;
-        nextColl = prv;
-        nextIdx = prvCards.length - 1;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (!isModalOpen()) return;
+      const target = e.target as HTMLElement | null;
+      // Let the user scroll the info box content without hijacking
+      if (target?.closest(".emote-info-boxes")) {
+        touchActive = false;
+        return;
       }
+      touchActive = true;
+      touchStartY = e.touches[0].clientY;
+      const overlay = document.querySelector(".emote-modal-overlay") as HTMLElement | null;
+      touchStartScroll = overlay ? overlay.scrollTop : 0;
+    };
 
-      const newCards = byColl[nextColl] || [];
-      const newCard = newCards[nextIdx];
-      if (!newCard) return;
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchActive) return;
+      touchActive = false;
 
-      setModalCollection(nextColl);
-      setModalIndex(nextIdx);
-      setActiveEmote(newCard);
+      const overlay = document.querySelector(".emote-modal-overlay") as HTMLElement | null;
+      const scrollAfter = overlay ? overlay.scrollTop : 0;
+      // If the modal itself scrolled during the gesture, treat as content-scroll
+      if (Math.abs(scrollAfter - touchStartScroll) > TOUCH_SCROLL_TOLERANCE) return;
+
+      const delta = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(delta) < TOUCH_THRESHOLD) return;
+      const direction: 1 | -1 = delta > 0 ? 1 : -1;
+      navigateModalCardRef.current(direction);
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
-    return () => window.removeEventListener("wheel", handleWheel);
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
   }, []);
 
   // ---- Close modal + sync URL ----
@@ -221,10 +272,10 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
     setActiveEmote(null);
     setModalCollection(null);
     setModalIndex(-1);
-    router.push(`/collections/${coll}`, { scroll: false });
+    router.replace(`/collections/${coll}`, { scroll: false });
   }, [modalCollection, id, router]);
 
-  // ---- ESC navigation ----
+  // ---- ESC ----
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -264,32 +315,37 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
     };
   }, [activeEmote]);
 
-  // ---- Deep link via ?card= ----
+  // ---- Deep link via ?card= (initial only, ignored when modal already open) ----
   const searchParams = useSearchParams();
   const cardParam = searchParams.get("card");
 
   useEffect(() => {
     if (!cardParam) return;
-    if (activeEmote) return;
+    if (activeEmoteRef.current) return;
 
-    const match = mergedCards.find(
-      p => p.name.toLowerCase().replace(/\s+/g, "-") === cardParam.toLowerCase()
-    );
-    if (match && match.name.toLowerCase() !== "banana") {
-      const idx = mergedCards.findIndex(c => c.name === match.name);
-      setActiveEmote(match);
-      setModalCollection(id);
-      setModalIndex(idx);
+    for (const coll of COLLECTION_ORDER) {
+      const cards = allCardsByCollection[coll] || [];
+      const idx = cards.findIndex(
+        c => c.name.toLowerCase().replace(/\s+/g, "-") === cardParam.toLowerCase()
+      );
+      if (idx >= 0) {
+        const match = cards[idx];
+        if (match.name.toLowerCase() === "banana") return;
+        setActiveEmote(match);
+        setModalCollection(coll);
+        setModalIndex(idx);
+        return;
+      }
     }
-  }, [cardParam, mergedCards, id, activeEmote]);
+  }, [cardParam, allCardsByCollection]);
 
-  // ---- Card click opens modal ----
+  // ---- Card click ----
   const openCard = useCallback((piece: Card, index: number) => {
     setActiveEmote(piece);
     setModalCollection(id);
     setModalIndex(index);
     const slug = piece.name.toLowerCase().replace(/\s+/g, "-");
-    router.push(`?card=${slug}`, { scroll: false });
+    router.push(`/collections/${id}?card=${slug}`, { scroll: false });
   }, [id, router]);
 
   if (!art) return null;
