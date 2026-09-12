@@ -50,6 +50,28 @@ function normalizeType(t: string | undefined): string {
   if (!t) return "Emote";
   return TYPE_DISPLAY[t] || t;
 }
+// Normalize a string for loose matching (lowercase, strip non-alphanumeric)
+function normalizeForMatch(s: string): string {
+  return (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+// Given a card name and the emote totals map, find the best emote match
+function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): number {
+  const cardNorm = normalizeForMatch(cardName);
+  if (!cardNorm) return 0;
+
+  let best = 0;
+  for (const [emoteName, count] of Object.entries(emoteTotals)) {
+    const emoteNorm = normalizeForMatch(emoteName);
+    // Exact normalized match, OR the emote name ends with the card name
+    // (e.g. "lilyBanana" ends with "banana" → matches card "Banana")
+    if (emoteNorm === cardNorm || emoteNorm.endsWith(cardNorm)) {
+      const n = Number(count);
+      if (n > best) best = n;
+    }
+  }
+  return best;
+}
 
 const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
@@ -66,21 +88,25 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
   const [nudge, setNudge] = useState(0);
   const [kvCards, setKvCards] = useState<Card[]>([]);
   const [deletedNames, setDeletedNames] = useState<string[]>([]);
+  const [emoteTotals, setEmoteTotals] = useState<Record<string, number>>({});
 
   // ---- Load KV data ----
   useEffect(() => {
     let cancelled = false;
-    async function load() {
+        async function load() {
       try {
-        const [cardsRes, deletedRes] = await Promise.all([
+        const [cardsRes, deletedRes, emotesRes] = await Promise.all([
           fetch("/api/cards/list", { cache: "no-store" }),
           fetch("/api/cards/deleted", { cache: "no-store" }),
+          fetch("/api/emotes/totals", { cache: "no-store" }),
         ]);
         const cards = cardsRes.ok ? await cardsRes.json() : [];
         const deleted = deletedRes.ok ? await deletedRes.json() : [];
+        const emoteTotals = emotesRes.ok ? await emotesRes.json() : {};
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
+          setEmoteTotals(emoteTotals);
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -508,7 +534,14 @@ export default function CollectionsPage({ params }: { params: Promise<{ id: stri
             <ProfileCard
               key={`${piece.name}|${idx}`}
               name={piece.name}
-              title={piece.type}
+              title={
+                piece.type === "Emote"
+                  ? (() => {
+                      const n = findEmoteCount(piece.name, emoteTotals);
+                      return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
+                    })()
+                  : piece.type
+              }
               handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
               status="Online"
               contactText="View"
