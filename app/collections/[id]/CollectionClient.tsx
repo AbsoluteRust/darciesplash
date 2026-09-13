@@ -1,7 +1,7 @@
 'use client';
 
 import "./page.css";
-import { use, useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { use, useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import Iridescence from "../../../components/Iridescence";
 import ProfileCard from "@/components/ProfileCard";
 import LazyMount from "@/components/LazyMount";
@@ -87,6 +87,42 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [kvCards, setKvCards] = useState<Card[]>([]);
   const [deletedNames, setDeletedNames] = useState<string[]>([]);
   const [emoteTotals, setEmoteTotals] = useState<Record<string, number>>({});
+  const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
+  const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
+  const [hintProgress, setHintProgress] = useState(0);
+
+  // ---- Transition helper ----
+  const triggerTransition = useCallback((direction: "next" | "prev", slug: string) => {
+    if (leaving) return;
+    setLeaving(direction);
+    setHintProgress(0);
+    setHintDirection(null);
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("collection-transition-entry", direction);
+    }
+    setTimeout(() => {
+      router.push(`/collections/${slug}`);
+    }, 300);
+  }, [leaving, router]);
+
+  const triggerTransitionRef = useRef(triggerTransition);
+  useEffect(() => { triggerTransitionRef.current = triggerTransition; }, [triggerTransition]);
+
+  // ---- Entry animation when arriving from a collection transition ----
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const dir = sessionStorage.getItem("collection-transition-entry");
+    if (dir !== "next" && dir !== "prev") return;
+    sessionStorage.removeItem("collection-transition-entry");
+
+    const html = document.documentElement;
+    html.classList.add(`entering-${dir}`);
+    const t = setTimeout(() => html.classList.remove(`entering-${dir}`), 420);
+    return () => {
+      clearTimeout(t);
+      html.classList.remove(`entering-${dir}`);
+    };
+  }, []);
 
   // ---- Load KV data ----
   useEffect(() => {
@@ -155,18 +191,26 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
       if (atBottom && e.deltaY > 0 && nextSlug) {
         attempts++;
+        const progress = Math.min(attempts / 12, 1);
         setNudge(-Math.min(Math.sqrt(attempts) * 10, 35));
-        if (attempts >= 12) router.push(`/collections/${nextSlug}`);
+        setHintDirection("next");
+        setHintProgress(progress);
+        if (attempts >= 12) triggerTransitionRef.current("next", nextSlug);
         return;
       }
       if (atTop && e.deltaY < 0 && prevSlug) {
         attempts++;
+        const progress = Math.min(attempts / 12, 1);
         setNudge(Math.min(Math.sqrt(attempts) * 10, 35));
-        if (attempts >= 12) router.push(`/collections/${prevSlug}`);
+        setHintDirection("prev");
+        setHintProgress(progress);
+        if (attempts >= 12) triggerTransitionRef.current("prev", prevSlug);
         return;
       }
       attempts = 0;
       setNudge(0);
+      setHintProgress(0);
+      setHintDirection(null);
     };
 
     let touchActive = false;
@@ -198,32 +242,42 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
       if (atBottom && delta > 0 && nextSlug) {
         overscroll = delta;
+        const progress = Math.min(overscroll / OVERSCROLL_TRIGGER, 1);
         setNudge(-Math.min(overscroll / 8, 35));
+        setHintDirection("next");
+        setHintProgress(progress);
         if (overscroll > OVERSCROLL_TRIGGER) {
           touchActive = false;
-          router.push(`/collections/${nextSlug}`);
+          triggerTransitionRef.current("next", nextSlug);
         }
         return;
       }
 
       if (atTop && delta < 0 && prevSlug) {
         overscroll = -delta;
+        const progress = Math.min(overscroll / OVERSCROLL_TRIGGER, 1);
         setNudge(Math.min(overscroll / 8, 35));
+        setHintDirection("prev");
+        setHintProgress(progress);
         if (overscroll > OVERSCROLL_TRIGGER) {
           touchActive = false;
-          router.push(`/collections/${prevSlug}`);
+          triggerTransitionRef.current("prev", prevSlug);
         }
         return;
       }
 
       overscroll = 0;
       setNudge(0);
+      setHintProgress(0);
+      setHintDirection(null);
     };
 
     const handleTouchEnd = () => {
       touchActive = false;
       overscroll = 0;
       setNudge(0);
+      setHintProgress(0);
+      setHintDirection(null);
     };
 
     window.addEventListener("wheel", handleWheel);
@@ -435,8 +489,11 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   if (!art) return null;
 
+  const nextLabel = nextSlug ? (ITEMS.find(i => i.slug === nextSlug)?.label ?? "Next Collection") : "";
+  const prevLabel = prevSlug ? (ITEMS.find(i => i.slug === prevSlug)?.label ?? "Previous Collection") : "";
+
   return (
-    <div className="collections-page">
+    <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
       <Link href="/" className="home-button">Esc</Link>
 
       {id === "celestial" && (
@@ -555,6 +612,24 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           ))}
         </div>
       </div>
+
+      {hintProgress > 0 && hintDirection && !leaving && (
+        <div
+          className={`collection-hint collection-hint--${hintDirection}`}
+          style={{
+            opacity: Math.min(hintProgress * 1.4, 1),
+            transform: `translateX(-50%) scale(${0.9 + hintProgress * 0.1})`,
+          }}
+        >
+          <span className="collection-hint__arrow">
+            {hintDirection === "next" ? "↓" : "↑"}
+          </span>
+          <span className="collection-hint__label">Continue scrolling</span>
+          <span className="collection-hint__title">
+            {hintDirection === "next" ? nextLabel : prevLabel}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
