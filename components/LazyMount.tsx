@@ -20,14 +20,19 @@ export default function LazyMount({
     const el = ref.current;
     if (!el) return;
 
-    // If IntersectionObserver isn't available (very old browsers), just show it
     if (typeof IntersectionObserver === 'undefined') {
       setVisible(true);
       return;
     }
 
     const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
+      ([entry]) => {
+        // Only react to becoming visible. Once mounted, stay mounted.
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();   // ⭐ stop observing once mounted
+        }
+      },
       { rootMargin, threshold: 0 }
     );
 
@@ -40,7 +45,6 @@ export default function LazyMount({
       ref={ref}
       className={className}
       style={{
-        // Reserve space so scroll position doesn't jump when cards mount
         minHeight: visible ? undefined : placeholderHeight,
       }}
     >
