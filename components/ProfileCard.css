@@ -746,3 +746,93 @@
     opacity: 0.6;
   }
 }
+.pc-card-wrapper--rarity-uncommon  { --rarity-color: #22c55e; }
+.pc-card-wrapper--rarity-rare      { --rarity-color: #3b82f6; }
+.pc-card-wrapper--rarity-epic      { --rarity-color: #a855f7; }
+.pc-card-wrapper--rarity-legendary { --rarity-color: #eab308; }
+.pc-card-wrapper--rarity-mythic    { --rarity-color: #ef4444; }
+
+
+/* ---- Rarity border + glow on the card shell ---- */
+
+.pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  border: 2px solid var(--rarity-color);
+  box-shadow:
+    0 0 22px var(--rarity-color),
+    inset 0 0 18px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Legendary & Mythic get a pulsing glow */
+.pc-card-wrapper--rarity-legendary .pc-card-shell::after,
+.pc-card-wrapper--rarity-mythic .pc-card-shell::after {
+  animation: rarityPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes rarityPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 22px var(--rarity-color),
+      inset 0 0 18px rgba(0, 0, 0, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 38px var(--rarity-color),
+      inset 0 0 18px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* ---- Rarity badge ---- */
+
+.pc-rarity-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--rarity-color, rgba(255, 255, 255, 0.2));
+  box-shadow: 0 0 12px var(--rarity-color, transparent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+  user-select: none;
+}
+
+.pc-rarity-badge__emoji {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* Badge colour per rarity (independent of the wrapper variable) */
+.pc-rarity-badge--uncommon  { --rarity-color: #22c55e; }
+.pc-rarity-badge--rare      { --rarity-color: #3b82f6; }
+.pc-rarity-badge--epic      { --rarity-color: #a855f7; }
+.pc-rarity-badge--legendary { --rarity-color: #eab308; }
+.pc-rarity-badge--mythic    { --rarity-color: #ef4444; }
+
+@media (max-width: 600px) {
+  .pc-rarity-badge {
+    top: 8px;
+    right: 8px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+  .pc-rarity-badge__emoji {
+    font-size: 11px;
+  }
+}
