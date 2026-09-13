@@ -457,12 +457,26 @@ html.entering-prev .collections-page {
 
 @media (max-width: 900px) {
   .emote-modal-overlay {
-    padding-bottom: 200px;
+    padding-bottom: 260px;
   }
 }
 
 @media (max-width: 600px) {
   .emote-modal-overlay {
     padding-bottom: 260px;
+  }
+}
+@media (max-width: 900px) {
+  .emote-modal-overlay::after {
+    content: "Tap outside to close";
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    user-select: none;
   }
 }
