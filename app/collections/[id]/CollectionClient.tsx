@@ -308,6 +308,52 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const modalIndexRef = useRef(modalIndex);
   const allCardsByCollectionRef = useRef(allCardsByCollection);
   const cardTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+    // ---- Card image preloading ----
+  const PRELOAD_RADIUS = 2;
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  const preloadCardImage = useCallback((url: string) => {
+    if (!url) return;
+    if (preloadedRef.current.has(url)) return;
+    preloadedRef.current.add(url);
+    const img = new Image();
+    img.src = url;
+  }, []);
+
+  const preloadAdjacent = useCallback((collId: string, idx: number) => {
+    const cards = allCardsByCollectionRef.current[collId] || [];
+    if (cards.length === 0) return;
+
+    // Current + radius on both sides, within this collection
+    for (let d = -PRELOAD_RADIUS; d <= PRELOAD_RADIUS; d++) {
+      const i = idx + d;
+      if (i >= 0 && i < cards.length) preloadCardImage(cards[i].image);
+    }
+
+    // Cross-boundary: near the last card, preload the first few of the next collection
+    if (idx >= cards.length - 1) {
+      const cur = COLLECTION_ORDER.indexOf(collId);
+      const nxt = COLLECTION_ORDER[cur + 1];
+      if (nxt) {
+        const nxtCards = allCardsByCollectionRef.current[nxt] || [];
+        for (let i = 0; i <= PRELOAD_RADIUS && i < nxtCards.length; i++) {
+          preloadCardImage(nxtCards[i].image);
+        }
+      }
+    }
+
+    // Cross-boundary: near the first card, preload the last few of the previous collection
+    if (idx <= 0) {
+      const cur = COLLECTION_ORDER.indexOf(collId);
+      const prv = COLLECTION_ORDER[cur - 1];
+      if (prv) {
+        const prvCards = allCardsByCollectionRef.current[prv] || [];
+        for (let d = 0; d <= PRELOAD_RADIUS && d < prvCards.length; d++) {
+          preloadCardImage(prvCards[prvCards.length - 1 - d].image);
+        }
+      }
+    }
+  }, [preloadCardImage]);
 
   useEffect(() => { activeEmoteRef.current = activeEmote; }, [activeEmote]);
   useEffect(() => { modalCollectionRef.current = modalCollection; }, [modalCollection]);
@@ -374,6 +420,9 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       setModalIndex(nextIdx);
       setActiveEmote(newCard);
 
+      // ⭐ Preload the ±2 cards around the new one, before the swap completes
+      preloadAdjacent(nextColl, nextIdx);
+
       const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
       router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
 
@@ -385,7 +434,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       cardTimeoutsRef.current.push(t2);
     }, CARD_EXIT_MS);
     cardTimeoutsRef.current.push(t1);
-  }, [router]);
+  }, [router, preloadAdjacent]);
 
   const navigateModalCardRef = useRef(navigateModalCard);
   useEffect(() => { navigateModalCardRef.current = navigateModalCard; }, [navigateModalCard]);
@@ -515,18 +564,20 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         setActiveEmote(match);
         setModalCollection(coll);
         setModalIndex(idx);
+        preloadAdjacent(coll, idx);
         return;
       }
     }
-  }, [cardParam, allCardsByCollection]);
+  }, [cardParam, allCardsByCollection, preloadAdjacent]);
 
   const openCard = useCallback((piece: Card, index: number) => {
     setActiveEmote(piece);
     setModalCollection(id);
     setModalIndex(index);
+    preloadAdjacent(id, index);
     const slug = piece.name.toLowerCase().replace(/\s+/g, "-");
     router.push(`/collections/${id}?card=${slug}`, { scroll: false });
-  }, [id, router]);
+  }, [id, router, preloadAdjacent]);
 
   if (!art) return null;
 
