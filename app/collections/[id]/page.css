@@ -452,3 +452,17 @@ html.entering-prev .collections-page {
     padding-right: 6px;
   }
 }
+
+/* ---- Mobile: big tap-to-close zone below the modal card ---- */
+
+@media (max-width: 900px) {
+  .emote-modal-overlay {
+    padding-bottom: 200px;
+  }
+}
+
+@media (max-width: 600px) {
+  .emote-modal-overlay {
+    padding-bottom: 260px;
+  }
+}
