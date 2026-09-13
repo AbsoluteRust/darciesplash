@@ -75,6 +75,9 @@ const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
 const TOUCH_SCROLL_TOLERANCE = 8;
 
+const CARD_EXIT_MS = 220;
+const CARD_ENTER_MS = 340;
+
 export default function CollectionClient({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const rawParams = use(params);
@@ -90,6 +93,10 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
+  const [cardTransition, setCardTransition] = useState<{
+    phase: "leaving" | "entering";
+    direction: "next" | "prev";
+  } | null>(null);
 
   // ---- Transition helper ----
   const triggerTransition = useCallback((direction: "next" | "prev", slug: string) => {
@@ -300,14 +307,27 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const modalCollectionRef = useRef(modalCollection);
   const modalIndexRef = useRef(modalIndex);
   const allCardsByCollectionRef = useRef(allCardsByCollection);
+  const cardTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => { activeEmoteRef.current = activeEmote; }, [activeEmote]);
   useEffect(() => { modalCollectionRef.current = modalCollection; }, [modalCollection]);
   useEffect(() => { modalIndexRef.current = modalIndex; }, [modalIndex]);
   useEffect(() => { allCardsByCollectionRef.current = allCardsByCollection; }, [allCardsByCollection]);
 
-  // ---- Modal navigation ----
+  // Clear pending card transition timeouts on unmount
+  useEffect(() => {
+    return () => {
+      cardTimeoutsRef.current.forEach(t => clearTimeout(t));
+      cardTimeoutsRef.current = [];
+    };
+  }, []);
+
+  // ---- Modal navigation (with slide transition) ----
   const navigateModalCard = useCallback((direction: 1 | -1) => {
+    // Cancel any in-flight transition
+    cardTimeoutsRef.current.forEach(t => clearTimeout(t));
+    cardTimeoutsRef.current = [];
+
     const ae = activeEmoteRef.current;
     const mc = modalCollectionRef.current;
     const mi = modalIndexRef.current;
@@ -343,12 +363,28 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     const newCard = newCards[nextIdx];
     if (!newCard) return;
 
-    setModalCollection(nextColl);
-    setModalIndex(nextIdx);
-    setActiveEmote(newCard);
+    const dirLabel: "next" | "prev" = direction > 0 ? "next" : "prev";
 
-    const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
-    router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
+    // Phase 1: leaving animation
+    setCardTransition({ phase: "leaving", direction: dirLabel });
+
+    // Phase 2: swap card, then entering animation
+    const t1 = setTimeout(() => {
+      setModalCollection(nextColl);
+      setModalIndex(nextIdx);
+      setActiveEmote(newCard);
+
+      const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
+      router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
+
+      setCardTransition({ phase: "entering", direction: dirLabel });
+
+      const t2 = setTimeout(() => {
+        setCardTransition(null);
+      }, CARD_ENTER_MS);
+      cardTimeoutsRef.current.push(t2);
+    }, CARD_EXIT_MS);
+    cardTimeoutsRef.current.push(t1);
   }, [router]);
 
   const navigateModalCardRef = useRef(navigateModalCard);
@@ -411,6 +447,11 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   }, []);
 
   const closeModal = useCallback(() => {
+    // Clear any in-flight card transition
+    cardTimeoutsRef.current.forEach(t => clearTimeout(t));
+    cardTimeoutsRef.current = [];
+    setCardTransition(null);
+
     const coll = modalCollection || id;
     setActiveEmote(null);
     setModalCollection(null);
@@ -492,6 +533,10 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const nextLabel = nextSlug ? (ITEMS.find(i => i.slug === nextSlug)?.label ?? "Next Collection") : "";
   const prevLabel = prevSlug ? (ITEMS.find(i => i.slug === prevSlug)?.label ?? "Previous Collection") : "";
 
+  const modalTransitionClass = cardTransition
+    ? ` card-${cardTransition.phase}-${cardTransition.direction}`
+    : "";
+
   return (
     <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
       <Link href="/" className="home-button">Esc</Link>
@@ -518,7 +563,10 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
       {activeEmote && (
         <div className="emote-modal-overlay" onClick={closeModal}>
-          <div className="emote-modal emote-layout" onClick={e => e.stopPropagation()}>
+          <div
+            className={`emote-modal emote-layout${modalTransitionClass}`}
+            onClick={e => e.stopPropagation()}
+          >
             {activeEmote.type === "Emote" && (
               <ProfileCard
                 key={activeEmote.name}
