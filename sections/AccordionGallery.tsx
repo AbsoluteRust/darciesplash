@@ -6,11 +6,11 @@ import './AccordionGallery.css';import { useRouter } from 'next/navigation';
 
 
 const DEFAULT_ITEMS = [
-  { image: '/artpieces/darcie/darCollection.png', label: 'The Darcie Collection', slug: "darcie", link: "#" },
-  { image: '/artpieces/tobi/tobiDrip.png', label: 'The Tobi Collection', slug: "tobi", link: "#" },
-  { image: "/artpieces/magiBoom.png", label: "The Madolche Collection", slug: "madolche", link: "#" },
-  { image: "/artpieces/lilyStargazer.png", label: "The Celestial Collection", slug: "celestial", link: "#" },
-  { image: '/artpieces/allcomms/haloCollection.png', label: 'The Halo Collection', slug: "halo", link: "#" },
+  { image: '/artpieces/darcie/darCollection.webp', label: 'The Darcie Collection', slug: "darcie", link: "#" },
+  { image: '/artpieces/tobi/tobiDrip.webp', label: 'The Tobi Collection', slug: "tobi", link: "#" },
+  { image: "/artpieces/magiBoom.webp", label: "The Madolche Collection", slug: "madolche", link: "#" },
+  { image: "/artpieces/lilyStargazer.webp", label: "The Celestial Collection", slug: "celestial", link: "#" },
+  { image: '/artpieces/allcomms/haloCollection.webp', label: 'The Halo Collection', slug: "halo", link: "#" },
 ];
 
 
