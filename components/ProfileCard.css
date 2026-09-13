@@ -728,38 +728,37 @@
 .pc-card-wrapper--rarity-legendary { --rarity-color: #eab308; }
 .pc-card-wrapper--rarity-mythic    { --rarity-color: #ef4444; }
 
-/* Border — sits on .pc-card so it tilts with the card */
+/* Rarity border + inner glow — both on .pc-card::after so they tilt with the card */
 .pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: var(--card-radius);
   border: 2px solid var(--rarity-color);
-  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 0 30px color-mix(in srgb, var(--rarity-color) 45%, transparent),
+    inset 0 0 12px rgba(0, 0, 0, 0.4);
   pointer-events: none;
   z-index: 10;
 }
 
-/* Outer glow — sits on .pc-card-shell (soft blur, doesn't need to tilt) */
-.pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card-shell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--card-radius);
-  box-shadow: 0 0 22px var(--rarity-color);
-  pointer-events: none;
-  z-index: 9;
+/* Legendary & Mythic pulse (inner glow only, tilts with the card) */
+.pc-card-wrapper--rarity-legendary .pc-card::after,
+.pc-card-wrapper--rarity-mythic .pc-card::after {
+  animation: rarityPulseInner 2.4s ease-in-out infinite;
 }
 
-/* Legendary & Mythic pulse */
-.pc-card-wrapper--rarity-legendary .pc-card-shell::after,
-.pc-card-wrapper--rarity-mythic .pc-card-shell::after {
-  animation: rarityPulse 2.4s ease-in-out infinite;
-}
-
-@keyframes rarityPulse {
-  0%, 100% { box-shadow: 0 0 22px var(--rarity-color); }
-  50%      { box-shadow: 0 0 38px var(--rarity-color); }
+@keyframes rarityPulseInner {
+  0%, 100% {
+    box-shadow:
+      inset 0 0 30px color-mix(in srgb, var(--rarity-color) 45%, transparent),
+      inset 0 0 12px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    box-shadow:
+      inset 0 0 50px color-mix(in srgb, var(--rarity-color) 70%, transparent),
+      inset 0 0 12px rgba(0, 0, 0, 0.4);
+  }
 }
 
 /* ---- Rarity badge ---- */
