@@ -34,7 +34,7 @@
   perspective: 500px;
   transform: translate3d(0, 0, 0.1px);
   position: relative;
-  touch-action: pan-y;   /* ⭐ allow vertical scroll, block horizontal pan */
+  touch-action: pan-y;
 }
 
 .pc-behind {
@@ -116,7 +116,6 @@
   animation: holo-bg 18s linear infinite;
   pointer-events: none;
 }
-
 
 .pc-shine,
 .pc-shine::after {
@@ -562,9 +561,7 @@
   }
 }
 
-
-  .pc-card.modal-mode .pc-avatar-content {
-	  
+.pc-card.modal-mode .pc-avatar-content {
   transform: none !important;
   mix-blend-mode: normal !important;
 }
@@ -572,7 +569,7 @@
 .emote-info-boxes {
   margin-top: 24px;
   display: flex;
-  flex-wrap: wrap;        /* ⭐ allows wrapping */
+  flex-wrap: wrap;
   gap: 20px;
   justify-content: center;
 }
@@ -588,7 +585,6 @@
   font-family: inherit;
   animation: fadeIn 0.25s ease;
 
-  /* ⭐ Match ProfileCard width */
   width: 100%;
   max-width: 750px;
 }
@@ -604,17 +600,6 @@
   }
 }
 
-
-@media (max-width: 900px) {
-  .emote-info-boxes {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .emote-info-box {
-    max-width: 100%;
-  }
-}
 .emote-link {
   color: #9ecbff;
   font-weight: 600;
@@ -632,14 +617,13 @@
   justify-content: flex-start;
 
   width: 100%;
-  max-width: 900px;   /* ⭐ modal width based on viewport width */
+  max-width: 900px;
 }
 
-
 .emote-layout .pc-card-wrapper {
-	max-width: 420px;
-  margin: 0 auto;          /* ⭐ centers the entire card */
-  display: block;          /* prevents grid stretching */
+  max-width: 420px;
+  margin: 0 auto;
+  display: block;
 }
 
 .art-layout {
@@ -647,13 +631,11 @@
   align-items: center;
   justify-content: center;
 
-  /* ⭐ This is the magic */
-  max-width: calc(100vw - 40px);      /* side padding */
-  max-height: calc(100vh - 260px);    /* top padding + space for info boxes */
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 260px);
 
-  margin: 20px auto 0 auto;           /* aesthetic top padding */
+  margin: 20px auto 0 auto;
 }
-
 
 .emote-modal-overlay {
   position: fixed;
@@ -665,7 +647,6 @@
   padding: 40px 0;
 }
 
-
 .full-wallpaper {
   width: 100%;
   height: auto;
@@ -673,7 +654,6 @@
   display: block;
   max-height: none;
 }
-
 
 .modal-content-row {
   display: flex;
@@ -684,8 +664,6 @@
   margin-bottom: 24px;
 }
 
-
-/* Square crop for wallpapers on the main page */
 .pc-card.is-wallpaper .pc-avatar-content .pc-avatar-crop {
   aspect-ratio: 1 / 1;
   overflow: hidden;
@@ -697,7 +675,7 @@
   object-fit: cover;
   object-position: 50% 27%;
 }
-/* Square crop for splash arts on the main page */
+
 .pc-card.is-splash .pc-avatar-content .pc-avatar-crop {
   aspect-ratio: 1 / 1;
   overflow: hidden;
@@ -707,24 +685,21 @@
   width: 100%;
   height: 72%;
   object-fit: cover;
-  object-position: center; /* adjust if you want to focus on faces */
+  object-position: center;
 }
 
 @media (hover: none) {
-  /* Parent rainbow layer — reduce the blend intensity */
   .pc-card:hover .pc-shine,
   .pc-card.active .pc-shine {
     filter: brightness(0.5) contrast(1.1) saturate(0.35);
   }
 
-  /* The "white spot + rainbow" layer — the main blowout source */
   .pc-shine::before {
     filter: brightness(calc(0.7 - var(--pointer-from-center) * 0.3))
             contrast(calc(0.9 + var(--pointer-from-center) * 0.3))
             saturate(calc(0.4 + var(--pointer-from-center) * 0.2));
   }
 
-  /* Fade the lit layers instead of full opacity on tap */
   .pc-card:hover .pc-shine::before,
   .pc-card.active .pc-shine::before {
     opacity: 0.5;
@@ -735,56 +710,56 @@
     opacity: 0.4;
   }
 
-  /* Difference-blend layer: reduce contrast so it doesn't invert to white */
   .pc-shine::after {
     filter: brightness(0.5) contrast(1.1);
   }
 
-  /* Glare overlay: reduce strength */
   .pc-glare {
     filter: brightness(0.5) contrast(1.0);
     opacity: 0.6;
   }
 }
+
+/* ---- Rarity treatments ---- */
+
 .pc-card-wrapper--rarity-uncommon  { --rarity-color: #22c55e; }
 .pc-card-wrapper--rarity-rare      { --rarity-color: #3b82f6; }
 .pc-card-wrapper--rarity-epic      { --rarity-color: #a855f7; }
 .pc-card-wrapper--rarity-legendary { --rarity-color: #eab308; }
 .pc-card-wrapper--rarity-mythic    { --rarity-color: #ef4444; }
 
-
-/* ---- Rarity border + glow on the card shell ---- */
-
-.pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card-shell::after {
+/* Border — sits on .pc-card so it tilts with the card */
+.pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: var(--card-radius);
   border: 2px solid var(--rarity-color);
-  box-shadow:
-    0 0 22px var(--rarity-color),
-    inset 0 0 18px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.35);
   pointer-events: none;
   z-index: 10;
 }
 
-/* Legendary & Mythic get a pulsing glow */
+/* Outer glow — sits on .pc-card-shell (soft blur, doesn't need to tilt) */
+.pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  box-shadow: 0 0 22px var(--rarity-color);
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* Legendary & Mythic pulse */
 .pc-card-wrapper--rarity-legendary .pc-card-shell::after,
 .pc-card-wrapper--rarity-mythic .pc-card-shell::after {
   animation: rarityPulse 2.4s ease-in-out infinite;
 }
 
 @keyframes rarityPulse {
-  0%, 100% {
-    box-shadow:
-      0 0 22px var(--rarity-color),
-      inset 0 0 18px rgba(0, 0, 0, 0.35);
-  }
-  50% {
-    box-shadow:
-      0 0 38px var(--rarity-color),
-      inset 0 0 18px rgba(0, 0, 0, 0.35);
-  }
+  0%, 100% { box-shadow: 0 0 22px var(--rarity-color); }
+  50%      { box-shadow: 0 0 38px var(--rarity-color); }
 }
 
 /* ---- Rarity badge ---- */
@@ -818,7 +793,6 @@
   line-height: 1;
 }
 
-/* Badge colour per rarity (independent of the wrapper variable) */
 .pc-rarity-badge--uncommon  { --rarity-color: #22c55e; }
 .pc-rarity-badge--rare      { --rarity-color: #3b82f6; }
 .pc-rarity-badge--epic      { --rarity-color: #a855f7; }
