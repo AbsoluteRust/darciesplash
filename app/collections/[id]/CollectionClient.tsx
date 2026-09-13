@@ -17,6 +17,7 @@ type Card = {
   type: string;
   image: string;
   glow?: string;
+  rarity?: string;
   description?: string;
   details?: string;
   link?: string;
@@ -812,6 +813,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
                 status="Online"
                 contactText="View"
                 avatarUrl={piece.image}
+                rarity={piece.rarity}
                 showUserInfo={false}
                 enableTilt={true}
                 enableMobileTilt={false}
