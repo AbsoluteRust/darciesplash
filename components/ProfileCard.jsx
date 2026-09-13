@@ -11,6 +11,15 @@ const ANIMATION_CONFIG = {
   ENTER_TRANSITION_MS: 180
 };
 
+const RARITY_EMOJI = {
+  Common: "⚪",
+  Uncommon: "🟢",
+  Rare: "🔵",
+  Epic: "🟣",
+  Legendary: "🟡",
+  Mythic: "🔴",
+};
+
 const clamp = (v, min = 0, max = 100) => Math.min(Math.max(v, min), max);
 const round = (v, precision = 3) => parseFloat(v.toFixed(precision));
 const adjust = (v, fMin, fMax, tMin, tMax) => round(tMin + ((tMax - tMin) * (v - fMin)) / (fMax - fMin));
@@ -25,6 +34,7 @@ const ProfileCardComponent = ({
   behindGlowSize,
   className = '',
   enableTilt = true,
+  rarity,
   enableMobileTilt = false,
   mobileTiltSensitivity = 5,
   miniAvatarUrl,
@@ -42,6 +52,11 @@ const ProfileCardComponent = ({
 
   const enterTimerRef = useRef(null);
   const leaveRafRef = useRef(null);
+
+  const rarityClass = rarity && rarity !== 'Common'
+    ? `pc-card-wrapper--rarity-${rarity.toLowerCase()}`
+    : '';
+  const SHOW_BADGE = rarity && rarity !== 'Common';
 
   const tiltEngine = useMemo(() => {
     if (!enableTilt) return null;
@@ -304,80 +319,89 @@ const ProfileCardComponent = ({
   const handleContactClick = useCallback(() => {
     onContactClick?.();
   }, [onContactClick]);
-  
-  
-  return (
-    <div ref={wrapRef} className={`pc-card-wrapper ${className}`.trim()} style={cardStyle}>
-  {behindGlowEnabled && <div className="pc-behind" />}
 
-  <div ref={shellRef} className="pc-card-shell" onClick={handleContactClick}>
-  <section
-  className={`pc-card 
-    ${isModal ? "modal-mode" : ""} 
-    ${title === "Mobile Wallpaper" ? "is-wallpaper" : ""}
-    ${title === "Splash Art" ? "is-splash" : ""}
-    ${title === "Sticker" ? "is-sticker" : ""}
-  `}
->
-    <div className="pc-inside">
-      <div className="pc-shine" />
-      <div className="pc-glare" />
-      <div className="pc-content pc-avatar-content">
-	  <div className={`pc-avatar-crop ${isModal ? "modal-crop" : ""}`}>
-        <img
-          className="avatar"
-          src={avatarUrl}
-          alt={`${name || 'User'} avatar`}
-          loading="lazy"
-          onError={e => {
-            const t = e.target;
-            t.style.display = 'none';
-          }}
-        />
-        {showUserInfo && (
-          <div className="pc-user-info">
-            <div className="pc-user-details">
-              <div className="pc-mini-avatar">
+  return (
+    <div
+      ref={wrapRef}
+      className={`pc-card-wrapper ${rarityClass} ${className}`.trim()}
+      style={cardStyle}
+    >
+      {behindGlowEnabled && <div className="pc-behind" />}
+
+      <div ref={shellRef} className="pc-card-shell" onClick={handleContactClick}>
+        <section
+          className={`pc-card 
+            ${isModal ? "modal-mode" : ""} 
+            ${title === "Mobile Wallpaper" ? "is-wallpaper" : ""}
+            ${title === "Splash Art" ? "is-splash" : ""}
+            ${title === "Sticker" ? "is-sticker" : ""}
+          `}
+        >
+          <div className="pc-inside">
+            <div className="pc-shine" />
+            <div className="pc-glare" />
+            <div className="pc-content pc-avatar-content">
+              <div className={`pc-avatar-crop ${isModal ? "modal-crop" : ""}`}>
                 <img
-                  src={miniAvatarUrl || avatarUrl}
-                  alt={`${name || 'User'} mini avatar`}
+                  className="avatar"
+                  src={avatarUrl}
+                  alt={`${name || 'User'} avatar`}
                   loading="lazy"
                   onError={e => {
                     const t = e.target;
-                    t.style.opacity = '0.5';
-                    t.src = avatarUrl;
+                    t.style.display = 'none';
                   }}
                 />
-              </div>
-              <div className="pc-user-text">
-                <div className="pc-handle">@{handle}</div>
-                <div className="pc-status">{status}</div>
+                {showUserInfo && (
+                  <div className="pc-user-info">
+                    <div className="pc-user-details">
+                      <div className="pc-mini-avatar">
+                        <img
+                          src={miniAvatarUrl || avatarUrl}
+                          alt={`${name || 'User'} mini avatar`}
+                          loading="lazy"
+                          onError={e => {
+                            const t = e.target;
+                            t.style.opacity = '0.5';
+                            t.src = avatarUrl;
+                          }}
+                        />
+                      </div>
+                      <div className="pc-user-text">
+                        <div className="pc-handle">@{handle}</div>
+                        <div className="pc-status">{status}</div>
+                      </div>
+                    </div>
+                    <button
+                      className="pc-contact-btn"
+                      onClick={handleContactClick}
+                      style={{ pointerEvents: 'auto' }}
+                      type="button"
+                      aria-label={`Contact ${name || 'user'}`}
+                    >
+                      {contactText}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
-            <button
-              className="pc-contact-btn"
-              onClick={handleContactClick}
-              style={{ pointerEvents: 'auto' }}
-              type="button"
-              aria-label={`Contact ${name || 'user'}`}
-            >
-              {contactText}
-            </button>
+
+            <div className="pc-content">
+              <div className="pc-details">
+                <h3>{name}</h3>
+                <p>{title}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {SHOW_BADGE && (
+          <div className={`pc-rarity-badge pc-rarity-badge--${rarity.toLowerCase()}`}>
+            <span className="pc-rarity-badge__emoji">{RARITY_EMOJI[rarity] || "⚪"}</span>
+            <span className="pc-rarity-badge__text">{rarity}</span>
           </div>
         )}
       </div>
-	  </div>
-
-      <div className="pc-content">
-        <div className="pc-details">
-          <h3>{name}</h3>
-          <p>{title}</p>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
-
     </div>
   );
 };

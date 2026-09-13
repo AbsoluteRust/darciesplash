@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { title, type, collection, about, imageUrl } = body;
+  const { title, type, collection, about, imageUrl, rarity } = body;
 
   if (!title || !type || !collection || !about || !imageUrl) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
     description: about,
     details: "",
     link: "",
+    ...(rarity && { rarity }),
   };
 
   cards.push(newCard);
