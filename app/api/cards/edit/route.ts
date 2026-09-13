@@ -30,9 +30,7 @@ export async function POST(req: NextRequest) {
   const index = cards.findIndex(c => c.name.toLowerCase() === lowerTitle);
 
   if (index === -1) {
-    // Not in KV — likely a hardcoded card. Create a KV override entry with
-    // only the fields the user changed. The site merges KV over hardcoded,
-    // so any empty fields fall back to the hardcoded values.
+    // Not in KV — hardcoded override (legacy path, shouldn't happen after migration)
     const override: Partial<Card> & { name: string } = {
       name: new_title || title,
     };
@@ -48,6 +46,8 @@ export async function POST(req: NextRequest) {
   }
 
   const oldImage = cards[index].image;
+  const oldName = cards[index].name;
+  const nameChanged = new_title && new_title.toLowerCase() !== lowerTitle;
 
   cards[index] = {
     ...cards[index],
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
 
   await kv.set("cards", cards);
 
+  // Delete old image from Blob if it was replaced
   if (
     new_image_url &&
     oldImage &&
@@ -70,6 +71,44 @@ export async function POST(req: NextRequest) {
       await del(oldImage);
     } catch (err) {
       console.error("Failed to delete old blob:", err);
+    }
+  }
+
+  // ⭐ If the card was renamed, update every user inventory that references the old name
+  if (nameChanged) {
+    try {
+      const invKeys = await kv.keys("user_cards:*");
+      let touchedUsers = 0;
+
+      for (const invKey of invKeys) {
+        const inv = (await kv.hgetall(invKey)) || {};
+        const newInv: Record<string, number> = {};
+        let changed = false;
+
+        for (const [key, count] of Object.entries(inv)) {
+          const [cardName, rarity] = key.split("|");
+          if (cardName.toLowerCase() === lowerTitle) {
+            const newKey = `${new_title}|${rarity}`;
+            newInv[newKey] = (newInv[newKey] || 0) + Number(count);
+            changed = true;
+          } else {
+            newInv[key] = Number(count);
+          }
+        }
+
+        if (changed) {
+          // Overwrite the whole hash — del + hset to avoid leaving stale fields
+          await kv.del(invKey);
+          await kv.hset(invKey, newInv);
+          touchedUsers++;
+        }
+      }
+
+      console.log(`[edit] renamed "${oldName}" → "${new_title}" in ${touchedUsers} inventories`);
+    } catch (err) {
+      console.error("[edit] failed to migrate inventories:", err);
+      // Don't fail the whole request if inventory migration errors —
+      // the card rename itself succeeded.
     }
   }
 
