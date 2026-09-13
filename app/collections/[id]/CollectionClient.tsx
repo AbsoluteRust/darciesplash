@@ -4,6 +4,7 @@ import "./page.css";
 import { use, useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Iridescence from "../../../components/Iridescence";
 import ProfileCard from "@/components/ProfileCard";
+import LazyMount from "@/components/LazyMount";
 import { ITEMS } from "@/sections/AccordionGallery";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -522,30 +523,35 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           }}
         >
           {mergedCards.map((piece, idx) => (
-            <ProfileCard
+            <LazyMount
               key={`${piece.name}|${idx}`}
-              name={piece.name}
-              title={
-                piece.type === "Emote"
-                  ? (() => {
-                      const n = findEmoteCount(piece.name, emoteTotals);
-                      return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
-                    })()
-                  : piece.type
-              }
-              handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
-              status="Online"
-              contactText="View"
-              avatarUrl={piece.image}
-              showUserInfo={false}
-              enableTilt={true}
-              enableMobileTilt={false}
-              behindGlowColor={piece.glow || DEFAULT_GLOW}
-              iconUrl={null}
-              behindGlowEnabled
-              innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-              onContactClick={() => openCard(piece, idx)}
-            />
+              rootMargin="600px"
+              placeholderHeight={560}
+            >
+              <ProfileCard
+                name={piece.name}
+                title={
+                  piece.type === "Emote"
+                    ? (() => {
+                        const n = findEmoteCount(piece.name, emoteTotals);
+                        return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
+                      })()
+                    : piece.type
+                }
+                handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
+                status="Online"
+                contactText="View"
+                avatarUrl={piece.image}
+                showUserInfo={false}
+                enableTilt={true}
+                enableMobileTilt={false}
+                behindGlowColor={piece.glow || DEFAULT_GLOW}
+                iconUrl={null}
+                behindGlowEnabled
+                innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+                onContactClick={() => openCard(piece, idx)}
+              />
+            </LazyMount>
           ))}
         </div>
       </div>
