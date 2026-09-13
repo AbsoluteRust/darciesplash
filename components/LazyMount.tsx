@@ -27,10 +27,9 @@ export default function LazyMount({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Only react to becoming visible. Once mounted, stay mounted.
         if (entry.isIntersecting) {
           setVisible(true);
-          observer.disconnect();   // ⭐ stop observing once mounted
+          observer.disconnect();
         }
       },
       { rootMargin, threshold: 0 }
@@ -43,7 +42,7 @@ export default function LazyMount({
   return (
     <div
       ref={ref}
-      className={className}
+      className={`lazy-mount${visible ? ' lazy-mount--visible' : ''}${className ? ` ${className}` : ''}`}
       style={{
         minHeight: visible ? undefined : placeholderHeight,
       }}
