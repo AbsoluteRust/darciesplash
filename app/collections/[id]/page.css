@@ -377,3 +377,39 @@ html.entering-prev .collections-page {
   from { opacity: 0; transform: translateY(60px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* ---- Bigger slide for cross-collection transitions inside the modal ---- */
+
+.emote-modal.card-leaving-next.card-crossing {
+  animation: cardCrossOutUp 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
+}
+.emote-modal.card-leaving-prev.card-crossing {
+  animation: cardCrossOutDown 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
+}
+.emote-modal.card-entering-next.card-crossing {
+  animation: cardCrossInFromBottom 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.emote-modal.card-entering-prev.card-crossing {
+  animation: cardCrossInFromTop 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cardCrossOutUp {
+  to { transform: translateY(-200px); opacity: 0; }
+}
+@keyframes cardCrossOutDown {
+  to { transform: translateY(200px); opacity: 0; }
+}
+@keyframes cardCrossInFromBottom {
+  from { transform: translateY(200px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+@keyframes cardCrossInFromTop {
+  from { transform: translateY(-200px); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+/* ---- Modal-level hint panel (sits above modal overlay) ---- */
+
+.collection-hint--modal {
+  z-index: 10001;
+}

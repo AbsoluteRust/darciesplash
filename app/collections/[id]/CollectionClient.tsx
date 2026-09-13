@@ -77,6 +77,10 @@ const TOUCH_SCROLL_TOLERANCE = 8;
 
 const CARD_EXIT_MS = 220;
 const CARD_ENTER_MS = 340;
+const CARD_CROSSING_EXIT_MS = 300;
+const CARD_CROSSING_ENTER_MS = 420;
+
+const MODAL_OVERSCROLL_TRIGGER = 500;
 
 export default function CollectionClient({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -96,7 +100,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [cardTransition, setCardTransition] = useState<{
     phase: "leaving" | "entering";
     direction: "next" | "prev";
+    crossing: boolean;
   } | null>(null);
+
+  // ---- In-modal cross-collection hint ----
+  const [modalHintDirection, setModalHintDirection] = useState<"next" | "prev" | null>(null);
+  const [modalHintProgress, setModalHintProgress] = useState(0);
+  const modalOverscrollRef = useRef(0);
 
   // ---- Transition helper ----
   const triggerTransition = useCallback((direction: "next" | "prev", slug: string) => {
@@ -308,7 +318,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const modalIndexRef = useRef(modalIndex);
   const allCardsByCollectionRef = useRef(allCardsByCollection);
   const cardTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-    // ---- Card image preloading ----
+
+  // ---- Card image preloading ----
   const PRELOAD_RADIUS = 2;
   const preloadedRef = useRef<Set<string>>(new Set());
 
@@ -324,13 +335,11 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     const cards = allCardsByCollectionRef.current[collId] || [];
     if (cards.length === 0) return;
 
-    // Current + radius on both sides, within this collection
     for (let d = -PRELOAD_RADIUS; d <= PRELOAD_RADIUS; d++) {
       const i = idx + d;
       if (i >= 0 && i < cards.length) preloadCardImage(cards[i].image);
     }
 
-    // Cross-boundary: near the last card, preload the first few of the next collection
     if (idx >= cards.length - 1) {
       const cur = COLLECTION_ORDER.indexOf(collId);
       const nxt = COLLECTION_ORDER[cur + 1];
@@ -342,7 +351,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       }
     }
 
-    // Cross-boundary: near the first card, preload the last few of the previous collection
     if (idx <= 0) {
       const cur = COLLECTION_ORDER.indexOf(collId);
       const prv = COLLECTION_ORDER[cur - 1];
@@ -360,7 +368,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   useEffect(() => { modalIndexRef.current = modalIndex; }, [modalIndex]);
   useEffect(() => { allCardsByCollectionRef.current = allCardsByCollection; }, [allCardsByCollection]);
 
-  // Clear pending card transition timeouts on unmount
   useEffect(() => {
     return () => {
       cardTimeoutsRef.current.forEach(t => clearTimeout(t));
@@ -370,9 +377,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   // ---- Modal navigation (with slide transition) ----
   const navigateModalCard = useCallback((direction: 1 | -1) => {
-    // Cancel any in-flight transition
     cardTimeoutsRef.current.forEach(t => clearTimeout(t));
     cardTimeoutsRef.current = [];
+
+    // Reset modal hint whenever we navigate
+    modalOverscrollRef.current = 0;
+    setModalHintProgress(0);
+    setModalHintDirection(null);
 
     const ae = activeEmoteRef.current;
     const mc = modalCollectionRef.current;
@@ -410,36 +421,36 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     if (!newCard) return;
 
     const dirLabel: "next" | "prev" = direction > 0 ? "next" : "prev";
+    const crossing = nextColl !== mc;
 
-    // Phase 1: leaving animation
-    setCardTransition({ phase: "leaving", direction: dirLabel });
+    const exitMs = crossing ? CARD_CROSSING_EXIT_MS : CARD_EXIT_MS;
+    const enterMs = crossing ? CARD_CROSSING_ENTER_MS : CARD_ENTER_MS;
 
-    // Phase 2: swap card, then entering animation
+    setCardTransition({ phase: "leaving", direction: dirLabel, crossing });
+
     const t1 = setTimeout(() => {
       setModalCollection(nextColl);
       setModalIndex(nextIdx);
       setActiveEmote(newCard);
-
-      // ⭐ Preload the ±2 cards around the new one, before the swap completes
       preloadAdjacent(nextColl, nextIdx);
 
       const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
       router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
 
-      setCardTransition({ phase: "entering", direction: dirLabel });
+      setCardTransition({ phase: "entering", direction: dirLabel, crossing });
 
       const t2 = setTimeout(() => {
         setCardTransition(null);
-      }, CARD_ENTER_MS);
+      }, enterMs);
       cardTimeoutsRef.current.push(t2);
-    }, CARD_EXIT_MS);
+    }, exitMs);
     cardTimeoutsRef.current.push(t1);
   }, [router, preloadAdjacent]);
 
   const navigateModalCardRef = useRef(navigateModalCard);
   useEffect(() => { navigateModalCardRef.current = navigateModalCard; }, [navigateModalCard]);
 
-  // ---- Modal scroll (wheel + touch) ----
+  // ---- Modal scroll (wheel + touch) with cross-collection hint ----
   useEffect(() => {
     let wheelAccum = 0;
     let touchActive = false;
@@ -448,9 +459,61 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
     const isModalOpen = () => !!activeEmoteRef.current && !!modalCollectionRef.current;
 
+    const getBoundaryInfo = (goingNext: boolean) => {
+      const mc = modalCollectionRef.current;
+      const mi = modalIndexRef.current;
+      const byColl = allCardsByCollectionRef.current;
+      if (!mc) return { atBoundary: false, nextCollSlug: null };
+
+      const cards = byColl[mc] || [];
+      const curIdx = COLLECTION_ORDER.indexOf(mc);
+
+      if (goingNext) {
+        const atLast = mi >= cards.length - 1;
+        const nxt = COLLECTION_ORDER[curIdx + 1];
+        if (atLast && nxt && (byColl[nxt] || []).length > 0) {
+          return { atBoundary: true, nextCollSlug: nxt };
+        }
+      } else {
+        const atFirst = mi <= 0;
+        const prv = COLLECTION_ORDER[curIdx - 1];
+        if (atFirst && prv && (byColl[prv] || []).length > 0) {
+          return { atBoundary: true, nextCollSlug: prv };
+        }
+      }
+      return { atBoundary: false, nextCollSlug: null };
+    };
+
     const handleWheel = (e: WheelEvent) => {
       if (!isModalOpen()) return;
       e.preventDefault();
+
+      const goingNext = e.deltaY > 0;
+      const goingPrev = e.deltaY < 0;
+      const { atBoundary } = getBoundaryInfo(goingNext);
+
+      if (atBoundary) {
+        const direction = goingNext ? "next" : "prev";
+        modalOverscrollRef.current += Math.abs(e.deltaY);
+        const progress = Math.min(modalOverscrollRef.current / MODAL_OVERSCROLL_TRIGGER, 1);
+        setModalHintDirection(direction);
+        setModalHintProgress(progress);
+        if (progress >= 1) {
+          modalOverscrollRef.current = 0;
+          setModalHintProgress(0);
+          setModalHintDirection(null);
+          navigateModalCardRef.current(goingNext ? 1 : -1);
+        }
+        return;
+      }
+
+      // Not at boundary — reset any accumulated hint
+      if (modalOverscrollRef.current > 0) {
+        modalOverscrollRef.current = 0;
+        setModalHintProgress(0);
+        setModalHintDirection(null);
+      }
+
       wheelAccum += e.deltaY;
       if (Math.abs(wheelAccum) < WHEEL_THRESHOLD) return;
       const direction: 1 | -1 = wheelAccum > 0 ? 1 : -1;
@@ -481,8 +544,32 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
       const delta = touchStartY - e.changedTouches[0].clientY;
       if (Math.abs(delta) < TOUCH_THRESHOLD) return;
-      const direction: 1 | -1 = delta > 0 ? 1 : -1;
-      navigateModalCardRef.current(direction);
+
+      const goingNext = delta > 0;
+      const { atBoundary } = getBoundaryInfo(goingNext);
+
+      if (atBoundary) {
+        const direction = goingNext ? "next" : "prev";
+        modalOverscrollRef.current += Math.abs(delta);
+        const progress = Math.min(modalOverscrollRef.current / (MODAL_OVERSCROLL_TRIGGER * 0.6), 1);
+        setModalHintDirection(direction);
+        setModalHintProgress(progress);
+        if (progress >= 1) {
+          modalOverscrollRef.current = 0;
+          setModalHintProgress(0);
+          setModalHintDirection(null);
+          navigateModalCardRef.current(goingNext ? 1 : -1);
+        }
+        return;
+      }
+
+      if (modalOverscrollRef.current > 0) {
+        modalOverscrollRef.current = 0;
+        setModalHintProgress(0);
+        setModalHintDirection(null);
+      }
+
+      navigateModalCardRef.current(goingNext ? 1 : -1);
     };
 
     window.addEventListener("wheel", handleWheel, { passive: false });
@@ -496,10 +583,12 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   }, []);
 
   const closeModal = useCallback(() => {
-    // Clear any in-flight card transition
     cardTimeoutsRef.current.forEach(t => clearTimeout(t));
     cardTimeoutsRef.current = [];
     setCardTransition(null);
+    modalOverscrollRef.current = 0;
+    setModalHintProgress(0);
+    setModalHintDirection(null);
 
     const coll = modalCollection || id;
     setActiveEmote(null);
@@ -585,7 +674,14 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const prevLabel = prevSlug ? (ITEMS.find(i => i.slug === prevSlug)?.label ?? "Previous Collection") : "";
 
   const modalTransitionClass = cardTransition
-    ? ` card-${cardTransition.phase}-${cardTransition.direction}`
+    ? ` card-${cardTransition.phase}-${cardTransition.direction}${cardTransition.crossing ? " card-crossing" : ""}`
+    : "";
+
+  const modalHintTargetSlug = modalHintDirection === "next"
+    ? COLLECTION_ORDER[COLLECTION_ORDER.indexOf(modalCollection || "") + 1]
+    : COLLECTION_ORDER[COLLECTION_ORDER.indexOf(modalCollection || "") - 1];
+  const modalHintTargetLabel = modalHintTargetSlug
+    ? (ITEMS.find(i => i.slug === modalHintTargetSlug)?.label ?? "Next Collection")
     : "";
 
   return (
@@ -665,6 +761,24 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
               )}
             </div>
           </div>
+
+          {modalHintProgress > 0 && modalHintDirection && (
+            <div
+              className={`collection-hint collection-hint--modal collection-hint--${modalHintDirection}`}
+              style={{
+                opacity: Math.min(modalHintProgress * 1.4, 1),
+                transform: `translateX(-50%) scale(${0.9 + modalHintProgress * 0.1})`,
+              }}
+            >
+              <span className="collection-hint__arrow">
+                {modalHintDirection === "next" ? "↓" : "↑"}
+              </span>
+              <span className="collection-hint__label">
+                {modalHintDirection === "next" ? "End of collection" : "Start of collection"}
+              </span>
+              <span className="collection-hint__title">{modalHintTargetLabel}</span>
+            </div>
+          )}
         </div>
       )}
 
