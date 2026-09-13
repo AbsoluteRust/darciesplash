@@ -21,10 +21,7 @@ body::-webkit-scrollbar {
   position: relative;
   min-height: 100%;
 }
-.grid-container .card-grid > div {
-  content-visibility: auto;
-  contain-intrinsic-size: 320px 560px;
-}
+
 .collections-page::-webkit-scrollbar {
   display: none;
 }
