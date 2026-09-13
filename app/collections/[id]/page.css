@@ -413,3 +413,42 @@ html.entering-prev .collections-page {
 .collection-hint--modal {
   z-index: 10001;
 }
+
+/* ---- Mobile edge padding ---- */
+
+@media (max-width: 900px) {
+  .grid-container {
+    padding: 40px 16px;
+  }
+
+  .emote-modal-overlay {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .emote-layout {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .emote-info-boxes {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .grid-container {
+    padding: 32px 14px;
+  }
+
+  .emote-modal-overlay {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .emote-layout {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
