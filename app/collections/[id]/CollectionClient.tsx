@@ -71,6 +71,15 @@ function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): 
   return best;
 }
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
 const TOUCH_SCROLL_TOLERANCE = 8;
@@ -175,7 +184,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     const map: Record<string, Card[]> = {};
     for (const coll of COLLECTION_ORDER) {
       const collGlow = COLLECTION_GLOW[coll] || DEFAULT_GLOW;
-      map[coll] = kvCards
+      let cards = kvCards
         .filter(c => c.collection === coll)
         .filter(c => !deletedSet.has(c.name.toLowerCase()))
         .map(c => ({
@@ -183,6 +192,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           type: normalizeType(c.type),
           glow: c.glow || collGlow,
         }));
+
+      // Halo is a mixed bag — shuffle on each load for variety
+      if (coll === "halo") {
+        cards = shuffleArray(cards);
+      }
+
+      map[coll] = cards;
     }
     return map;
   }, [kvCards, deletedNames]);
