@@ -39,7 +39,7 @@ export default function Navbar() {
                 transition={{ type: "spring", stiffness: 250, damping: 70, mass: 1 }}
             >
                 {/* LEFT — Home + past collections */}
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-6 relative z-10">
 <button
     type="button"
     onClick={() => {
@@ -77,6 +77,8 @@ export default function Navbar() {
             transform: "translate(-50%, -50%)",
             width: "700px",
             height: "100px",
+            pointerEvents: "none",   // ⭐ clicks pass through
+            zIndex: 0,
         }}
     >
         <WarpText
@@ -98,9 +100,8 @@ export default function Navbar() {
         />
     </div>
 )}
-
                 {/* RIGHT — Upcoming collections */}
-                <div className="hidden md:flex items-center gap-6">
+                <div className="hidden md:flex items-center gap-6 relative z-10">
                     {after.map(c => (
                         <Link
                             key={c.slug}
