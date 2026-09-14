@@ -36,4 +36,11 @@ export const testimonialsData: ITestimonial[] = [
         date: 'September 14th, 2026',
         quote: "Darcie was fast, responsive, and delivered pure cuteness!",
     },
+    {
+        image: 'https://cdn.discordapp.com/avatars/836373219443212298/607815492549b7175a2e4e79f6433f5f.webp?size=240',
+        name: 'Sora',
+        handle: '@soramelt',
+        date: 'September 14th, 2026',
+        quote: "hatsune miku approves darcie's art <:mikuSit:1374391189247234118>",
+    },
 ];
