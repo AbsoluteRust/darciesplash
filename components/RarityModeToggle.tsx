@@ -7,7 +7,7 @@ const OPTIONS: {
     disabled?: boolean;
     title?: string;
 }[] = [
-    { value: 'global', label: 'Global' },
+    { value: 'global', label: '🌏' },
     { value: 'off', label: 'Off' },
     {
         value: 'personal',
