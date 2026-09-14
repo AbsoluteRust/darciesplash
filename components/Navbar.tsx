@@ -50,7 +50,7 @@ export default function Navbar() {
                                 router.push("/");
                             }
                         }}
-                        className="hover:text-pink-500 transition flex items-center gap-2 cursor-pointer"
+                        className="hover:text-pink-500 transition flex items-center gap-2 cursor-pointer text-white/60 hover:text-white"
                         aria-label="Home"
                     >
                         <HomeIcon size={20} />
@@ -60,7 +60,7 @@ export default function Navbar() {
                             <Link
                                 key={c.slug}
                                 href={`/collections/${c.slug}`}
-                                className="hover:text-pink-500 transition text-sm"
+                                className="transition text-sm text-white/40 hover:text-pink-400"
                             >
                                 {c.label}
                             </Link>
@@ -102,25 +102,25 @@ export default function Navbar() {
                     </div>
                 )}
 
-                {/* RIGHT — Upcoming collections (with padding to clear the toggle) */}
-                <div className={`hidden md:flex items-center gap-6 relative z-10 ${isCollectionPage ? "pr-44" : ""}`}>
+                {/* RIGHT — Upcoming collections (smaller reserved padding now) */}
+                <div className={`hidden md:flex items-center gap-6 relative z-10 ${isCollectionPage ? "pr-24" : ""}`}>
                     {after.map(c => (
                         <Link
                             key={c.slug}
                             href={`/collections/${c.slug}`}
-                            className="hover:text-pink-500 transition text-sm"
+                            className="transition text-sm text-white/40 hover:text-pink-400"
                         >
                             {c.label}
                         </Link>
                     ))}
                 </div>
 
-                {/* RARITY TOGGLE — absolutely positioned at the right edge */}
+                {/* RARITY TOGGLE — pinned near right edge */}
                 {isCollectionPage && (
-    <div className="hidden md:block absolute right-3 md:right-5 lg:right-6 xl:right-8 top-1/2 -translate-y-1/2 z-20">
-        <RarityModeToggle />
-    </div>
-)}
+                    <div className="hidden md:block absolute right-3 md:right-5 lg:right-6 xl:right-8 top-1/2 -translate-y-1/2 z-20">
+                        <RarityModeToggle />
+                    </div>
+                )}
 
                 {/* Mobile menu button */}
                 <button onClick={() => setIsOpen(true)} className="md:hidden">

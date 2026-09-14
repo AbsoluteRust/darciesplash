@@ -11,7 +11,7 @@ const OPTIONS: {
     { value: 'off', label: 'Off' },
     {
         value: 'personal',
-        label: 'Personal',
+        label: '🔒',
         disabled: true,
         title: 'Coming soon — sign in with Discord to unlock',
     },
@@ -35,8 +35,8 @@ export default function RarityModeToggle() {
                             active
                                 ? 'bg-white/90 text-black'
                                 : opt.disabled
-                                ? 'text-white/30 cursor-not-allowed'
-                                : 'text-white/70 hover:text-white'
+                                ? 'text-white/25 cursor-not-allowed'
+                                : 'text-white/60 hover:text-white'
                         }`}
                     >
                         {opt.label}
