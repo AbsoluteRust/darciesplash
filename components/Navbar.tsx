@@ -32,8 +32,8 @@ export default function Navbar() {
         <>
             <motion.nav
                 className={`fixed top-0 z-50 flex items-center justify-between w-full px-6 md:px-16 lg:px-24 xl:px-32 backdrop-blur transition-all duration-300 ${
-                    isCollectionPage ? "py-6" : "py-4"
-                }`}
+    isCollectionPage ? "py-8" : "py-4"
+}`}
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 250, damping: 70, mass: 1 }}
@@ -75,8 +75,8 @@ export default function Navbar() {
             left: "50%",
             top: "50%",
             transform: "translate(-50%, -50%)",
-            width: "420px",
-            height: "56px",
+            width: "700px",
+            height: "100px",
         }}
     >
         <WarpText
@@ -89,7 +89,7 @@ export default function Navbar() {
             pointerStrength={0.28}
             refraction={0.018}
             ripple
-            fontSize={24}
+            fontSize={48}
             fontWeight={800}
             style={{ width: "100%", height: "100%", minHeight: 0 }}
             fontFamily="inherit"

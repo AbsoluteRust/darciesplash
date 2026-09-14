@@ -683,7 +683,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   return (
     <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
       {/* Spacer so content clears the fixed navbar */}
-      <div style={{ height: "96px" }} aria-hidden="true" />
+      <div style={{ height: "140px" }} aria-hidden="true" />
 
       {id === "celestial" && (
         <Iridescence color={[1, 1, 1]} mouseReact amplitude={0.1} speed={0.25} className="iridescence-container" />
