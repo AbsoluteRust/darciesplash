@@ -43,4 +43,11 @@ export const testimonialsData: ITestimonial[] = [
         date: 'September 14th, 2026',
         quote: "hatsune miku approves darcie's art <:mikuSit:1374391189247234118>",
     },
+    {
+        image: 'https://cdn.discordapp.com/avatars/285239143041073155/8bddc6165a087e0d8e15b290866082e4.webp?size=240',
+        name: 'tobi510kenobi',
+        handle: '@tobi510kenobi',
+        date: 'September 14th, 2026',
+        quote: "One of the best artists I’ve ever had the pleasures of meeting, she is a one of a kind person with absolute transparency in what’s happening and what’s going on, their will never be someone like Darcie ever again",
+    },
 ];
