@@ -1,46 +1,124 @@
 'use client'
-import { MenuIcon, XIcon } from "lucide-react";
-import Image from "next/image";
+import { MenuIcon, XIcon, HomeIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
-import { navlinks } from "@/data/navlinks";
-import { INavLink } from "@/types";
+import WarpText from "@/components/WarpText";
+
+const COLLECTIONS = [
+  { slug: "darcie",    label: "Darcie" },
+  { slug: "tobi",      label: "Tobi" },
+  { slug: "madolche",  label: "Madolche" },
+  { slug: "celestial", label: "Celestial" },
+  { slug: "halo",      label: "Halo" },
+];
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const pathname = usePathname();
+
+    const match = pathname?.match(/^\/collections\/([^/]+)/);
+    const currentSlug = match ? match[1] : null;
+    const currentIdx = currentSlug ? COLLECTIONS.findIndex(c => c.slug === currentSlug) : -1;
+
+    const isCollectionPage = currentIdx >= 0;
+    const before = isCollectionPage ? COLLECTIONS.slice(0, currentIdx) : [];
+    const after = isCollectionPage ? COLLECTIONS.slice(currentIdx + 1) : COLLECTIONS;
+    const currentLabel = isCollectionPage ? COLLECTIONS[currentIdx].label : null;
 
     return (
         <>
-            <motion.nav className="fixed top-0 z-50 flex items-center justify-between w-full py-4 px-6 md:px-16 lg:px-24 xl:px-32 backdrop-blur"
+            <motion.nav
+                className="fixed top-0 z-50 flex items-center justify-between w-full py-4 px-6 md:px-16 lg:px-24 xl:px-32 backdrop-blur"
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                viewport={{ once: true }}
                 transition={{ type: "spring", stiffness: 250, damping: 70, mass: 1 }}
             >
-                <a href="https://discord.gg/afMt4RppfR">
-                    <Image className="h-8.5 w-auto" src="/assets/logo.svg" alt="logo" width={130} height={34} priority />
-                </a>
+                {/* LEFT — Home + past collections */}
+                <div className="flex items-center gap-6">
+                    <Link
+                        href="/"
+                        className="hover:text-pink-500 transition flex items-center gap-2"
+                        aria-label="Home"
+                    >
+                        <HomeIcon size={20} />
+                    </Link>
+                    <div className="hidden md:flex items-center gap-6">
+                        {before.map(c => (
+                            <Link
+                                key={c.slug}
+                                href={`/collections/${c.slug}`}
+                                className="hover:text-pink-500 transition text-sm"
+                            >
+                                {c.label}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
 
-                <div className="hidden md:flex items-center gap-8 transition duration-500">
-                    {navlinks.map((link: INavLink) => (
-                        <Link key={link.name} href={link.href} className="hover:text-pink-500 transition">
-                            {link.name}
+                {/* CENTER — WarpText (collection pages only) */}
+                {currentLabel && (
+                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
+                        <WarpText
+                            text={`The ${currentLabel} Collection`}
+                            color="#f8f5ff"
+                            warpStrength={0.06}
+                            warpScale={2}
+                            speed={0.55}
+                            pointerInfluence={0.3}
+                            pointerStrength={0.28}
+                            refraction={0.018}
+                            ripple
+                            fontSize={26}
+                            fontWeight={800}
+                            style={{ height: "48px", width: "360px" }}
+                            fontFamily="inherit"
+                            letterSpacing={-0.05}
+                            lineHeight={0.9}
+                        />
+                    </div>
+                )}
+
+                {/* RIGHT — Upcoming collections */}
+                <div className="hidden md:flex items-center gap-6">
+                    {after.map(c => (
+                        <Link
+                            key={c.slug}
+                            href={`/collections/${c.slug}`}
+                            className="hover:text-pink-500 transition text-sm"
+                        >
+                            {c.label}
                         </Link>
                     ))}
                 </div>
+
+                {/* Mobile menu button */}
                 <button onClick={() => setIsOpen(true)} className="md:hidden">
                     <MenuIcon size={26} className="active:scale-90 transition" />
                 </button>
             </motion.nav>
 
-            <div className={`fixed inset-0 z-100 bg-black/40 backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-400 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}>
-                {navlinks.map((link: INavLink) => (
-                    <Link key={link.name} href={link.href} onNavigate={() => setIsOpen(false)}>
-                        {link.name}
+            {/* Mobile menu */}
+            <div
+                className={`fixed inset-0 z-100 bg-black/40 backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-400 ${
+                    isOpen ? "translate-x-0" : "-translate-x-full"
+                }`}
+            >
+                <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
+                {COLLECTIONS.map(c => (
+                    <Link
+                        key={c.slug}
+                        href={`/collections/${c.slug}`}
+                        onNavigate={() => setIsOpen(false)}
+                    >
+                        {c.label}
                     </Link>
                 ))}
-                <button onClick={() => setIsOpen(false)} className="active:ring-3 active:ring-white aspect-square size-10 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-md flex">
+                <button
+                    onClick={() => setIsOpen(false)}
+                    className="active:ring-3 active:ring-white aspect-square size-10 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-md flex"
+                >
                     <XIcon />
                 </button>
             </div>

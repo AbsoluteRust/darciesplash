@@ -7,8 +7,6 @@ import ProfileCard from "@/components/ProfileCard";
 import LazyMount from "@/components/LazyMount";
 import { ITEMS } from "@/sections/AccordionGallery";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import WarpText from "../../../components/WarpText";
 import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
 
@@ -381,7 +379,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     cardTimeoutsRef.current.forEach(t => clearTimeout(t));
     cardTimeoutsRef.current = [];
 
-    // Reset modal hint whenever we navigate
     modalOverscrollRef.current = 0;
     setModalHintProgress(0);
     setModalHintDirection(null);
@@ -490,7 +487,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       e.preventDefault();
 
       const goingNext = e.deltaY > 0;
-      const goingPrev = e.deltaY < 0;
       const { atBoundary } = getBoundaryInfo(goingNext);
 
       if (atBoundary) {
@@ -508,7 +504,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         return;
       }
 
-      // Not at boundary — reset any accumulated hint
       if (modalOverscrollRef.current > 0) {
         modalOverscrollRef.current = 0;
         setModalHintProgress(0);
@@ -687,7 +682,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   return (
     <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
-      <Link href="/" className="home-button">Esc</Link>
+      {/* Spacer so content clears the fixed navbar */}
+      <div style={{ height: "96px" }} aria-hidden="true" />
 
       {id === "celestial" && (
         <Iridescence color={[1, 1, 1]} mouseReact amplitude={0.1} speed={0.25} className="iridescence-container" />
@@ -697,17 +693,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           <Silk speed={5} scale={1} color="#4E2E69" noiseIntensity={1.2} rotation={0} />
         </div>
       )}
-
-      <div className="art-content warp-title">
-        <WarpText
-          text={`The ${id.charAt(0).toUpperCase() + id.slice(1)} Collection`}
-          color="#f8f5ff" warpStrength={0.08} warpScale={2} speed={0.55}
-          pointerInfluence={0.42} pointerStrength={0.38} refraction={0.021}
-          ripple fontSize={116} fontWeight={800}
-          style={{ height: "320px" }}
-          fontFamily="inherit" letterSpacing={-0.06} lineHeight={0.9}
-        />
-      </div>
 
       {activeEmote && (
         <div className="emote-modal-overlay" onClick={closeModal}>
