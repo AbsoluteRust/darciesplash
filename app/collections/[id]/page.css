@@ -138,18 +138,36 @@ body::-webkit-scrollbar {
   z-index: 9999;
   padding: 10px 16px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.15);
-  backdrop-filter: blur(10px);
-  color: white;
-  font-weight: 600;
-  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
   cursor: pointer;
   transition: all 0.2s ease;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
 .home-button:hover {
-  background: rgba(255,255,255,0.25);
+  background: rgba(0, 0, 0, 0.88);
+  border-color: rgba(255, 255, 255, 0.75);
   transform: translateY(-2px);
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.home-button:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 3px;
 }
 
 .warp-text {
