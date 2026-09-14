@@ -4,6 +4,7 @@ import LenisScroll from "@/components/LenisScroll";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { RarityModeProvider } from "@/components/RarityModeContext";
+import { PageLoadingProvider } from "@/components/PageLoadingContext";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -24,11 +25,13 @@ export default function RootLayout({ children, }: Readonly<{
             </head>
             <body>
                 <LenisScroll />
-                <RarityModeProvider>
-                    <Navbar />
-                    {children}
-                    <Footer />
-                </RarityModeProvider>
+                <PageLoadingProvider>
+                    <RarityModeProvider>
+                        <Navbar />
+                        <div style={{ minHeight: '100vh' }}>{children}</div>
+                        <Footer />
+                    </RarityModeProvider>
+                </PageLoadingProvider>
             </body>
         </html>
     );

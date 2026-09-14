@@ -5,8 +5,15 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { IFooterLink } from "@/types";
+import { usePageLoading } from "./PageLoadingContext";
 
 export default function Footer() {
+    const { loading } = usePageLoading();
+
+    // Hide the footer while a page is loading its content,
+    // otherwise it briefly appears above the fold before cards render.
+    if (loading) return null;
+
     return (
         <footer className="flex flex-wrap justify-center md:justify-between overflow-hidden gap-10 md:gap-20 mt-40 py-6 px-6 md:px-16 lg:px-24 xl:px-32 text-[13px] text-gray-500">
             <motion.div className="flex flex-wrap items-start gap-10 md:gap-35"
