@@ -30,7 +30,9 @@ export default function Navbar() {
     return (
         <>
             <motion.nav
-                className="fixed top-0 z-50 flex items-center justify-between w-full py-4 px-6 md:px-16 lg:px-24 xl:px-32 backdrop-blur"
+                className={`fixed top-0 z-50 flex items-center justify-between w-full px-6 md:px-16 lg:px-24 xl:px-32 backdrop-blur transition-all duration-300 ${
+                    isCollectionPage ? "py-6" : "py-4"
+                }`}
                 initial={{ y: -100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 250, damping: 70, mass: 1 }}
@@ -70,11 +72,11 @@ export default function Navbar() {
                             pointerStrength={0.28}
                             refraction={0.018}
                             ripple
-                            fontSize={26}
+                            fontSize={24}
                             fontWeight={800}
-                            style={{ height: "48px", width: "360px" }}
+                            style={{ height: "56px", minHeight: "56px", width: "380px" }}
                             fontFamily="inherit"
-                            letterSpacing={-0.05}
+                            letterSpacing={-0.04}
                             lineHeight={0.9}
                         />
                     </div>
