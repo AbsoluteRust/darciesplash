@@ -13,14 +13,7 @@ export const testimonialsData: ITestimonial[] = [
         name: 'Little Magileine',
         handle: '@littlemagileine',
         date: 'September 6th, 2026',
-        quote: 'Incredibly hard worker. Phenomenal artist. Absolute Legend! ',
-    },
-    {
-        image: 'https://cdn.discordapp.com/avatars/429492118801612800/942d8635f90f950f5dcc2a67c63e46c2.webp?size=128',
-        name: '𒆜Koma火𒆜',
-        handle: '@koma_kai',
-        date: 'April 22, 2025',
-        quote: 'a',
+        quote: '<:magiGift:1321088440988733440>',
     },
     {
         image: 'https://cdn.discordapp.com/avatars/400163290896138246/7de01d3cee9972df86603bf251398642.webp?size=128',
@@ -35,5 +28,12 @@ export const testimonialsData: ITestimonial[] = [
         handle: '@epiccgamer21',
         date: 'September 6th, 2026',
         quote: "Incredibly hard worker. Phenomenal artist. Absolute Legend! ",
+    },
+    {
+        image: 'https://cdn.discordapp.com/avatars/288341784709562369/a4175efaf84832bc1f1de9f3e72d8ddb.webp?size=240',
+        name: 'leykuph',
+        handle: '@leykuph',
+        date: 'September 14th, 2026',
+        quote: "Darcie was fast, responsive, and delivered pure cuteness!",
     },
 ];

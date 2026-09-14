@@ -15,6 +15,7 @@ export interface ITestimonial {
     handle: string;
     date: string;
     quote: string;
+    emote?: string;
 }
 
 export interface IFeature {

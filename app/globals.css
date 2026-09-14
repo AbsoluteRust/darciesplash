@@ -161,3 +161,12 @@ button {
     @apply font-sans;
     }
 }
+
+.testimonial-emote-inline {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+  margin: 0 0.15em;
+  object-fit: contain;
+}
