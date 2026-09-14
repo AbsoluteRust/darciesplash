@@ -82,25 +82,22 @@ const AccordionGallery = ({
 
         tl.to(panel, { flexGrow: isActive ? grow : 1, ...rotProp, duration: dur, ease }, 0);
 
-        if (media) {
-          const drift = Math.max(-1.5, Math.min(1.5, active - i));
-          const shift = drift * parallax * mediaSize * 0.06;
-          const gray = grayscale ? (isActive ? 0 : 1) : 0;
-          tl.to(
-            media,
-            {
-              xPercent: -50,
-              yPercent: -50,
-              x: vertical ? 0 : isActive ? 0 : shift,
-              y: vertical ? (isActive ? 0 : shift) : 0,
-              '--ag-gray': gray,
-              '--ag-dim': isActive ? 0 : 0.35,
-              duration: dur,
-              ease
-            },
-            0
-          );
-        }
+if (media) {
+  const drift = Math.max(-1.5, Math.min(1.5, active - i));
+  const shift = drift * parallax * mediaSize * 0.06;
+  tl.to(
+    media,
+    {
+      xPercent: -50,
+      yPercent: -50,
+      x: vertical ? 0 : isActive ? 0 : shift,
+      y: vertical ? (isActive ? 0 : shift) : 0,
+      duration: dur,
+      ease
+    },
+    0
+  );
+}
 
         if (showLabels && bar && text) {
           if (isActive) {
