@@ -68,27 +68,36 @@ export default function Navbar() {
                 </div>
 
                 {/* CENTER — WarpText (collection pages only) */}
-                {currentLabel && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 pointer-events-none hidden md:block">
-                        <WarpText
-                            text={`The ${currentLabel} Collection`}
-                            color="#f8f5ff"
-                            warpStrength={0.06}
-                            warpScale={2}
-                            speed={0.55}
-                            pointerInfluence={0.3}
-                            pointerStrength={0.28}
-                            refraction={0.018}
-                            ripple
-                            fontSize={24}
-                            fontWeight={800}
-                            style={{ height: "56px", minHeight: "56px", width: "380px" }}
-                            fontFamily="inherit"
-                            letterSpacing={-0.04}
-                            lineHeight={0.9}
-                        />
-                    </div>
-                )}
+{currentLabel && (
+    <div
+        className="absolute hidden md:flex items-center justify-center"
+        style={{
+            left: "50%",
+            top: "50%",
+            transform: "translate(-50%, -50%)",
+            width: "420px",
+            height: "56px",
+        }}
+    >
+        <WarpText
+            text={`The ${currentLabel} Collection`}
+            color="#f8f5ff"
+            warpStrength={0.06}
+            warpScale={2}
+            speed={0.55}
+            pointerInfluence={0.3}
+            pointerStrength={0.28}
+            refraction={0.018}
+            ripple
+            fontSize={24}
+            fontWeight={800}
+            style={{ width: "100%", height: "100%", minHeight: 0 }}
+            fontFamily="inherit"
+            letterSpacing={-0.04}
+            lineHeight={0.9}
+        />
+    </div>
+)}
 
                 {/* RIGHT — Upcoming collections */}
                 <div className="hidden md:flex items-center gap-6">
