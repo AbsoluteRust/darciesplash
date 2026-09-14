@@ -2,7 +2,7 @@
 import { MenuIcon, XIcon, HomeIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import WarpText from "@/components/WarpText";
 
@@ -17,6 +17,7 @@ const COLLECTIONS = [
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const pathname = usePathname();
+    const router = useRouter();
 
     const match = pathname?.match(/^\/collections\/([^/]+)/);
     const currentSlug = match ? match[1] : null;
@@ -39,13 +40,20 @@ export default function Navbar() {
             >
                 {/* LEFT — Home + past collections */}
                 <div className="flex items-center gap-6">
-                    <Link
-                        href="/"
-                        className="hover:text-pink-500 transition flex items-center gap-2"
-                        aria-label="Home"
-                    >
-                        <HomeIcon size={20} />
-                    </Link>
+<button
+    type="button"
+    onClick={() => {
+        if (pathname === "/") {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        } else {
+            router.push("/");
+        }
+    }}
+    className="hover:text-pink-500 transition flex items-center gap-2 cursor-pointer"
+    aria-label="Home"
+>
+    <HomeIcon size={20} />
+</button>
                     <div className="hidden md:flex items-center gap-6">
                         {before.map(c => (
                             <Link
