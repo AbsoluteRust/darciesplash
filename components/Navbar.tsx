@@ -5,6 +5,7 @@ import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import WarpText from "@/components/WarpText";
+import RarityModeToggle from "@/components/RarityModeToggle";
 
 const COLLECTIONS = [
   { slug: "darcie",    label: "Darcie" },
@@ -100,18 +101,19 @@ export default function Navbar() {
         />
     </div>
 )}
-                {/* RIGHT — Upcoming collections */}
-                <div className="hidden md:flex items-center gap-6 relative z-10">
-                    {after.map(c => (
-                        <Link
-                            key={c.slug}
-                            href={`/collections/${c.slug}`}
-                            className="hover:text-pink-500 transition text-sm"
-                        >
-                            {c.label}
-                        </Link>
-                    ))}
-                </div>
+{/* RIGHT — Upcoming collections + rarity toggle */}
+<div className="hidden md:flex items-center gap-6 relative z-10">
+    {after.map(c => (
+        <Link
+            key={c.slug}
+            href={`/collections/${c.slug}`}
+            className="hover:text-pink-500 transition text-sm"
+        >
+            {c.label}
+        </Link>
+    ))}
+    {isCollectionPage && <RarityModeToggle />}
+</div>
 
                 {/* Mobile menu button */}
                 <button onClick={() => setIsOpen(true)} className="md:hidden">
@@ -119,29 +121,30 @@ export default function Navbar() {
                 </button>
             </motion.nav>
 
-            {/* Mobile menu */}
-            <div
-                className={`fixed inset-0 z-100 bg-black/40 backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-400 ${
-                    isOpen ? "translate-x-0" : "-translate-x-full"
-                }`}
-            >
-                <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
-                {COLLECTIONS.map(c => (
-                    <Link
-                        key={c.slug}
-                        href={`/collections/${c.slug}`}
-                        onNavigate={() => setIsOpen(false)}
-                    >
-                        {c.label}
-                    </Link>
-                ))}
-                <button
-                    onClick={() => setIsOpen(false)}
-                    className="active:ring-3 active:ring-white aspect-square size-10 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-md flex"
-                >
-                    <XIcon />
-                </button>
-            </div>
+{/* Mobile menu */}
+<div
+    className={`fixed inset-0 z-100 bg-black/40 backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-400 ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+    }`}
+>
+    <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
+    {COLLECTIONS.map(c => (
+        <Link
+            key={c.slug}
+            href={`/collections/${c.slug}`}
+            onNavigate={() => setIsOpen(false)}
+        >
+            {c.label}
+        </Link>
+    ))}
+    {isCollectionPage && <RarityModeToggle />}
+    <button
+        onClick={() => setIsOpen(false)}
+        className="active:ring-3 active:ring-white aspect-square size-10 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-md flex"
+    >
+        <XIcon />
+    </button>
+</div>
         </>
     );
 }

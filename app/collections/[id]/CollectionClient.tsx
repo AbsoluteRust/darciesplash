@@ -9,6 +9,7 @@ import { ITEMS } from "@/sections/AccordionGallery";
 import { useRouter } from "next/navigation";
 import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
+import { useRarityMode } from "@/components/RarityModeContext";
 
 type Card = {
   name: string;
@@ -85,6 +86,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const rawParams = use(params);
   const id = rawParams.id;
+
+  const { mode: rarityMode } = useRarityMode();
 
   const [activeEmote, setActiveEmote] = useState<Card | null>(null);
   const [modalCollection, setModalCollection] = useState<string | null>(null);
@@ -798,7 +801,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
                 status="Online"
                 contactText="View"
                 avatarUrl={piece.image}
-                rarity={piece.rarity}
+                rarity={rarityMode === 'off' ? undefined : piece.rarity}
                 showUserInfo={false}
                 enableTilt={true}
                 enableMobileTilt={false}
