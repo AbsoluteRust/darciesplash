@@ -21,7 +21,7 @@ export default function RarityModeToggle() {
     const { mode, setMode } = useRarityMode();
 
     return (
-        <div className="flex items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md p-0.5 text-xs">
+        <div className="flex items-center rounded-full border border-white/15 bg-black/40 backdrop-blur-md p-0.5 text-[11px]">
             {OPTIONS.map(opt => {
                 const active = mode === opt.value;
                 return (
@@ -31,7 +31,7 @@ export default function RarityModeToggle() {
                         disabled={opt.disabled}
                         title={opt.title}
                         onClick={() => !opt.disabled && setMode(opt.value)}
-                        className={`px-3 py-1 rounded-full transition font-medium tracking-wide ${
+                        className={`px-2.5 py-1 rounded-full transition font-medium tracking-wide ${
                             active
                                 ? 'bg-white/90 text-black'
                                 : opt.disabled
