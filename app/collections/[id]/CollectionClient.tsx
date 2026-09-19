@@ -5,6 +5,7 @@ import { use, useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef
 import Iridescence from "../../../components/Iridescence";
 import ProfileCard from "@/components/ProfileCard";
 import LazyMount from "@/components/LazyMount";
+import RelatedCardMini from "@/components/RelatedCardMini";
 import { ITEMS } from "@/sections/AccordionGallery";
 import { useRouter } from "next/navigation";
 import Silk from "@/components/Silk";
@@ -21,6 +22,7 @@ type Card = {
   details?: string;
   link?: string;
   collection?: string;
+  related?: string[];
 };
 
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
@@ -71,15 +73,6 @@ function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): 
   return best;
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
-  const out = [...arr];
-  for (let i = out.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [out[i], out[j]] = [out[j], out[i]];
-  }
-  return out;
-}
-
 const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
 const TOUCH_SCROLL_TOLERANCE = 8;
@@ -114,7 +107,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     crossing: boolean;
   } | null>(null);
 
-  // ---- In-modal cross-collection hint ----
   const [modalHintDirection, setModalHintDirection] = useState<"next" | "prev" | null>(null);
   const [modalHintProgress, setModalHintProgress] = useState(0);
   const modalOverscrollRef = useRef(0);
@@ -193,7 +185,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           glow: c.glow || collGlow,
         }));
 
-      // Halo is a mixed bag — shuffle on each load for variety
       if (coll === "halo") {
         cards = shuffleArray(cards);
       }
@@ -203,12 +194,31 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return map;
   }, [kvCards, deletedNames]);
 
+  // ---- Card lookup by name (across all collections) ----
+  const cardByName = useMemo(() => {
+    const map = new Map<string, Card>();
+    for (const coll of COLLECTION_ORDER) {
+      for (const c of allCardsByCollection[coll] || []) {
+        map.set(c.name, c);
+      }
+    }
+    return map;
+  }, [allCardsByCollection]);
+
   const mergedCards = allCardsByCollection[id] || [];
 
   const art = ITEMS.find(item => item.slug === id);
   const currentIndex = COLLECTION_ORDER.indexOf(id);
   const nextSlug = COLLECTION_ORDER[currentIndex + 1];
   const prevSlug = COLLECTION_ORDER[currentIndex - 1];
+
+  // ---- Related cards for the active card ----
+  const relatedCards = useMemo(() => {
+    if (!activeEmote?.related || activeEmote.related.length === 0) return [];
+    return activeEmote.related
+      .map(name => cardByName.get(name))
+      .filter((c): c is Card => Boolean(c));
+  }, [activeEmote, cardByName]);
 
   // ---- Page scroll → next/prev collection (only when modal closed) ----
   useEffect(() => {
@@ -683,6 +693,30 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     router.push(`/collections/${id}?card=${slug}`, { scroll: false });
   }, [id, router, preloadAdjacent]);
 
+  // ---- Open card by name (used by Related panel) ----
+  const openCardByName = useCallback((name: string) => {
+    for (const coll of COLLECTION_ORDER) {
+      const cards = allCardsByCollection[coll] || [];
+      const idx = cards.findIndex(c => c.name === name);
+      if (idx >= 0) {
+        const newCard = cards[idx];
+        cardTimeoutsRef.current.forEach(t => clearTimeout(t));
+        cardTimeoutsRef.current = [];
+        setCardTransition(null);
+        modalOverscrollRef.current = 0;
+        setModalHintProgress(0);
+        setModalHintDirection(null);
+        setActiveEmote(newCard);
+        setModalCollection(coll);
+        setModalIndex(idx);
+        preloadAdjacent(coll, idx);
+        const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
+        router.replace(`/collections/${coll}?card=${slug}`, { scroll: false });
+        return;
+      }
+    }
+  }, [allCardsByCollection, preloadAdjacent, router]);
+
   if (!art) return null;
 
   const nextLabel = nextSlug ? (ITEMS.find(i => i.slug === nextSlug)?.label ?? "Next Collection") : "";
@@ -701,7 +735,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   return (
     <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
-      {/* Spacer so content clears the fixed navbar */}
       <div style={{ height: "140px" }} aria-hidden="true" />
 
       {id === "celestial" && (
@@ -766,6 +799,25 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
               )}
             </div>
           </div>
+
+          {/* ⭐ Related cards panel (desktop only, hidden via CSS below 1200px) */}
+          {relatedCards.length > 0 && (
+            <div
+              className="related-panel"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="related-panel__label">Related</div>
+              <div className="related-panel__grid">
+                {relatedCards.map(rc => (
+                  <RelatedCardMini
+                    key={rc.name}
+                    card={rc}
+                    onClick={() => openCardByName(rc.name)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
           {modalHintProgress > 0 && modalHintDirection && (
             <div
