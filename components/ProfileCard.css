@@ -30,6 +30,16 @@
   --card-radius: 30px;
 }
 
+/* Avatar fade-in — sits before the main positioning rule so it doesn't override transform */
+.pc-avatar-content .avatar {
+  opacity: 0;
+  transition: opacity 240ms ease-out;
+}
+
+.pc-avatar-content .avatar.loaded {
+  opacity: 1;
+}
+
 .pc-card-wrapper {
   perspective: 500px;
   transform: translate3d(0, 0, 0.1px);
@@ -248,6 +258,7 @@
   backface-visibility: hidden;
 }
 
+/* Main positioning rule — note the transition now includes opacity too */
 .pc-avatar-content .avatar {
   width: 100%;
   position: absolute;
@@ -258,7 +269,7 @@
   bottom: -1px;
   backface-visibility: hidden;
   will-change: transform;
-  transition: transform 120ms ease-out;
+  transition: transform 120ms ease-out, opacity 240ms ease-out;
 }
 
 .pc-avatar-content::before {
@@ -375,7 +386,6 @@
   font-weight: 600;
   margin: 0;
   font-size: min(5svh, 3em);
-  margin: 0;
   background-image: linear-gradient(to bottom, #fff, #6f6fbe);
   background-size: 1em 1.5em;
   -webkit-text-fill-color: transparent;

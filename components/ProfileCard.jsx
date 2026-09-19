@@ -1,7 +1,26 @@
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import './ProfileCard.css';
 
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
+const OPTIMIZE_WIDTHS = [256, 384, 640, 828, 1080, 1200];
+
+function optimizedUrl(url, width) {
+  if (!url) return url;
+  if (!url.startsWith('/') && !url.includes('.public.blob.vercel-storage.com')) {
+    return url;
+  }
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${width}&q=75`;
+}
+
+function optimizedSrcSet(url) {
+  if (!url) return undefined;
+  if (!url.startsWith('/') && !url.includes('.public.blob.vercel-storage.com')) {
+    return undefined;
+  }
+  return OPTIMIZE_WIDTHS
+    .map(w => `${optimizedUrl(url, w)} ${w}w`)
+    .join(', ');
+}
 
 const ANIMATION_CONFIG = {
   INITIAL_DURATION: 1200,
@@ -45,6 +64,7 @@ const ProfileCardComponent = ({
   contactText = 'Contact',
   showUserInfo = true,
   isModal = false,
+  priority = false,
   onContactClick
 }) => {
   const wrapRef = useRef(null);
@@ -52,6 +72,8 @@ const ProfileCardComponent = ({
 
   const enterTimerRef = useRef(null);
   const leaveRafRef = useRef(null);
+
+  const [avatarLoaded, setAvatarLoaded] = useState(false);
 
   const rarityClass = rarity && rarity !== 'Common'
     ? `pc-card-wrapper--rarity-${rarity.toLowerCase()}`
@@ -343,10 +365,15 @@ const ProfileCardComponent = ({
             <div className="pc-content pc-avatar-content">
               <div className={`pc-avatar-crop ${isModal ? "modal-crop" : ""}`}>
                 <img
-                  className="avatar"
-                  src={avatarUrl}
+                  className={`avatar${avatarLoaded ? ' loaded' : ''}`}
+                  src={optimizedUrl(avatarUrl, 828)}
+                  srcSet={optimizedSrcSet(avatarUrl)}
+                  sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
                   alt={`${name || 'User'} avatar`}
-                  loading="lazy"
+                  loading={priority ? 'eager' : 'lazy'}
+                  decoding="async"
+                  fetchPriority={priority ? 'high' : 'low'}
+                  onLoad={() => setAvatarLoaded(true)}
                   onError={e => {
                     const t = e.target;
                     t.style.display = 'none';
