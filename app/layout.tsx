@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import { RarityModeProvider } from "@/components/RarityModeContext";
 import { PageLoadingProvider } from "@/components/PageLoadingContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
@@ -34,6 +35,7 @@ export default function RootLayout({ children, }: Readonly<{
                     </RarityModeProvider>
                 </PageLoadingProvider>
                 <SpeedInsights />
+                <Analytics />
             </body>
         </html>
     );
