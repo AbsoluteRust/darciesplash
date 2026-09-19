@@ -84,6 +84,15 @@ const CARD_CROSSING_ENTER_MS = 420;
 
 const MODAL_OVERSCROLL_TRIGGER = 500;
 
+function shuffleArray<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export default function CollectionClient({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const rawParams = use(params);
