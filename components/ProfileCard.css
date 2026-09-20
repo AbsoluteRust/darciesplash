@@ -738,11 +738,58 @@
 .pc-card-wrapper--rarity-legendary { --rarity-color: #eab308; }
 .pc-card-wrapper--rarity-mythic    { --rarity-color: #ef4444; }
 
-/* Legendary & Mythic: show the artwork in its true colors instead of the
+/* Mythic: show the artwork in its true colors instead of the
    luminosity-blended (purple-ish) look used by lower rarities. */
-.pc-card-wrapper--rarity-legendary .pc-avatar-content,
 .pc-card-wrapper--rarity-mythic .pc-avatar-content {
   mix-blend-mode: normal;
+}
+
+/* --- Legendary hover-reveal: true colours in a radius around the pointer ---
+   A second copy of the artwork sits above the card, blended normally, and is
+   masked to a soft circle centred on the pointer position. The circle follows
+   --pointer-x / --pointer-y, which the tilt engine updates on every frame. */
+
+.pc-colour-reveal {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 15;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+
+  mask-image: radial-gradient(
+    circle 130px at var(--pointer-x) var(--pointer-y),
+    #000 0%,
+    #000 50%,
+    transparent 100%
+  );
+  -webkit-mask-image: radial-gradient(
+    circle 130px at var(--pointer-x) var(--pointer-y),
+    #000 0%,
+    #000 50%,
+    transparent 100%
+  );
+}
+
+.pc-colour-reveal img {
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 100%;
+  transform-origin: 50% 100%;
+  transform: translateX(calc(-50% + (var(--pointer-from-left) - 0.5) * 6px)) translateZ(0)
+    scaleY(calc(1 + (var(--pointer-from-top) - 0.5) * 0.02))
+    scaleX(calc(1 + (var(--pointer-from-left) - 0.5) * 0.01));
+  will-change: transform;
+  transition: transform 120ms ease-out;
+  mix-blend-mode: normal;
+}
+
+.pc-card-shell:hover .pc-colour-reveal,
+.pc-card-shell.active .pc-colour-reveal {
+  opacity: 1;
 }
 
 /* Rarity border + inner glow — both on .pc-card::after so they tilt with the card */

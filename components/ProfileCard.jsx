@@ -128,6 +128,7 @@ const ProfileCardComponent = ({
     ? `pc-card-wrapper--rarity-${rarity.toLowerCase()}`
     : '';
   const SHOW_BADGE = rarity && rarity !== 'Common';
+  const isEmoteLike = title !== 'Mobile Wallpaper' && title !== 'Splash Art';
 
   const tiltEngine = useMemo(() => {
     if (!enableTilt) return null;
@@ -470,6 +471,20 @@ const ProfileCardComponent = ({
             </div>
           </div>
         </section>
+
+        
+        {rarity === 'Legendary' && isEmoteLike && !isModal && (
+          <div className="pc-colour-reveal" aria-hidden="true">
+            <img
+              src={optimizedUrl(avatarUrl, 828)}
+              srcSet={optimizedSrcSet(avatarUrl)}
+              sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+        )}
 
         {SHOW_BADGE && (
           <div className={`pc-rarity-badge pc-rarity-badge--${rarity.toLowerCase()}`}>
