@@ -738,6 +738,13 @@
 .pc-card-wrapper--rarity-legendary { --rarity-color: #eab308; }
 .pc-card-wrapper--rarity-mythic    { --rarity-color: #ef4444; }
 
+/* Legendary & Mythic: show the artwork in its true colors instead of the
+   luminosity-blended (purple-ish) look used by lower rarities. */
+.pc-card-wrapper--rarity-legendary .pc-avatar-content,
+.pc-card-wrapper--rarity-mythic .pc-avatar-content {
+  mix-blend-mode: normal;
+}
+
 /* Rarity border + inner glow — both on .pc-card::after so they tilt with the card */
 .pc-card-wrapper[class*="pc-card-wrapper--rarity-"] .pc-card::after {
   content: '';
