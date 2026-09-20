@@ -470,7 +470,6 @@ const ProfileCardComponent = ({
               </div>
             </div>
           </div>
-        </section>
 
         
         {rarity === 'Legendary' && isEmoteLike && !isModal && (
@@ -485,7 +484,8 @@ const ProfileCardComponent = ({
             />
           </div>
         )}
-
+        </section>
+        
         {SHOW_BADGE && (
           <div className={`pc-rarity-badge pc-rarity-badge--${rarity.toLowerCase()}`}>
             <span className="pc-rarity-badge__emoji">{RARITY_EMOJI[rarity] || "⚪"}</span>
