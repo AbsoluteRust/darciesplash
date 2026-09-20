@@ -755,18 +755,18 @@
   border-radius: var(--card-radius);
   overflow: hidden;
   pointer-events: none;
-  z-index: 15;
+  z-index: 9;
   opacity: 0;
   transition: opacity 180ms ease-out;
 
   mask-image: radial-gradient(
-    circle 130px at var(--pointer-x) var(--pointer-y),
+    circle 160px at var(--pointer-x) var(--pointer-y),
     #000 0%,
     #000 50%,
     transparent 100%
   );
   -webkit-mask-image: radial-gradient(
-    circle 130px at var(--pointer-x) var(--pointer-y),
+    circle 160px at var(--pointer-x) var(--pointer-y),
     #000 0%,
     #000 50%,
     transparent 100%
