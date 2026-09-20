@@ -57,7 +57,7 @@ export default async function Image() {
             display: "flex",
           }}
         >
-          Emotes · Splash Art · Wallpapers · Stickers
+          Emotes · Splash Art · Illustrations · Animations
         </div>
       </div>
     ),

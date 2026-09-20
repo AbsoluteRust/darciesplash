@@ -8,17 +8,16 @@ export const metadata: Metadata = {
     default: "The Commissioner's Collection",
     template: "%s | Darcie Splash",
   },
-  description: "A gallery of commissioned artwork — emotes, splash art, wallpapers, and stickers from Darcie.",
+  description: "A gallery of artwork by Darcie.",
   openGraph: {
     title: "The Commissioner's Collection",
-    description: "A gallery of commissioned artwork — emotes, splash art, wallpapers, and stickers from Darcie.",
+    description: "A gallery of artwork by Darcie",
     url: "https://folly.milktruckers.com",
-    siteName: "Darcie Splash",
     images: [
       {
         url: "/opengraph-image",
-        width: 1200,
-        height: 630,
+        width: 100,
+        height: 600,
         alt: "The Commissioner's Collection",
       },
     ],
@@ -27,7 +26,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "The Commissioner's Collection",
-    description: "A gallery of commissioned artwork — emotes, splash art, wallpapers, and stickers from Darcie.",
+    description: "A gallery of artwork by Darcie",
     images: ["/opengraph-image"],
   },
 };

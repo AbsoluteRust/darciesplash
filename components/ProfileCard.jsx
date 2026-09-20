@@ -43,6 +43,53 @@ const clamp = (v, min = 0, max = 100) => Math.min(Math.max(v, min), max);
 const round = (v, precision = 3) => parseFloat(v.toFixed(precision));
 const adjust = (v, fMin, fMax, tMin, tMax) => round(tMin + ((tMax - tMin) * (v - fMin)) / (fMax - fMin));
 
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? React.useLayoutEffect : React.useEffect;
+
+function useFitText(text, minFontSize = 10) {
+  const ref = useRef(null);
+
+  useIsomorphicLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const fit = () => {
+      // Reset to the CSS-defined size so we can re-measure it
+      el.style.fontSize = '';
+      const natural = parseFloat(getComputedStyle(el).fontSize) || 0;
+      if (!natural) return;
+
+      const available = el.clientWidth;
+      if (available === 0) return;
+
+      // Already fits at natural size (e.g. "Sit") — leave it alone
+      if (el.scrollWidth <= available) return;
+
+      // Binary-search the largest size between min and natural that fits
+      let lo = minFontSize;
+      let hi = natural;
+      el.style.fontSize = `${lo}px`;
+      if (el.scrollWidth > available) return; // even min overflows — give up
+
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollWidth <= available) lo = mid;
+        else hi = mid;
+      }
+      el.style.fontSize = `${lo}px`;
+    };
+
+    fit();
+
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, minFontSize]);
+
+  return ref;
+}
+
 const ProfileCardComponent = ({
   avatarUrl = '<Placeholder for avatar URL>',
   iconUrl = '<Placeholder for icon URL>',
@@ -67,6 +114,8 @@ const ProfileCardComponent = ({
   priority = false,
   onContactClick
 }) => {
+
+  const titleRef = useFitText(name);
   const wrapRef = useRef(null);
   const shellRef = useRef(null);
 
@@ -415,7 +464,7 @@ const ProfileCardComponent = ({
 
             <div className="pc-content">
               <div className="pc-details">
-                <h3>{name}</h3>
+                <h3 ref={titleRef}>{name}</h3>
                 <p>{title}</p>
               </div>
             </div>
