@@ -744,3 +744,103 @@ html.entering-prev .collections-page {
   font-size: 15px;
   font-style: italic;
 }
+
+/* ---- Edit order mode ---- */
+
+.collection-edit-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 9998;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: rgba(236, 72, 153, 0.9);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.4);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.collection-edit-fab:hover {
+  background: rgba(219, 39, 119, 1);
+  transform: translateY(-2px);
+}
+
+.collection-edit-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 14px 24px;
+  background: rgba(236, 72, 153, 0.9);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.collection-edit-banner__text {
+  opacity: 0.9;
+}
+
+.collection-edit-banner__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.collection-edit-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.collection-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.collection-edit-btn--cancel {
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+}
+
+.collection-edit-btn--cancel:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.collection-edit-btn--save {
+  background: #fff;
+  color: #ec4899;
+}
+
+.collection-edit-btn--save:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+/* While in edit mode, disable the automatic grid-nudge transform */
+.collections-page.is-editing-order .grid-container {
+  padding-top: 60px;
+}
+
+.collections-page.is-editing-order .card-grid {
+  cursor: default;
+}
