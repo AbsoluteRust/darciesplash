@@ -188,7 +188,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const id = rawParams.id;
 
   const { mode: rarityMode } = useRarityMode();
-  const { showMine, userId, roles } = useCollectionFilter();
+  const { showMine, setShowMine, userId, roles } = useCollectionFilter();
 
   const [activeEmote, setActiveEmote] = useState<Card | null>(null);
   const [modalCollection, setModalCollection] = useState<string | null>(null);
