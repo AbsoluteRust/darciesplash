@@ -25,6 +25,14 @@ type Card = {
   related?: string[];
 };
 
+type Chroma = {
+  name: string;
+  parent: string;
+  parentCollection?: string;
+  rarity: string;
+  image: string;
+};
+
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
 const COLLECTION_GLOW: Record<string, string> = {
@@ -107,6 +115,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [kvCards, setKvCards] = useState<Card[]>([]);
   const [deletedNames, setDeletedNames] = useState<string[]>([]);
   const [emoteTotals, setEmoteTotals] = useState<Record<string, number>>({});
+  const [chromas, setChromas] = useState<Chroma[]>([]);
+  const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
@@ -120,7 +130,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [modalHintProgress, setModalHintProgress] = useState(0);
   const modalOverscrollRef = useRef(0);
 
-  // ---- Transition helper ----
   const triggerTransition = useCallback((direction: "next" | "prev", slug: string) => {
     if (leaving) return;
     setLeaving(direction);
@@ -137,7 +146,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const triggerTransitionRef = useRef(triggerTransition);
   useEffect(() => { triggerTransitionRef.current = triggerTransition; }, [triggerTransition]);
 
-  // ---- Entry animation when arriving from a collection transition ----
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     const dir = sessionStorage.getItem("collection-transition-entry");
@@ -153,23 +161,25 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     };
   }, []);
 
-  // ---- Load KV data ----
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [cardsRes, deletedRes, emotesRes] = await Promise.all([
+        const [cardsRes, deletedRes, emotesRes, chromasRes] = await Promise.all([
           fetch("/api/cards/list", { cache: "no-store" }),
           fetch("/api/cards/deleted", { cache: "no-store" }),
           fetch("/api/emotes/totals", { cache: "no-store" }),
+          fetch("/api/chromas/list", { cache: "no-store" }),
         ]);
         const cards = cardsRes.ok ? await cardsRes.json() : [];
         const deleted = deletedRes.ok ? await deletedRes.json() : [];
         const emoteTotals = emotesRes.ok ? await emotesRes.json() : {};
+        const chromaList = chromasRes.ok ? await chromasRes.json() : [];
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
           setEmoteTotals(emoteTotals);
+          setChromas(chromaList);
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -179,7 +189,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return () => { cancelled = true; };
   }, []);
 
-  // ---- Group cards by collection ----
   const allCardsByCollection = useMemo(() => {
     const deletedSet = new Set(deletedNames.map(n => n.toLowerCase()));
     const map: Record<string, Card[]> = {};
@@ -203,7 +212,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return map;
   }, [kvCards, deletedNames]);
 
-  // ---- Card lookup by name (across all collections) ----
   const cardByName = useMemo(() => {
     const map = new Map<string, Card>();
     for (const coll of COLLECTION_ORDER) {
@@ -221,7 +229,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const nextSlug = COLLECTION_ORDER[currentIndex + 1];
   const prevSlug = COLLECTION_ORDER[currentIndex - 1];
 
-  // ---- Related cards for the active card ----
   const relatedCards = useMemo(() => {
     if (!activeEmote?.related || activeEmote.related.length === 0) return [];
     return activeEmote.related
@@ -229,7 +236,26 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       .filter((c): c is Card => Boolean(c));
   }, [activeEmote, cardByName]);
 
-  // ---- Page scroll → next/prev collection (only when modal closed) ----
+  const chromasByParent = useMemo(() => {
+    const map = new Map<string, Chroma[]>();
+    for (const c of chromas) {
+      const key = String(c.parent || "").toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(c);
+    }
+    return map;
+  }, [chromas]);
+
+  const chromasForActive = useMemo(() => {
+    if (!activeEmote?.name) return [];
+    return chromasByParent.get(activeEmote.name.toLowerCase()) || [];
+  }, [activeEmote, chromasByParent]);
+
+  useEffect(() => {
+    setActiveChroma(null);
+  }, [activeEmote?.name]);
+
   useEffect(() => {
     if (activeEmote) return;
     if (!nextSlug && !prevSlug) return;
@@ -349,14 +375,12 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     };
   }, [activeEmote, nextSlug, prevSlug, router]);
 
-  // ---- Refs ----
   const activeEmoteRef = useRef(activeEmote);
   const modalCollectionRef = useRef(modalCollection);
   const modalIndexRef = useRef(modalIndex);
   const allCardsByCollectionRef = useRef(allCardsByCollection);
   const cardTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // ---- Card image preloading ----
   const PRELOAD_RADIUS = 2;
   const preloadedRef = useRef<Set<string>>(new Set());
 
@@ -412,7 +436,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     };
   }, []);
 
-  // ---- Modal navigation (with slide transition) ----
   const navigateModalCard = useCallback((direction: 1 | -1) => {
     cardTimeoutsRef.current.forEach(t => clearTimeout(t));
     cardTimeoutsRef.current = [];
@@ -486,7 +509,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const navigateModalCardRef = useRef(navigateModalCard);
   useEffect(() => { navigateModalCardRef.current = navigateModalCard; }, [navigateModalCard]);
 
-  // ---- Modal scroll (wheel + touch) with cross-collection hint ----
   useEffect(() => {
     let wheelAccum = 0;
     let touchActive = false;
@@ -623,6 +645,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     modalOverscrollRef.current = 0;
     setModalHintProgress(0);
     setModalHintDirection(null);
+    setActiveChroma(null);
 
     const coll = modalCollection || id;
     setActiveEmote(null);
@@ -634,6 +657,10 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      if (activeChroma) {
+        setActiveChroma(null);
+        return;
+      }
       if (activeEmote) {
         closeModal();
         return;
@@ -642,7 +669,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [activeEmote, closeModal, router]);
+  }, [activeEmote, activeChroma, closeModal, router]);
 
   useEffect(() => {
     if (!activeEmote) return;
@@ -702,7 +729,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     router.push(`/collections/${id}?card=${slug}`, { scroll: false });
   }, [id, router, preloadAdjacent]);
 
-  // ---- Open card by name (used by Related panel) ----
   const openCardByName = useCallback((name: string) => {
     for (const coll of COLLECTION_ORDER) {
       const cards = allCardsByCollection[coll] || [];
@@ -809,7 +835,26 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* ⭐ Related cards panel (desktop only, hidden via CSS below 1200px) */}
+          {/* Chroma panel (desktop only, hidden via CSS below 1200px) */}
+          {chromasForActive.length > 0 && (
+            <div
+              className="chroma-panel"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="chroma-panel__label">Chromas</div>
+              <div className="chroma-panel__grid">
+                {chromasForActive.map(ch => (
+                  <RelatedCardMini
+                    key={`${ch.name}|${ch.rarity}`}
+                    card={{ name: ch.name, image: ch.image }}
+                    onClick={() => setActiveChroma(ch)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Related cards panel (desktop only, hidden via CSS below 1200px) */}
           {relatedCards.length > 0 && (
             <div
               className="related-panel"
@@ -824,6 +869,22 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
                     onClick={() => openCardByName(rc.name)}
                   />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeChroma && (
+            <div
+              className="chroma-lightbox"
+              onClick={() => setActiveChroma(null)}
+            >
+              <div
+                className="chroma-lightbox__inner"
+                onClick={e => e.stopPropagation()}
+              >
+                <img src={activeChroma.image} alt={activeChroma.name} />
+                <div className="chroma-lightbox__name">{activeChroma.name}</div>
+                <div className="chroma-lightbox__rarity">{activeChroma.rarity}</div>
               </div>
             </div>
           )}

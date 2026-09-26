@@ -2,7 +2,6 @@ html, body {
   overscroll-behavior-y: contain;
 }
 
-/* Keep your existing scroll-behavior if you like */
 html {
   scroll-behavior: smooth;
   overflow-x: hidden;
@@ -10,7 +9,6 @@ html {
   min-height: 100%;
 }
 
-/* Chrome / Safari: hide scrollbar visuals */
 body::-webkit-scrollbar {
   width: 0;
   height: 0;
@@ -46,7 +44,7 @@ body::-webkit-scrollbar {
   width: 100vw;
   height: 100vh;
   z-index: -1;
-  pointer-events: none; /* optional but helpful */
+  pointer-events: none;
 }
 
 .remix-modal-stack {
@@ -90,8 +88,8 @@ body::-webkit-scrollbar {
 }
 
 .card-grid {
-  width: 100%;        /* important */
-  max-width: 100%;    /* VERY important */
+  width: 100%;
+  max-width: 100%;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 32px;
@@ -99,7 +97,7 @@ body::-webkit-scrollbar {
 
 .grid-container {
   width: 100%;
-  max-width: 1600px; /* must be >= 1548px */
+  max-width: 1600px;
   margin: 0 auto;
   padding: 40px 0;
 }
@@ -118,7 +116,7 @@ body::-webkit-scrollbar {
 
 @media (max-width: 600px) {
   .card-grid {
-    grid-template-columns: repeat(2, 1fr);   /* was 1fr */
+    grid-template-columns: repeat(2, 1fr);
     gap: 14px;
   }
 }
@@ -213,10 +211,10 @@ body::-webkit-scrollbar {
 
   display: flex;
   justify-content: center;
-  align-items: flex-start;   /* ⭐ FIXED */
+  align-items: flex-start;
 
-  overflow-y: auto;          /* ⭐ allow scroll */
-  overflow-x: hidden;        /* ⭐ prevent sideways escape */
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .emote-modal-overlay::-webkit-scrollbar {
@@ -239,7 +237,7 @@ body::-webkit-scrollbar {
   height: auto;
 
   max-width: 100%;
-  max-height: 100%;      /* ⭐ now tied to art-layout’s max-height */
+  max-height: 100%;
 
   object-fit: contain;
   display: block;
@@ -250,7 +248,6 @@ body::-webkit-scrollbar {
   display: none;
 }
 
-/* Fade-in animation */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -471,8 +468,6 @@ html.entering-prev .collections-page {
   }
 }
 
-/* ---- Mobile: big tap-to-close zone below the modal card ---- */
-
 @media (max-width: 900px) {
   .emote-modal-overlay {
     padding-bottom: 260px;
@@ -589,4 +584,107 @@ html.entering-prev .collections-page {
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
+}
+
+/* ---- Chroma panel (mirror of related panel, on the left) ---- */
+
+.chroma-panel {
+  display: none;
+  position: fixed;
+  top: 12vh;
+  left: 6vw;
+  width: 260px;
+  z-index: 10001;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 1200px) {
+  .chroma-panel {
+    display: flex;
+  }
+}
+
+.chroma-panel__label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  user-select: none;
+}
+
+.chroma-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-right: 2px;
+}
+
+.chroma-panel__grid::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- Chroma lightbox ---- */
+
+.chroma-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+  animation: fadeIn 180ms ease-out;
+}
+
+.chroma-lightbox__inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: min(90vw, 700px);
+  max-height: 90vh;
+  cursor: default;
+}
+
+.chroma-lightbox__inner img {
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75);
+}
+
+.chroma-lightbox__name {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.chroma-lightbox__rarity {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: -6px;
 }
