@@ -4,6 +4,7 @@ import LenisScroll from "@/components/LenisScroll";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { RarityModeProvider } from "@/components/RarityModeContext";
+import { CollectionFilterProvider } from "@/components/CollectionFilterContext";
 import { PageLoadingProvider } from "@/components/PageLoadingContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
@@ -29,9 +30,11 @@ export default function RootLayout({ children, }: Readonly<{
                 <LenisScroll />
                 <PageLoadingProvider>
                     <RarityModeProvider>
-                        <Navbar />
-                        <div style={{ minHeight: '100vh' }}>{children}</div>
-                        <Footer />
+                        <CollectionFilterProvider>
+                            <Navbar />
+                            <div style={{ minHeight: '100vh' }}>{children}</div>
+                            <Footer />
+                        </CollectionFilterProvider>
                     </RarityModeProvider>
                 </PageLoadingProvider>
                 <SpeedInsights />

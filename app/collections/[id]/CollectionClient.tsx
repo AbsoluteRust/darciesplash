@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
 import { useRarityMode } from "@/components/RarityModeContext";
+import { useCollectionFilter } from "@/components/CollectionFilterContext";
 
 type Card = {
   name: string;
@@ -83,8 +84,6 @@ function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): 
   return best;
 }
 
-// Highest rarity the user owns a given card at, from a user_cards inventory.
-// Returns null if the user doesn't own the card at any rarity.
 function getOwnedRarity(cardName: string, inv: Record<string, number>): string | null {
   const lower = cardName.toLowerCase();
   let best: string | null = null;
@@ -130,6 +129,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const id = rawParams.id;
 
   const { mode: rarityMode } = useRarityMode();
+  const { showMine } = useCollectionFilter();
 
   const [activeEmote, setActiveEmote] = useState<Card | null>(null);
   const [modalCollection, setModalCollection] = useState<string | null>(null);
@@ -141,7 +141,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [chromas, setChromas] = useState<Chroma[]>([]);
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
   const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
-  const [showMine, setShowMine] = useState(false);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
@@ -252,7 +251,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   const mergedCards = allCardsByCollection[id] || [];
 
-  // Names the signed-in user owns, lowercased for case-insensitive matching.
   const ownedNames = useMemo(() => {
     if (!myInv) return null;
     const set = new Set<string>();
@@ -263,7 +261,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return set;
   }, [myInv]);
 
-  // Cards to render in the grid, filtered by "My Collection" when active.
   const displayCards = useMemo(() => {
     if (!showMine || !ownedNames) return mergedCards;
     return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
@@ -955,25 +952,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
               <span className="collection-hint__title">{modalHintTargetLabel}</span>
             </div>
           )}
-        </div>
-      )}
-
-      {myInv !== null && (
-        <div className="collection-toggle">
-          <button
-            type="button"
-            className={`collection-toggle__btn${!showMine ? " is-active" : ""}`}
-            onClick={() => setShowMine(false)}
-          >
-            All Cards
-          </button>
-          <button
-            type="button"
-            className={`collection-toggle__btn${showMine ? " is-active" : ""}`}
-            onClick={() => setShowMine(true)}
-          >
-            My Collection
-          </button>
         </div>
       )}
 
