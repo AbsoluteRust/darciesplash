@@ -696,3 +696,51 @@ html.entering-prev .collections-page {
   font-weight: 600;
   margin-top: -6px;
 }
+
+/* ---- Personal collection toggle ---- */
+
+.collection-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  margin: 0 auto 28px auto;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.collection-toggle__btn {
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.collection-toggle__btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.collection-toggle__btn.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.collection-empty {
+  text-align: center;
+  padding: 100px 20px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 15px;
+  font-style: italic;
+}

@@ -35,6 +35,8 @@ type Chroma = {
 
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
+const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
+
 const COLLECTION_GLOW: Record<string, string> = {
   celestial: "rgba(125, 190, 255, 0.67)",
   madolche: "rgba(255, 180, 220, 0.67)",
@@ -81,6 +83,27 @@ function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): 
   return best;
 }
 
+// Highest rarity the user owns a given card at, from a user_cards inventory.
+// Returns null if the user doesn't own the card at any rarity.
+function getOwnedRarity(cardName: string, inv: Record<string, number>): string | null {
+  const lower = cardName.toLowerCase();
+  let best: string | null = null;
+  let bestRank = -1;
+  for (const key of Object.keys(inv)) {
+    const parts = key.split("|");
+    if (parts.length !== 2) continue;
+    const [name, rarity] = parts;
+    if (!name || !rarity) continue;
+    if (name.toLowerCase() !== lower) continue;
+    const rank = RARITY_ORDER.indexOf(rarity);
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = rarity;
+    }
+  }
+  return best;
+}
+
 const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
 const TOUCH_SCROLL_TOLERANCE = 8;
@@ -117,6 +140,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [emoteTotals, setEmoteTotals] = useState<Record<string, number>>({});
   const [chromas, setChromas] = useState<Chroma[]>([]);
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
+  const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
+  const [showMine, setShowMine] = useState(false);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
@@ -165,21 +190,24 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     let cancelled = false;
     async function load() {
       try {
-        const [cardsRes, deletedRes, emotesRes, chromasRes] = await Promise.all([
+        const [cardsRes, deletedRes, emotesRes, chromasRes, meRes] = await Promise.all([
           fetch("/api/cards/list", { cache: "no-store" }),
           fetch("/api/cards/deleted", { cache: "no-store" }),
           fetch("/api/emotes/totals", { cache: "no-store" }),
           fetch("/api/chromas/list", { cache: "no-store" }),
+          fetch("/api/me/cards", { cache: "no-store" }),
         ]);
         const cards = cardsRes.ok ? await cardsRes.json() : [];
         const deleted = deletedRes.ok ? await deletedRes.json() : [];
         const emoteTotals = emotesRes.ok ? await emotesRes.json() : {};
         const chromaList = chromasRes.ok ? await chromasRes.json() : [];
+        const inv = meRes.ok ? await meRes.json() : null;
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
           setEmoteTotals(emoteTotals);
           setChromas(chromaList);
+          setMyInv(inv);
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -223,6 +251,23 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   }, [allCardsByCollection]);
 
   const mergedCards = allCardsByCollection[id] || [];
+
+  // Names the signed-in user owns, lowercased for case-insensitive matching.
+  const ownedNames = useMemo(() => {
+    if (!myInv) return null;
+    const set = new Set<string>();
+    for (const key of Object.keys(myInv)) {
+      const [name] = key.split("|");
+      if (name) set.add(name.toLowerCase());
+    }
+    return set;
+  }, [myInv]);
+
+  // Cards to render in the grid, filtered by "My Collection" when active.
+  const displayCards = useMemo(() => {
+    if (!showMine || !ownedNames) return mergedCards;
+    return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
+  }, [mergedCards, showMine, ownedNames]);
 
   const art = ITEMS.find(item => item.slug === id);
   const currentIndex = COLLECTION_ORDER.indexOf(id);
@@ -839,7 +884,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Chroma panel (desktop only, hidden via CSS below 1200px) */}
           {chromasForActive.length > 0 && (
             <div
               className="chroma-panel"
@@ -859,7 +903,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
             </div>
           )}
 
-          {/* Related cards panel (desktop only, hidden via CSS below 1200px) */}
           {relatedCards.length > 0 && (
             <div
               className="related-panel"
@@ -915,49 +958,86 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      <div className="grid-container">
-        <div
-          className="card-grid"
-          style={{
-            transform: `translateY(${nudge}px)`,
-            transition: nudge === 0
-              ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
-              : "transform 80ms ease-out",
-          }}
-        >
-          {mergedCards.map((piece, idx) => (
-            <LazyMount
-              key={`${piece.name}|${idx}`}
-              rootMargin="600px"
-              placeholderHeight={560}
-            >
-              <ProfileCard
-                name={piece.name}
-                title={
-                  piece.type === "Emote"
-                    ? (() => {
-                        const n = findEmoteCount(piece.name, emoteTotals);
-                        return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
-                      })()
-                    : piece.type
-                }
-                handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
-                status="Online"
-                contactText="View"
-                avatarUrl={piece.image}
-                rarity={rarityMode === 'off' ? undefined : piece.rarity}
-                showUserInfo={false}
-                enableTilt={true}
-                enableMobileTilt={false}
-                behindGlowColor={piece.glow || DEFAULT_GLOW}
-                iconUrl={null}
-                behindGlowEnabled
-                innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-                onContactClick={() => openCard(piece, idx)}
-              />
-            </LazyMount>
-          ))}
+      {myInv !== null && (
+        <div className="collection-toggle">
+          <button
+            type="button"
+            className={`collection-toggle__btn${!showMine ? " is-active" : ""}`}
+            onClick={() => setShowMine(false)}
+          >
+            All Cards
+          </button>
+          <button
+            type="button"
+            className={`collection-toggle__btn${showMine ? " is-active" : ""}`}
+            onClick={() => setShowMine(true)}
+          >
+            My Collection
+          </button>
         </div>
+      )}
+
+      <div className="grid-container">
+        {showMine && displayCards.length === 0 ? (
+          <div className="collection-empty">
+            You haven't collected any {art?.label ?? "cards"} yet.
+          </div>
+        ) : (
+          <div
+            className="card-grid"
+            style={{
+              transform: `translateY(${nudge}px)`,
+              transition: nudge === 0
+                ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+                : "transform 80ms ease-out",
+            }}
+          >
+            {displayCards.map((piece, idx) => {
+              const ownedRarity = showMine && myInv
+                ? getOwnedRarity(piece.name, myInv)
+                : null;
+
+              return (
+                <LazyMount
+                  key={`${piece.name}|${idx}`}
+                  rootMargin="600px"
+                  placeholderHeight={560}
+                >
+                  <ProfileCard
+                    name={piece.name}
+                    title={
+                      piece.type === "Emote"
+                        ? (() => {
+                            const n = findEmoteCount(piece.name, emoteTotals);
+                            return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
+                          })()
+                        : piece.type
+                    }
+                    handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
+                    status="Online"
+                    contactText="View"
+                    avatarUrl={piece.image}
+                    rarity={
+                      rarityMode === "off"
+                        ? undefined
+                        : (showMine && ownedRarity)
+                          ? ownedRarity
+                          : piece.rarity
+                    }
+                    showUserInfo={false}
+                    enableTilt={true}
+                    enableMobileTilt={false}
+                    behindGlowColor={piece.glow || DEFAULT_GLOW}
+                    iconUrl={null}
+                    behindGlowEnabled
+                    innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+                    onContactClick={() => openCard(piece, idx)}
+                  />
+                </LazyMount>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {hintProgress > 0 && hintDirection && !leaving && (
