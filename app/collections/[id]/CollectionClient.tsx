@@ -542,13 +542,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       return { atBoundary: false, nextCollSlug: null };
     };
 
-const handleWheel = (e: WheelEvent) => {
-  if (!isModalOpen()) return;
+    const handleWheel = (e: WheelEvent) => {
+      if (!isModalOpen()) return;
 
-  const target = e.target as HTMLElement | null;
-  if (target?.closest(".related-panel, .chroma-panel")) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".related-panel, .chroma-panel")) return;
 
-  e.preventDefault();
+      e.preventDefault();
 
       const goingNext = e.deltaY > 0;
       const { atBoundary } = getBoundaryInfo(goingNext);
@@ -844,6 +844,7 @@ const handleWheel = (e: WheelEvent) => {
             <div
               className="chroma-panel"
               onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
             >
               <div className="chroma-panel__label">Chromas</div>
               <div className="chroma-panel__grid">
@@ -863,6 +864,7 @@ const handleWheel = (e: WheelEvent) => {
             <div
               className="related-panel"
               onClick={e => e.stopPropagation()}
+              onWheel={e => e.stopPropagation()}
             >
               <div className="related-panel__label">Related</div>
               <div className="related-panel__grid">
