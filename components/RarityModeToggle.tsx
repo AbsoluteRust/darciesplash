@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 import { useRarityMode, type RarityMode } from './RarityModeContext';
 import { useCollectionFilter } from './CollectionFilterContext';
 
@@ -16,14 +16,17 @@ const OPTIONS: {
 export default function RarityModeToggle() {
   const { mode, setMode } = useRarityMode();
   const { showMine, setShowMine, isSignedIn } = useCollectionFilter();
-  const router = useRouter();
 
   const handleLockClick = () => {
-    if (isSignedIn === null) return; // still loading, do nothing
+    if (isSignedIn === null) return; // still loading
+
     if (!isSignedIn) {
-      router.push('/signin');
+      // Direct to Discord — no intermediate /signin page.
+      // callbackUrl sends the user back to where they were after auth.
+      signIn('discord', { callbackUrl: window.location.href });
       return;
     }
+
     setShowMine(!showMine);
   };
 
