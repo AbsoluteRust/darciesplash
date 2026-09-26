@@ -8,6 +8,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
+    jwt({ token, account, profile }) {
+      if (account && profile) {
+        // Discord's profile.id is the snowflake — pin it to the token
+        token.sub = (profile as any).id ?? token.sub;
+      }
+      return token;
+    },
     session({ session, token }) {
       if (token.sub) {
         session.user.id = token.sub;
