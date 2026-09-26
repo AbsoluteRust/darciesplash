@@ -542,9 +542,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       return { atBoundary: false, nextCollSlug: null };
     };
 
-    const handleWheel = (e: WheelEvent) => {
-      if (!isModalOpen()) return;
-      e.preventDefault();
+const handleWheel = (e: WheelEvent) => {
+  if (!isModalOpen()) return;
+
+  const target = e.target as HTMLElement | null;
+  if (target?.closest(".related-panel, .chroma-panel")) return;
+
+  e.preventDefault();
 
       const goingNext = e.deltaY > 0;
       const { atBoundary } = getBoundaryInfo(goingNext);
