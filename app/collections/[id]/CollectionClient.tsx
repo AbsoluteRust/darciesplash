@@ -50,6 +50,11 @@ type Chroma = {
   image: string;
 };
 
+type EmoteInfo = {
+  id: string;
+  animated: boolean;
+};
+
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
 const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
@@ -119,6 +124,34 @@ function getOwnedRarity(cardName: string, inv: Record<string, number>): string |
   return best;
 }
 
+function findEmoteInfo(
+  cardName: string,
+  emoteMap: Record<string, EmoteInfo>
+): { name: string; id: string; animated: boolean } | null {
+  if (!cardName || !emoteMap) return null;
+
+  if (emoteMap[cardName]) {
+    return { name: cardName, ...emoteMap[cardName] };
+  }
+
+  const lower = cardName.toLowerCase();
+  for (const [name, info] of Object.entries(emoteMap)) {
+    if (name.toLowerCase() === lower) {
+      return { name, ...info };
+    }
+  }
+
+  const norm = normalizeForMatch(cardName);
+  if (!norm) return null;
+  for (const [name, info] of Object.entries(emoteMap)) {
+    const nNorm = normalizeForMatch(name);
+    if (nNorm === norm || nNorm.endsWith(norm)) {
+      return { name, ...info };
+    }
+  }
+  return null;
+}
+
 function applySavedOrder(cards: Card[], savedOrder: string[]): Card[] {
   if (!savedOrder || savedOrder.length === 0) return cards;
   const byName = new Map(cards.map(c => [c.name, c]));
@@ -130,7 +163,6 @@ function applySavedOrder(cards: Card[], savedOrder: string[]): Card[] {
       byName.delete(name);
     }
   }
-  // Cards not in the saved order (newly added) appended at the end
   for (const c of byName.values()) out.push(c);
   return out;
 }
@@ -201,11 +233,11 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
   const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
   const [savedOrder, setSavedOrder] = useState<string[]>([]);
+  const [emoteMap, setEmoteMap] = useState<Record<string, EmoteInfo>>({});
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
 
-  // Edit-mode state
   const [editMode, setEditMode] = useState(false);
   const [editOrder, setEditOrder] = useState<Card[] | null>(null);
   const [saving, setSaving] = useState(false);
@@ -260,13 +292,14 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     let cancelled = false;
     async function load() {
       try {
-        const [cardsRes, deletedRes, emotesRes, chromasRes, meRes, orderRes] = await Promise.all([
+        const [cardsRes, deletedRes, emotesRes, chromasRes, meRes, orderRes, emoteIdsRes] = await Promise.all([
           fetch("/api/cards/list", { cache: "no-store" }),
           fetch("/api/cards/deleted", { cache: "no-store" }),
           fetch("/api/emotes/totals", { cache: "no-store" }),
           fetch("/api/chromas/list", { cache: "no-store" }),
           fetch("/api/me/cards", { cache: "no-store" }),
           fetch(`/api/collection-order?collection=${encodeURIComponent(id)}`, { cache: "no-store" }),
+          fetch("/api/emotes/ids", { cache: "no-store" }),
         ]);
         const cards = cardsRes.ok ? await cardsRes.json() : [];
         const deleted = deletedRes.ok ? await deletedRes.json() : [];
@@ -274,6 +307,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         const chromaList = chromasRes.ok ? await chromasRes.json() : [];
         const inv = meRes.ok ? await meRes.json() : null;
         const orderData = orderRes.ok ? await orderRes.json() : { order: [] };
+        const emoteIds = emoteIdsRes.ok ? await emoteIdsRes.json() : {};
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
@@ -281,6 +315,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           setChromas(chromaList);
           setMyInv(inv);
           setSavedOrder(Array.isArray(orderData.order) ? orderData.order : []);
+          setEmoteMap(emoteIds && typeof emoteIds === "object" ? emoteIds : {});
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -335,7 +370,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return set;
   }, [myInv]);
 
-  // Base list (before order), then ordered. Edit mode uses the working draft.
   const displayCards = useMemo(() => {
     if (editMode && editOrder) return editOrder;
 
@@ -343,7 +377,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       ? mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()))
       : mergedCards;
 
-    if (showMine) return base; // personal view keeps natural order for now
+    if (showMine) return base;
     return applySavedOrder(base, savedOrder);
   }, [mergedCards, showMine, ownedNames, savedOrder, editMode, editOrder]);
 
@@ -351,6 +385,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     () => canEditCollectionOrder(userId, id, roles),
     [userId, id, roles]
   );
+
+  const canCopyEmotes = roles?.darsubscribbler === true;
 
   const enterEditMode = useCallback(() => {
     setShowMine(false);
@@ -955,6 +991,10 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
+    const copyEmote = canCopyEmotes && piece.type === "Emote"
+      ? findEmoteInfo(piece.name, emoteMap)
+      : null;
+
     return (
       <ProfileCard
         name={piece.name}
@@ -985,6 +1025,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         behindGlowEnabled
         innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
         onContactClick={() => openCard(piece, idx)}
+        copyEmote={copyEmote}
       />
     );
   };

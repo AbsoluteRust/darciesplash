@@ -54,7 +54,6 @@ function useFitText(text, minFontSize = 10) {
     if (!el) return;
 
     const fit = () => {
-      // Reset to the CSS-defined size so we can re-measure it
       el.style.fontSize = '';
       const natural = parseFloat(getComputedStyle(el).fontSize) || 0;
       if (!natural) return;
@@ -62,14 +61,12 @@ function useFitText(text, minFontSize = 10) {
       const available = el.clientWidth;
       if (available === 0) return;
 
-      // Already fits at natural size (e.g. "Sit") — leave it alone
       if (el.scrollWidth <= available) return;
 
-      // Binary-search the largest size between min and natural that fits
       let lo = minFontSize;
       let hi = natural;
       el.style.fontSize = `${lo}px`;
-      if (el.scrollWidth > available) return; // even min overflows — give up
+      if (el.scrollWidth > available) return;
 
       for (let i = 0; i < 8; i++) {
         const mid = (lo + hi) / 2;
@@ -112,7 +109,8 @@ const ProfileCardComponent = ({
   showUserInfo = true,
   isModal = false,
   priority = false,
-  onContactClick
+  onContactClick,
+  copyEmote = null,
 }) => {
 
   const titleRef = useFitText(name);
@@ -123,12 +121,39 @@ const ProfileCardComponent = ({
   const leaveRafRef = useRef(null);
 
   const [avatarLoaded, setAvatarLoaded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const copiedTimerRef = useRef(null);
 
   const rarityClass = rarity && rarity !== 'Common'
     ? `pc-card-wrapper--rarity-${rarity.toLowerCase()}`
     : '';
   const SHOW_BADGE = rarity && rarity !== 'Common';
   const isEmoteLike = title !== 'Mobile Wallpaper' && title !== 'Splash Art';
+
+  const handleCopyEmote = useCallback(async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (!copyEmote) return;
+    const ext = copyEmote.animated ? 'gif' : 'png';
+    const url = `https://cdn.discordapp.com/emojis/${copyEmote.id}.${ext}?size=128`;
+    const markdown = `[${copyEmote.name}](${url})`;
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopied(true);
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = window.setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error('[copy emote] failed:', err);
+    }
+  }, [copyEmote]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
+    };
+  }, []);
 
   const tiltEngine = useMemo(() => {
     if (!enableTilt) return null;
@@ -471,21 +496,33 @@ const ProfileCardComponent = ({
             </div>
           </div>
 
-        
-        {rarity === 'Legendary' && isEmoteLike && !isModal && (
-          <div className="pc-colour-reveal" aria-hidden="true">
-            <img
-              src={optimizedUrl(avatarUrl, 828)}
-              srcSet={optimizedSrcSet(avatarUrl)}
-              sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        )}
+          {rarity === 'Legendary' && isEmoteLike && !isModal && (
+            <div className="pc-colour-reveal" aria-hidden="true">
+              <img
+                src={optimizedUrl(avatarUrl, 828)}
+                srcSet={optimizedSrcSet(avatarUrl)}
+                sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          )}
         </section>
-        
+
+        {copyEmote && (
+          <button
+            type="button"
+            className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
+            onClick={handleCopyEmote}
+            title={copied ? 'Copied!' : `Copy ${copyEmote.name} for Discord`}
+            aria-label={`Copy emote ${copyEmote.name}`}
+            style={{ pointerEvents: 'auto' }}
+          >
+            {copied ? '✓' : '📋'}
+          </button>
+        )}
+
         {SHOW_BADGE && (
           <div className={`pc-rarity-badge pc-rarity-badge--${rarity.toLowerCase()}`}>
             <span className="pc-rarity-badge__emoji">{RARITY_EMOJI[rarity] || "⚪"}</span>
