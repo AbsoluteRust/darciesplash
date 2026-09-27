@@ -956,23 +956,19 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
-    // Build the copy-to-clipboard markdown URL. Uses Next.js's image optimizer
-    // to serve the artwork at ~emote size instead of the source's natural size.
-    let copyEmote: { name: string; url: string } | null = null;
-    if (canCopyEmotes && piece.type === "Emote" && piece.image) {
-      const origin = typeof window !== "undefined" ? window.location.origin : null;
-      if (origin) {
-        const isOptimizable =
-          piece.image.startsWith("/") ||
-          piece.image.includes(".public.blob.vercel-storage.com");
-
-        const url = isOptimizable
-          ? `${origin}/_next/image?url=${encodeURIComponent(piece.image)}&w=${EMOTE_PX}&q=90`
-          : piece.image;
-
-        copyEmote = { name: piece.name, url };
-      }
-    }
+// Build the copy-to-clipboard markdown URL. Uses the original image URL
+// directly so Discord's embed scraper recognises it as an image. Next.js's
+// /_next/image endpoint doesn't end in a file extension and Discord won't
+// embed it.
+let copyEmote: { name: string; url: string } | null = null;
+if (canCopyEmotes && piece.type === "Emote" && piece.image) {
+  const origin = typeof window !== "undefined" ? window.location.origin : null;
+  if (origin) {
+    const isAbsolute = /^https?:\/\//i.test(piece.image);
+    const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
+    copyEmote = { name: piece.name, url };
+  }
+}
 
     return (
       <ProfileCard
