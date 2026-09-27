@@ -1,8 +1,7 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
-import sharp from "sharp";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 
 const RARITY_COLORS: Record<string, string> = {
   Common: "#9ca3af",
@@ -13,24 +12,6 @@ const RARITY_COLORS: Record<string, string> = {
   Mythic: "#ef4444",
 };
 
-async function compressImage(url: string, maxWidth = 800): Promise<string | null> {
-  try {
-    const res = await fetch(url, { cache: "force-cache" });
-    if (!res.ok) return null;
-    const buf = Buffer.from(await res.arrayBuffer());
-
-    const out = await sharp(buf)
-      .resize({ width: maxWidth, withoutEnlargement: true })
-      .webp({ quality: 78 })
-      .toBuffer();
-
-    return `data:image/webp;base64,${out.toString("base64")}`;
-  } catch (err) {
-    console.error("[card-image] compress failed:", err);
-    return null;
-  }
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const name = searchParams.get("name") || "Unknown Card";
@@ -38,14 +19,12 @@ export async function GET(req: NextRequest) {
   const rarity = searchParams.get("rarity") || "";
   const collection = searchParams.get("collection") || "";
   let image = searchParams.get("image") || "";
-  const rarityColor = RARITY_COLORS[rarity] || "#9ca3af";
-
+  // Satori can't resolve relative paths — make them absolute using this route's origin
   if (image && !image.startsWith("http")) {
     const origin = new URL(req.url).origin;
     image = image.startsWith("/") ? `${origin}${image}` : `${origin}/${image}`;
   }
-
-  const compressedImage = image ? await compressImage(image) : null;
+  const rarityColor = RARITY_COLORS[rarity] || "#9ca3af";
 
   return new ImageResponse(
     (
@@ -71,9 +50,9 @@ export async function GET(req: NextRequest) {
             boxShadow: `0 0 40px ${rarityColor}55`,
           }}
         >
-          {compressedImage ? (
+          {image ? (
             <img
-              src={compressedImage}
+              src={image}
               alt=""
               style={{
                 width: "100%",
@@ -157,7 +136,7 @@ export async function GET(req: NextRequest) {
       width: 400,
       height: 560,
       headers: {
-        "Cache-Control": "public, max-age=31536000, immutable",
+        'Cache-Control': 'public, max-age=31536000, immutable',
       },
     }
   );
