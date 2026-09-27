@@ -37,6 +37,7 @@ const RARITY_EMOJI = {
   Epic: "🟣",
   Legendary: "🟡",
   Mythic: "🔴",
+  Contraband: "🖤",
 };
 
 const clamp = (v, min = 0, max = 100) => Math.min(Math.max(v, min), max);

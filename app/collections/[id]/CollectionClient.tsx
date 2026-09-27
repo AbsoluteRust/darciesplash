@@ -52,7 +52,7 @@ type Chroma = {
 
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
-const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
+const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Contraband"];
 
 const COLLECTION_GLOW: Record<string, string> = {
   celestial: "rgba(125, 190, 255, 0.67)",
@@ -335,16 +335,17 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     return set;
   }, [myInv]);
 
-  const displayCards = useMemo(() => {
-    if (editMode && editOrder) return editOrder;
+const displayCards = useMemo(() => {
+  if (editMode && editOrder) return editOrder;
 
-    const base = showMine && ownedNames
-      ? mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()))
-      : mergedCards;
+  if (showMine && ownedNames) {
+    return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
+  }
 
-    if (showMine) return base;
-    return applySavedOrder(base, savedOrder);
-  }, [mergedCards, showMine, ownedNames, savedOrder, editMode, editOrder]);
+  // Public view — contraband cards are only visible in My Collection mode.
+  const publicCards = mergedCards.filter(c => !c.contraband);
+  return applySavedOrder(publicCards, savedOrder);
+}, [mergedCards, showMine, ownedNames, savedOrder, editMode, editOrder]);
 
   const canEdit = useMemo(
     () => canEditCollectionOrder(userId, id, roles),

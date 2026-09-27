@@ -11,6 +11,8 @@ interface Card {
   details: string;
   link: string;
   commissioner?: string;
+  contraband?: boolean;
+  contrabandArtist?: string;
   rarity?: string;
 }
 
@@ -31,6 +33,8 @@ export async function POST(req: NextRequest) {
     new_link,
     new_image_url,
     new_commissioner,
+    new_contraband,
+    new_contraband_artist,
     new_rarity,
   } = body;
 
@@ -42,7 +46,6 @@ export async function POST(req: NextRequest) {
   const cards: Card[] = (await kv.get("cards")) || [];
   const index = cards.findIndex(c => c.name.toLowerCase() === lowerTitle);
 
-  // Build the merged field set, using !== undefined so empty strings clear values
   const updates: Partial<Card> = {};
   if (new_title !== undefined) updates.name = new_title;
   if (new_type !== undefined) updates.type = new_type;
@@ -52,9 +55,10 @@ export async function POST(req: NextRequest) {
   if (new_link !== undefined) updates.link = new_link;
   if (new_image_url !== undefined) updates.image = new_image_url;
   if (new_commissioner !== undefined) updates.commissioner = new_commissioner;
+  if (new_contraband !== undefined) updates.contraband = new_contraband;
+  if (new_contraband_artist !== undefined) updates.contrabandArtist = new_contraband_artist;
   if (new_rarity !== undefined) updates.rarity = new_rarity;
 
-  // ---- Card not in KV: legacy override path ----
   if (index === -1) {
     const override: Partial<Card> & { name: string } = {
       name: new_title || title,
@@ -66,6 +70,8 @@ export async function POST(req: NextRequest) {
     if (new_link !== undefined) override.link = new_link;
     if (new_image_url !== undefined) override.image = new_image_url;
     if (new_commissioner !== undefined) override.commissioner = new_commissioner;
+    if (new_contraband !== undefined) override.contraband = new_contraband;
+    if (new_contraband_artist !== undefined) override.contrabandArtist = new_contraband_artist;
     if (new_rarity !== undefined) override.rarity = new_rarity;
 
     cards.push(override as Card);
@@ -74,7 +80,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, card: override });
   }
 
-  // ---- Existing card: merge updates ----
   const oldImage = cards[index].image;
   const oldName = cards[index].name;
   const nameChanged =
@@ -88,7 +93,6 @@ export async function POST(req: NextRequest) {
 
   await kv.set("cards", cards);
 
-  // Delete old image from Blob if it was replaced
   if (
     new_image_url !== undefined &&
     oldImage &&
@@ -102,7 +106,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // If the card was renamed, update every user inventory that references the old name
   if (nameChanged && new_title) {
     try {
       const invKeys = await kv.keys("user_cards:*");
@@ -117,10 +120,10 @@ export async function POST(req: NextRequest) {
           const [cardName, rarity] = key.split("|");
           if (cardName.toLowerCase() === lowerTitle) {
             const newKey = `${new_title}|${rarity}`;
-            newInv[newKey] = (newInv[newKey] || 0) + count;
+            newInv[newKey] = (newInv[newKey] || 0) + Number(count);
             changed = true;
           } else {
-            newInv[key] = count;
+            newInv[key] = Number(count);
           }
         }
 

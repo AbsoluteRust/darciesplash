@@ -10,6 +10,8 @@ interface Card {
   details: string;
   link: string;
   commissioner?: string;
+  contraband?: boolean;
+  contrabandArtist?: string;
   rarity?: string;
 }
 
@@ -20,9 +22,19 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { title, type, collection, about, imageUrl, commissioner, rarity } = body;
+  const {
+    title,
+    type,
+    collection,
+    about,
+    imageUrl,
+    commissioner,
+    contraband,
+    contrabandArtist,
+    rarity,
+  } = body;
 
-  if (!title || !type || !collection || !about || !imageUrl) {
+  if (!title || !type || !collection || !imageUrl) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -33,17 +45,18 @@ export async function POST(req: NextRequest) {
     type,
     collection,
     image: imageUrl,
-    description: about,
+    description: typeof about === "string" ? about : "",
     details: "",
     link: "",
     ...(commissioner && { commissioner }),
+    ...(contraband && { contraband: true }),
+    ...(contraband && contrabandArtist && { contrabandArtist }),
     ...(rarity && { rarity }),
   };
 
   cards.push(newCard);
   await kv.set("cards", cards);
 
-  // ⭐ Remove this title from the deleted list (if it was there)
   const deleted: string[] = (await kv.get("deleted")) || [];
   const filtered = deleted.filter(n => n.toLowerCase() !== title.toLowerCase());
   if (filtered.length !== deleted.length) {
