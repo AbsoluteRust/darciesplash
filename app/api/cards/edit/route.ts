@@ -10,6 +10,7 @@ interface Card {
   description: string;
   details: string;
   link: string;
+  commissioner?: string;
   rarity?: string;
 }
 
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest) {
     new_details,
     new_link,
     new_image_url,
+    new_commissioner,
     new_rarity,
   } = body;
 
@@ -49,6 +51,7 @@ export async function POST(req: NextRequest) {
   if (new_details !== undefined) updates.details = new_details;
   if (new_link !== undefined) updates.link = new_link;
   if (new_image_url !== undefined) updates.image = new_image_url;
+  if (new_commissioner !== undefined) updates.commissioner = new_commissioner;
   if (new_rarity !== undefined) updates.rarity = new_rarity;
 
   // ---- Card not in KV: legacy override path ----
@@ -62,6 +65,7 @@ export async function POST(req: NextRequest) {
     if (new_details !== undefined) override.details = new_details;
     if (new_link !== undefined) override.link = new_link;
     if (new_image_url !== undefined) override.image = new_image_url;
+    if (new_commissioner !== undefined) override.commissioner = new_commissioner;
     if (new_rarity !== undefined) override.rarity = new_rarity;
 
     cards.push(override as Card);
@@ -113,10 +117,10 @@ export async function POST(req: NextRequest) {
           const [cardName, rarity] = key.split("|");
           if (cardName.toLowerCase() === lowerTitle) {
             const newKey = `${new_title}|${rarity}`;
-            newInv[newKey] = (newInv[newKey] || 0) + Number(count);
+            newInv[newKey] = (newInv[newKey] || 0) + count;
             changed = true;
           } else {
-            newInv[key] = Number(count);
+            newInv[key] = count;
           }
         }
 

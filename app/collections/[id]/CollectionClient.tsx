@@ -11,6 +11,23 @@ import { useRouter } from "next/navigation";
 import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
 import { useRarityMode } from "@/components/RarityModeContext";
+import { useCollectionFilter } from "@/components/CollectionFilterContext";
+import { canEditCollectionOrder } from "@/lib/collection-owners";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Card = {
   name: string;
@@ -35,6 +52,8 @@ type Chroma = {
 
 const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
 
+const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic"];
+
 const COLLECTION_GLOW: Record<string, string> = {
   celestial: "rgba(125, 190, 255, 0.67)",
   madolche: "rgba(255, 180, 220, 0.67)",
@@ -44,6 +63,8 @@ const COLLECTION_GLOW: Record<string, string> = {
 };
 
 const DEFAULT_GLOW = "rgba(125, 190, 255, 0.67)";
+
+const EMOTE_PX = 48;
 
 const TYPE_DISPLAY: Record<string, string> = {
   emote: "Emote",
@@ -81,6 +102,40 @@ function findEmoteCount(cardName: string, emoteTotals: Record<string, number>): 
   return best;
 }
 
+function getOwnedRarity(cardName: string, inv: Record<string, number>): string | null {
+  const lower = cardName.toLowerCase();
+  let best: string | null = null;
+  let bestRank = -1;
+  for (const key of Object.keys(inv)) {
+    const parts = key.split("|");
+    if (parts.length !== 2) continue;
+    const [name, rarity] = parts;
+    if (!name || !rarity) continue;
+    if (name.toLowerCase() !== lower) continue;
+    const rank = RARITY_ORDER.indexOf(rarity);
+    if (rank > bestRank) {
+      bestRank = rank;
+      best = rarity;
+    }
+  }
+  return best;
+}
+
+function applySavedOrder(cards: Card[], savedOrder: string[]): Card[] {
+  if (!savedOrder || savedOrder.length === 0) return cards;
+  const byName = new Map(cards.map(c => [c.name, c]));
+  const out: Card[] = [];
+  for (const name of savedOrder) {
+    const c = byName.get(name);
+    if (c) {
+      out.push(c);
+      byName.delete(name);
+    }
+  }
+  for (const c of byName.values()) out.push(c);
+  return out;
+}
+
 const WHEEL_THRESHOLD = 50;
 const TOUCH_THRESHOLD = 60;
 const TOUCH_SCROLL_TOLERANCE = 8;
@@ -101,12 +156,40 @@ function shuffleArray<T>(arr: T[]): T[] {
   return out;
 }
 
+function SortableCard({ id, children }: { id: string; children: React.ReactNode }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: "relative",
+    cursor: "grab",
+    touchAction: "none",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {children}
+    </div>
+  );
+}
+
 export default function CollectionClient({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const rawParams = use(params);
   const id = rawParams.id;
 
   const { mode: rarityMode } = useRarityMode();
+  const { showMine, setShowMine, userId, roles } = useCollectionFilter();
 
   const [activeEmote, setActiveEmote] = useState<Card | null>(null);
   const [modalCollection, setModalCollection] = useState<string | null>(null);
@@ -117,9 +200,16 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [emoteTotals, setEmoteTotals] = useState<Record<string, number>>({});
   const [chromas, setChromas] = useState<Chroma[]>([]);
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
+  const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
+  const [savedOrder, setSavedOrder] = useState<string[]>([]);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
+
+  const [editMode, setEditMode] = useState(false);
+  const [editOrder, setEditOrder] = useState<Card[] | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const [cardTransition, setCardTransition] = useState<{
     phase: "leaving" | "entering";
     direction: "next" | "prev";
@@ -130,8 +220,13 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [modalHintProgress, setModalHintProgress] = useState(0);
   const modalOverscrollRef = useRef(0);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
   const triggerTransition = useCallback((direction: "next" | "prev", slug: string) => {
     if (leaving) return;
+    if (editMode) return;
     setLeaving(direction);
     setHintProgress(0);
     setHintDirection(null);
@@ -141,7 +236,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     setTimeout(() => {
       router.push(`/collections/${slug}`);
     }, 300);
-  }, [leaving, router]);
+  }, [leaving, router, editMode]);
 
   const triggerTransitionRef = useRef(triggerTransition);
   useEffect(() => { triggerTransitionRef.current = triggerTransition; }, [triggerTransition]);
@@ -165,21 +260,27 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     let cancelled = false;
     async function load() {
       try {
-        const [cardsRes, deletedRes, emotesRes, chromasRes] = await Promise.all([
+        const [cardsRes, deletedRes, emotesRes, chromasRes, meRes, orderRes] = await Promise.all([
           fetch("/api/cards/list", { cache: "no-store" }),
           fetch("/api/cards/deleted", { cache: "no-store" }),
           fetch("/api/emotes/totals", { cache: "no-store" }),
           fetch("/api/chromas/list", { cache: "no-store" }),
+          fetch("/api/me/cards", { cache: "no-store" }),
+          fetch(`/api/collection-order?collection=${encodeURIComponent(id)}`, { cache: "no-store" }),
         ]);
         const cards = cardsRes.ok ? await cardsRes.json() : [];
         const deleted = deletedRes.ok ? await deletedRes.json() : [];
         const emoteTotals = emotesRes.ok ? await emotesRes.json() : {};
         const chromaList = chromasRes.ok ? await chromasRes.json() : [];
+        const inv = meRes.ok ? await meRes.json() : null;
+        const orderData = orderRes.ok ? await orderRes.json() : { order: [] };
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
           setEmoteTotals(emoteTotals);
           setChromas(chromaList);
+          setMyInv(inv);
+          setSavedOrder(Array.isArray(orderData.order) ? orderData.order : []);
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -187,7 +288,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [id]);
 
   const allCardsByCollection = useMemo(() => {
     const deletedSet = new Set(deletedNames.map(n => n.toLowerCase()));
@@ -224,6 +325,77 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   const mergedCards = allCardsByCollection[id] || [];
 
+  const ownedNames = useMemo(() => {
+    if (!myInv) return null;
+    const set = new Set<string>();
+    for (const key of Object.keys(myInv)) {
+      const [name] = key.split("|");
+      if (name) set.add(name.toLowerCase());
+    }
+    return set;
+  }, [myInv]);
+
+  const displayCards = useMemo(() => {
+    if (editMode && editOrder) return editOrder;
+
+    const base = showMine && ownedNames
+      ? mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()))
+      : mergedCards;
+
+    if (showMine) return base;
+    return applySavedOrder(base, savedOrder);
+  }, [mergedCards, showMine, ownedNames, savedOrder, editMode, editOrder]);
+
+  const canEdit = useMemo(
+    () => canEditCollectionOrder(userId, id, roles),
+    [userId, id, roles]
+  );
+
+  const canCopyEmotes = roles?.darsubscribbler === true;
+
+  const enterEditMode = useCallback(() => {
+    setShowMine(false);
+    setEditOrder([...applySavedOrder(mergedCards, savedOrder)]);
+    setEditMode(true);
+  }, [mergedCards, savedOrder, setShowMine]);
+
+  const cancelEdit = useCallback(() => {
+    setEditMode(false);
+    setEditOrder(null);
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editOrder) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/collection-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ collection: id, order: editOrder.map(c => c.name) }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSavedOrder(editOrder.map(c => c.name));
+      setEditMode(false);
+      setEditOrder(null);
+    } catch (err) {
+      console.error("[collection-order] save failed:", err);
+    } finally {
+      setSaving(false);
+    }
+  }, [editOrder, id]);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setEditOrder(prev => {
+      if (!prev) return prev;
+      const oldIdx = prev.findIndex(c => c.name === active.id);
+      const newIdx = prev.findIndex(c => c.name === over.id);
+      if (oldIdx === -1 || newIdx === -1) return prev;
+      return arrayMove(prev, oldIdx, newIdx);
+    });
+  }, []);
+
   const art = ITEMS.find(item => item.slug === id);
   const currentIndex = COLLECTION_ORDER.indexOf(id);
   const nextSlug = COLLECTION_ORDER[currentIndex + 1];
@@ -258,6 +430,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     if (activeEmote) return;
+    if (editMode) return;
     if (!nextSlug && !prevSlug) return;
 
     let attempts = 0;
@@ -373,7 +546,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
       window.removeEventListener("touchend", handleTouchEnd);
       window.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [activeEmote, nextSlug, prevSlug, router]);
+  }, [activeEmote, nextSlug, prevSlug, router, editMode]);
 
   const activeEmoteRef = useRef(activeEmote);
   const modalCollectionRef = useRef(modalCollection);
@@ -661,6 +834,11 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+
+      if (editMode) {
+        cancelEdit();
+        return;
+      }
       if (activeChroma) {
         setActiveChroma(null);
         return;
@@ -673,7 +851,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     };
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
-  }, [activeEmote, activeChroma, closeModal, router]);
+  }, [activeEmote, activeChroma, closeModal, router, editMode, cancelEdit]);
 
   useEffect(() => {
     if (!activeEmote) return;
@@ -725,13 +903,14 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   }, [cardParam, allCardsByCollection, preloadAdjacent]);
 
   const openCard = useCallback((piece: Card, index: number) => {
+    if (editMode) return;
     setActiveEmote(piece);
     setModalCollection(id);
     setModalIndex(index);
     preloadAdjacent(id, index);
     const slug = piece.name.toLowerCase().replace(/\s+/g, "-");
     router.push(`/collections/${id}?card=${slug}`, { scroll: false });
-  }, [id, router, preloadAdjacent]);
+  }, [id, router, preloadAdjacent, editMode]);
 
   const openCardByName = useCallback((name: string) => {
     for (const coll of COLLECTION_ORDER) {
@@ -772,8 +951,62 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
     ? (ITEMS.find(i => i.slug === modalHintTargetSlug)?.label ?? "Next Collection")
     : "";
 
+  const renderCard = (piece: Card, idx: number) => {
+    const ownedRarity = showMine && myInv
+      ? getOwnedRarity(piece.name, myInv)
+      : null;
+
+// Build the copy-to-clipboard markdown URL. Uses the original image URL
+// directly so Discord's embed scraper recognises it as an image. Next.js's
+// /_next/image endpoint doesn't end in a file extension and Discord won't
+// embed it.
+let copyEmote: { name: string; url: string } | null = null;
+if (canCopyEmotes && piece.type === "Emote" && piece.image) {
+  const origin = typeof window !== "undefined" ? window.location.origin : null;
+  if (origin) {
+    const isAbsolute = /^https?:\/\//i.test(piece.image);
+    const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
+    copyEmote = { name: piece.name, url };
+  }
+}
+
+    return (
+      <ProfileCard
+        name={piece.name}
+        title={
+          piece.type === "Emote"
+            ? (() => {
+                const n = findEmoteCount(piece.name, emoteTotals);
+                return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
+              })()
+            : piece.type
+        }
+        handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
+        status="Online"
+        contactText="View"
+        avatarUrl={piece.image}
+        rarity={
+          rarityMode === "off"
+            ? undefined
+            : (showMine && ownedRarity)
+              ? ownedRarity
+              : piece.rarity
+        }
+        showUserInfo={false}
+        enableTilt={!editMode}
+        enableMobileTilt={false}
+        behindGlowColor={piece.glow || DEFAULT_GLOW}
+        iconUrl={null}
+        behindGlowEnabled
+        innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+        onContactClick={() => openCard(piece, idx)}
+        copyEmote={copyEmote}
+      />
+    );
+  };
+
   return (
-    <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}`}>
+    <div className={`collections-page${leaving ? ` leaving-${leaving}` : ""}${editMode ? " is-editing-order" : ""}`}>
       <div style={{ height: "140px" }} aria-hidden="true" />
 
       {id === "celestial" && (
@@ -839,7 +1072,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
             </div>
           </div>
 
-          {/* Chroma panel (desktop only, hidden via CSS below 1200px) */}
           {chromasForActive.length > 0 && (
             <div
               className="chroma-panel"
@@ -859,7 +1091,6 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
             </div>
           )}
 
-          {/* Related cards panel (desktop only, hidden via CSS below 1200px) */}
           {relatedCards.length > 0 && (
             <div
               className="related-panel"
@@ -915,52 +1146,90 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      <div className="grid-container">
-        <div
-          className="card-grid"
-          style={{
-            transform: `translateY(${nudge}px)`,
-            transition: nudge === 0
-              ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
-              : "transform 80ms ease-out",
-          }}
-        >
-          {mergedCards.map((piece, idx) => (
-            <LazyMount
-              key={`${piece.name}|${idx}`}
-              rootMargin="600px"
-              placeholderHeight={560}
+      {editMode && (
+        <div className="collection-edit-banner">
+          <span className="collection-edit-banner__text">
+            Drag cards to rearrange. Order saves for everyone.
+          </span>
+          <div className="collection-edit-banner__actions">
+            <button
+              type="button"
+              className="collection-edit-btn collection-edit-btn--cancel"
+              onClick={cancelEdit}
+              disabled={saving}
             >
-              <ProfileCard
-                name={piece.name}
-                title={
-                  piece.type === "Emote"
-                    ? (() => {
-                        const n = findEmoteCount(piece.name, emoteTotals);
-                        return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
-                      })()
-                    : piece.type
-                }
-                handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
-                status="Online"
-                contactText="View"
-                avatarUrl={piece.image}
-                rarity={rarityMode === 'off' ? undefined : piece.rarity}
-                showUserInfo={false}
-                enableTilt={true}
-                enableMobileTilt={false}
-                behindGlowColor={piece.glow || DEFAULT_GLOW}
-                iconUrl={null}
-                behindGlowEnabled
-                innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-                onContactClick={() => openCard(piece, idx)}
-              />
-            </LazyMount>
-          ))}
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="collection-edit-btn collection-edit-btn--save"
+              onClick={saveEdit}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
         </div>
+      )}
+
+      <div className="grid-container">
+        {showMine && displayCards.length === 0 ? (
+          <div className="collection-empty">
+            You haven't collected any {art?.label ?? "cards"} yet.
+          </div>
+        ) : editMode && editOrder ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={editOrder.map(c => c.name)} strategy={rectSortingStrategy}>
+              <div className="card-grid">
+                {editOrder.map((piece) => (
+                  <SortableCard key={piece.name} id={piece.name}>
+                    <LazyMount rootMargin="600px" placeholderHeight={560}>
+                      {renderCard(piece, 0)}
+                    </LazyMount>
+                  </SortableCard>
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
+        ) : (
+          <div
+            className="card-grid"
+            style={{
+              transform: `translateY(${nudge}px)`,
+              transition: nudge === 0
+                ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+                : "transform 80ms ease-out",
+            }}
+          >
+            {displayCards.map((piece, idx) => (
+              <LazyMount
+                key={`${piece.name}|${idx}`}
+                rootMargin="600px"
+                placeholderHeight={560}
+              >
+                {renderCard(piece, idx)}
+              </LazyMount>
+            ))}
+          </div>
+        )}
       </div>
 
-      {hintProgress > 0 && hintDirection && !leaving && (
+      {canEdit && !editMode && (
+        <button
+          type="button"
+          className="collection-edit-fab"
+          onClick={enterEditMode}
+          title="Edit card order"
+        >
+          ✏️ Edit order
+        </button>
+      )}
+
+      {hintProgress > 0 && hintDirection && !leaving && !editMode && (
         <div
           className={`collection-hint collection-hint--${hintDirection}`}
           style={{
