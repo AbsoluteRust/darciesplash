@@ -136,9 +136,7 @@ const ProfileCardComponent = ({
       e.stopPropagation();
     }
     if (!copyEmote) return;
-    const ext = copyEmote.animated ? 'gif' : 'png';
-    const url = `https://cdn.discordapp.com/emojis/${copyEmote.id}.${ext}?size=128`;
-    const markdown = `[${copyEmote.name}](${url})`;
+    const markdown = `[${copyEmote.name}](${copyEmote.url})`;
     try {
       await navigator.clipboard.writeText(markdown);
       setCopied(true);
@@ -515,7 +513,7 @@ const ProfileCardComponent = ({
             type="button"
             className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
             onClick={handleCopyEmote}
-            title={copied ? 'Copied!' : `Copy ${copyEmote.name} for Discord`}
+            title={copied ? 'Copied!' : `Copy :${copyEmote.name}:`}
             aria-label={`Copy emote ${copyEmote.name}`}
             style={{ pointerEvents: 'auto' }}
           >
