@@ -9,6 +9,8 @@ interface Card {
   description: string;
   details: string;
   link: string;
+  commissioner?: string;
+  rarity?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -18,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { title, type, collection, about, imageUrl, rarity } = body;
+  const { title, type, collection, about, imageUrl, commissioner, rarity } = body;
 
   if (!title || !type || !collection || !about || !imageUrl) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
     description: about,
     details: "",
     link: "",
+    ...(commissioner && { commissioner }),
     ...(rarity && { rarity }),
   };
 
