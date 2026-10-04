@@ -1,17 +1,11 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-
-const WidgetBot = dynamic(import('@widgetbot/react-embed'), {
-  ssr: false,
-});
-
 export default function DiscordChat() {
   return (
-    <WidgetBot
-      server="1216033209930747904" // Your GUILD_ID
-      channel="1549120331866833046" // Your GAME_CHANNEL_ID
-      style={{ width: '80%', height: '80%' }}
+    <iframe
+      src="https://e.widgetbot.io/channels/1216033209930747904/1549120331866833046"
+      allow="clipboard-write"
+      style={{ width: '100%', height: '100%', border: 'none' }}
     />
   );
 }
