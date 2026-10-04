@@ -12,6 +12,7 @@ const COLLECTIONS = [
   { slug: "tobi",      label: "Tobi" },
   { slug: "madolche",  label: "Madolche" },
   { slug: "celestial", label: "Celestial" },
+  { slug: "lunalux",   label: "LunaLux" },
   { slug: "halo",      label: "Halo" },
 ];
 

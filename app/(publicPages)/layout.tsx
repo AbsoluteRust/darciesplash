@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://folly.milktruckers.com"),
   title: {
     default: "The Commissioner's Collection",
-    template: "%s | Darcie Splash",
+    template: "%s",
   },
   description: "A gallery of artwork by Darcie.",
   openGraph: {

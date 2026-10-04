@@ -23,7 +23,7 @@ export async function generateMetadata({
         title: `The ${collectionName} Collection`,
         description: `Browse the ${collectionName} collection.`,
         url: `${siteUrl}/collections/${id}`,
-        siteName: "Darcie Splash",
+        siteName: "Folly of Flora",
         images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630 }],
       },
       twitter: { card: "summary_large_image" },
@@ -67,7 +67,7 @@ export async function generateMetadata({
       title: `${cardName} — ${collectionName} Collection`,
       description: `A ${cardType} from the ${collectionName} collection.`,
       url: `${siteUrl}/collections/${id}?card=${cardSlug}`,
-      siteName: "Darcie Splash",
+      siteName: "Folly of Flora",
       images: [{ url: ogImageUrl, width: 400, height: 560 }],
     },
     twitter: {

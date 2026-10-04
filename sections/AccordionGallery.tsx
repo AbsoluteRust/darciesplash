@@ -10,6 +10,7 @@ const DEFAULT_ITEMS = [
   { image: '/artpieces/tobi/tobiDrip.webp', label: 'The Tobi Collection', slug: "tobi", link: "#" },
   { image: "/artpieces/magiBoom.webp", label: "The Madolche Collection", slug: "madolche", link: "#" },
   { image: "/artpieces/lilyStargazer.webp", label: "The Celestial Collection", slug: "celestial", link: "#" },
+  { image: '/artpieces/lunalux/lunaluxCollection.webp', label: 'The LunaLux Collection', slug: "lunalux", link: "#" },
   { image: '/artpieces/allcomms/haloCollection.webp', label: 'The Halo Collection', slug: "halo", link: "#" },
 ];
 

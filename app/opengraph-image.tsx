@@ -32,7 +32,6 @@ export default async function Image() {
             display: "flex",
           }}
         >
-          Darcie Splash
         </div>
         <div
           style={{

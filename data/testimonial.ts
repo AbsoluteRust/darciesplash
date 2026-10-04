@@ -48,6 +48,6 @@ export const testimonialsData: ITestimonial[] = [
         name: 'tobi510kenobi',
         handle: '@tobi510kenobi',
         date: 'September 14th, 2026',
-        quote: "One of the best artists I’ve ever had the pleasures of meeting, she is a one of a kind person with absolute transparency in what’s happening and what’s going on, their will never be someone like Darcie ever again",
+        quote: "One of the best artists I’ve ever had the pleasures of meeting, she is a one of a kind person with absolute transparency in what’s happening and what’s going on, there will never be someone like Darcie ever again",
     },
 ];

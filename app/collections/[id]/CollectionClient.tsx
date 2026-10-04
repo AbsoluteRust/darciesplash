@@ -40,6 +40,8 @@ type Card = {
   link?: string;
   collection?: string;
   related?: string[];
+  contraband?: boolean;
+  contrabandArtist?: string;
 };
 
 type Chroma = {
@@ -50,16 +52,17 @@ type Chroma = {
   image: string;
 };
 
-const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "halo"];
+const COLLECTION_ORDER = ["darcie", "tobi", "madolche", "celestial", "lunalux", "halo"];
 
 const RARITY_ORDER = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Contraband"];
 
 const COLLECTION_GLOW: Record<string, string> = {
   celestial: "rgba(125, 190, 255, 0.67)",
-  madolche: "rgba(255, 180, 220, 0.67)",
-  tobi: "rgba(125, 190, 255, 0.67)",
-  darcie: "#fff",
+  madolche: "rgba(255, 133, 198, 0.67)",
+  tobi: "#fff",
+  darcie: "#ff97f6",
   halo: "#fff",
+  lunalux: "#fff"
 };
 
 const DEFAULT_GLOW = "rgba(125, 190, 255, 0.67)";
