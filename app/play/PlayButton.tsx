@@ -96,13 +96,14 @@ export default function PlayButton() {
     const isTextField = (t: EventTarget | null) =>
       t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || e.repeat) return;
-      if (isTextField(e.target)) return;
-      if (reveal) return; // don't charge while the reveal overlay is open
-      e.preventDefault();
-      beginHold();
-    };
+const onKeyDown = (e: KeyboardEvent) => {
+  if (e.code !== 'Space') return;
+  if (isTextField(e.target)) return;
+  e.preventDefault();       // always — including on key repeats
+  if (e.repeat) return;     // only ignore the *charge* on repeats
+  if (reveal) return;
+  beginHold();
+};
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
       if (isTextField(e.target)) return;
