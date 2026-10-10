@@ -6,6 +6,7 @@ interface Card {
   type: string;
   collection: string;
   image: string;
+  thumbUrl?: string;
   description: string;
   details: string;
   link: string;
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
     collection,
     about,
     imageUrl,
+    thumbUrl,
     commissioner,
     contraband,
     contrabandArtist,
@@ -45,6 +47,7 @@ export async function POST(req: NextRequest) {
     type,
     collection,
     image: imageUrl,
+    ...(typeof thumbUrl === "string" && thumbUrl && { thumbUrl }),
     description: typeof about === "string" ? about : "",
     details: "",
     link: "",

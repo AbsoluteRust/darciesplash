@@ -7,6 +7,7 @@ interface Card {
   type: string;
   collection: string;
   image: string;
+  thumbUrl?: string;
   description: string;
   details: string;
   link: string;
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
     new_details,
     new_link,
     new_image_url,
+    new_thumb_url,
     new_commissioner,
     new_contraband,
     new_contraband_artist,
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
   if (new_details !== undefined) updates.details = new_details;
   if (new_link !== undefined) updates.link = new_link;
   if (new_image_url !== undefined) updates.image = new_image_url;
+  if (new_thumb_url !== undefined) updates.thumbUrl = new_thumb_url;
   if (new_commissioner !== undefined) updates.commissioner = new_commissioner;
   if (new_contraband !== undefined) updates.contraband = new_contraband;
   if (new_contraband_artist !== undefined) updates.contrabandArtist = new_contraband_artist;
@@ -69,6 +72,7 @@ export async function POST(req: NextRequest) {
     if (new_details !== undefined) override.details = new_details;
     if (new_link !== undefined) override.link = new_link;
     if (new_image_url !== undefined) override.image = new_image_url;
+    if (new_thumb_url !== undefined) override.thumbUrl = new_thumb_url;
     if (new_commissioner !== undefined) override.commissioner = new_commissioner;
     if (new_contraband !== undefined) override.contraband = new_contraband;
     if (new_contraband_artist !== undefined) override.contrabandArtist = new_contraband_artist;
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
   }
 
   const oldImage = cards[index].image;
+  const oldThumbUrl = cards[index].thumbUrl;
   const oldName = cards[index].name;
   const nameChanged =
     new_title !== undefined &&
@@ -93,6 +98,7 @@ export async function POST(req: NextRequest) {
 
   await kv.set("cards", cards);
 
+  // Clean up the old full-res blob when the image is replaced
   if (
     new_image_url !== undefined &&
     oldImage &&
@@ -103,6 +109,20 @@ export async function POST(req: NextRequest) {
       await del(oldImage);
     } catch (err) {
       console.error("Failed to delete old blob:", err);
+    }
+  }
+
+  // Clean up the old thumbnail blob when the thumbnail is replaced
+  if (
+    new_thumb_url !== undefined &&
+    oldThumbUrl &&
+    oldThumbUrl !== new_thumb_url &&
+    oldThumbUrl.includes("blob.vercel-storage.com")
+  ) {
+    try {
+      await del(oldThumbUrl);
+    } catch (err) {
+      console.error("Failed to delete old thumb blob:", err);
     }
   }
 
