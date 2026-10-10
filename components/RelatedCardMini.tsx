@@ -3,6 +3,7 @@
 type MiniCard = {
   name: string;
   image: string;
+  thumbUrl?: string;
 };
 
 export default function RelatedCardMini({
@@ -19,7 +20,12 @@ export default function RelatedCardMini({
       onClick={onClick}
       aria-label={`Open ${card.name}`}
     >
-      <img src={card.image} alt="" loading="lazy" decoding="async" />
+      <img
+        src={card.thumbUrl || card.image}
+        alt=""
+        loading="lazy"
+        decoding="async"
+      />
       <span className="related-card-mini__name">{card.name}</span>
     </button>
   );

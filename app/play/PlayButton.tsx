@@ -18,6 +18,7 @@ export type PackCard = {
   contrabandArtist: string | null;
   color: string;
   emoji: string;
+  thumbUrl?: string | null;
 };
 
 export default function PlayButton() {

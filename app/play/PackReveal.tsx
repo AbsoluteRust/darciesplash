@@ -101,11 +101,11 @@ function FlipCard({
               style={{ boxShadow: `0 0 28px ${card.color}66` }}
             >
               <img
-                src={card.imageUrl}
-                alt={card.name}
-                className="w-full h-full object-contain"
-                draggable={false}
-              />
+  src={card.thumbUrl || card.imageUrl}
+  alt={card.name}
+  className="w-full h-full object-contain"
+  draggable={false}
+/>
 
               {(card.isChroma || card.isContraband) && (
                 <div className="absolute top-2 left-2 rounded-full bg-black/70 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
