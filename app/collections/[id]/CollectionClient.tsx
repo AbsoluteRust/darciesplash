@@ -33,6 +33,7 @@ type Card = {
   name: string;
   type: string;
   image: string;
+  thumbUrl?: string;
   glow?: string;
   rarity?: string;
   description?: string;
@@ -988,7 +989,7 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
         handle={piece.name.toLowerCase().replace(/\s+/g, "-")}
         status="Online"
         contactText="View"
-        avatarUrl={piece.image}
+        avatarUrl={piece.thumbUrl || piece.image}
         rarity={
           rarityMode === "off"
             ? undefined
