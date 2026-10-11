@@ -206,3 +206,67 @@ button {
   75%  { transform: translate(-1px, -2px) rotate(-0.5deg); }
   100% { transform: translate(0, 0)      rotate(0deg); }
 }
+
+/* ===========================================================
+   Firefox performance overrides
+   Firefox renders backdrop-filter in software and cannot
+   composite mix-blend-mode or continuous background-position
+   animations efficiently. Everything in this block is
+   Firefox-only; Chromium and WebKit ignore it.
+   =========================================================== */
+@supports (-moz-appearance: none) {
+  /* 1. Kill backdrop-filter everywhere. Replace with a solid
+     background dark enough to hide what's behind. */
+  .pc-user-info,
+  .pc-contact-btn,
+  .emote-info-box,
+  .ag-lightbox__sidebar,
+  .backdrop-blur {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: rgba(12, 12, 20, 0.88) !important;
+  }
+
+  /* 2. Stop the two infinite animations. They repaint the
+     entire card on every frame in FF. */
+  .pc-card {
+    animation: none !important;
+  }
+  .pc-shine {
+    animation: none !important;
+  }
+
+  /* 3. Soften the giant blur surfaces. 50px blur on a
+     full-viewport div is a raster of many megapixels per
+     frame in Firefox. */
+  .pc-behind {
+    filter: blur(20px) saturate(1.1) !important;
+    opacity: calc(0.5 * var(--card-opacity));
+  }
+  .ag-lightbox__bg img {
+    filter: brightness(0.45) blur(15px) saturate(1.5) !important;
+  }
+
+  /* 4. Drop mix-blend-mode. Each blend forces a separate
+     compositor layer and forces the whole stack to re-rasterize
+     whenever anything above changes. */
+  .pc-avatar-content,
+  .pc-content:not(.pc-avatar-content) {
+    mix-blend-mode: normal !important;
+  }
+  .pc-shine,
+  .pc-glare {
+    mix-blend-mode: normal !important;
+    opacity: 0.12 !important;
+  }
+
+  /* 5. Remove will-change from non-continuous animations.
+     Firefox promotes each to a layer and starts thrashing
+     when there are many. */
+  .pc-avatar-content .avatar,
+  .ag-panel,
+  .ag-panel__media,
+  .collections-page .ag-panel {
+    will-change: auto !important;
+  }
+}
