@@ -209,64 +209,44 @@ button {
 
 /* ===========================================================
    Firefox performance overrides
-   Firefox renders backdrop-filter in software and cannot
-   composite mix-blend-mode or continuous background-position
-   animations efficiently. Everything in this block is
-   Firefox-only; Chromium and WebKit ignore it.
+   Firefox software-renders backdrop-filter and doesn't GPU-
+   composite continuous background-position animations. Both
+   are fixed here. Blend modes, gradients and colors are left
+   completely alone — the card art must look identical.
    =========================================================== */
 @supports (-moz-appearance: none) {
-  /* 1. Kill backdrop-filter everywhere. Replace with a solid
-     background dark enough to hide what's behind. */
-  .pc-user-info,
-  .pc-contact-btn,
-  .emote-info-box,
-  .ag-lightbox__sidebar,
-  .backdrop-blur {
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-    background-color: rgba(12, 12, 20, 0.88) !important;
-  }
-
-  /* 2. Stop the two infinite animations. They repaint the
-     entire card on every frame in FF. */
-  .pc-card {
-    animation: none !important;
-  }
+  /* 1. Stop the two infinite animations. Firefox repaints the
+     whole card every frame for these; Chrome composites them
+     on the GPU. The gradient stays at its initial frame, so
+     the card looks the same — just without the shimmer motion. */
+  .pc-card,
   .pc-shine {
     animation: none !important;
   }
 
-  /* 3. Soften the giant blur surfaces. 50px blur on a
-     full-viewport div is a raster of many megapixels per
-     frame in Firefox. */
-  .pc-behind {
-    filter: blur(20px) saturate(1.1) !important;
-    opacity: calc(0.5 * var(--card-opacity));
+  /* 2. Kill backdrop-filter. This is the single biggest cost
+     in Firefox because it re-reads the framebuffer behind the
+     element every frame. Swap in a solid background that's
+     visually equivalent to the blurred glass. */
+  .pc-user-info,
+  .pc-contact-btn,
+  .emote-info-box {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
-  .ag-lightbox__bg img {
-    filter: brightness(0.45) blur(15px) saturate(1.5) !important;
+  .pc-user-info {
+    background: rgba(15, 15, 24, 0.88) !important;
   }
-
-  /* 4. Drop mix-blend-mode. Each blend forces a separate
-     compositor layer and forces the whole stack to re-rasterize
-     whenever anything above changes. */
-  .pc-avatar-content,
-  .pc-content:not(.pc-avatar-content) {
-    mix-blend-mode: normal !important;
-  }
-  .pc-shine,
-  .pc-glare {
-    mix-blend-mode: normal !important;
-    opacity: 0.12 !important;
+  .pc-contact-btn {
+    background: rgba(15, 15, 24, 0.65) !important;
   }
 
-  /* 5. Remove will-change from non-continuous animations.
-     Firefox promotes each to a layer and starts thrashing
-     when there are many. */
+  /* 3. Ease the will-change pressure. Firefox promotes each of
+     these to its own compositor layer and thrashes when there
+     are many on one page. */
   .pc-avatar-content .avatar,
   .ag-panel,
-  .ag-panel__media,
-  .collections-page .ag-panel {
+  .ag-panel__media {
     will-change: auto !important;
   }
 }
