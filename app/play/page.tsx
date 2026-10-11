@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { auth } from '@/auth';
 import PlayButton from './PlayButton';
+import SignInButton from './SignInButton';
 
 export const metadata = { title: 'Play | Folly' };
 
@@ -17,12 +17,7 @@ export default async function PlayPage() {
       ) : (
         <div className="text-center space-y-4">
           <p className="opacity-80">Sign in with Discord to play.</p>
-          <Link
-            href="/api/auth/signin/discord?callbackUrl=/play"
-            className="inline-block rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white"
-          >
-            Sign in with Discord
-          </Link>
+          <SignInButton />
         </div>
       )}
     </main>
