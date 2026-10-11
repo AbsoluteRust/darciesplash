@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { signIn, useSession } from 'next-auth/react';
 import PackReveal from './PackReveal';
 
 const HOLD_MS = 2000;
@@ -22,6 +23,7 @@ export type PackCard = {
 };
 
 export default function PlayButton() {
+  const { data: session, status: authStatus } = useSession();
   const [progress, setProgress] = useState(0);
   const [charging, setCharging] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
@@ -46,6 +48,15 @@ export default function PlayButton() {
     if (statusRef.current === 'opening') return;
     if (chargingRef.current) return;
 
+    // Not signed in? Skip the charge-up entirely and go straight to Discord.
+    if (authStatus === 'unauthenticated') {
+      signIn('discord', { callbackUrl: '/play' });
+      return;
+    }
+
+    // Session still resolving — do nothing for now.
+    if (authStatus === 'loading') return;
+
     chargingRef.current = true;
     setCharging(true);
     setMessage(null);
@@ -62,7 +73,7 @@ export default function PlayButton() {
       else rafRef.current = null;
     };
     rafRef.current = requestAnimationFrame(tick);
-  }, []);
+  }, [authStatus]);
 
   const endHold = useCallback(async () => {
     if (!chargingRef.current) return;
@@ -79,6 +90,14 @@ export default function PlayButton() {
     setStatus('opening');
     try {
       const res = await fetch('/api/open-pack', { method: 'POST' });
+
+      // Server says not authorized — send them to Discord and back.
+      if (res.status === 401) {
+        setStatus('idle');
+        signIn('discord', { callbackUrl: '/play' });
+        return;
+      }
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
 
@@ -97,14 +116,14 @@ export default function PlayButton() {
     const isTextField = (t: EventTarget | null) =>
       t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
 
-const onKeyDown = (e: KeyboardEvent) => {
-  if (e.code !== 'Space') return;
-  if (isTextField(e.target)) return;
-  e.preventDefault();       // always — including on key repeats
-  if (e.repeat) return;     // only ignore the *charge* on repeats
-  if (reveal) return;
-  beginHold();
-};
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (isTextField(e.target)) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      if (reveal) return;
+      beginHold();
+    };
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
       if (isTextField(e.target)) return;
@@ -121,6 +140,18 @@ const onKeyDown = (e: KeyboardEvent) => {
 
   const full = progress >= 1;
   const shaking = charging && progress > 0;
+  const signedIn = authStatus === 'authenticated';
+  const authLoading = authStatus === 'loading';
+
+  const label = authLoading
+    ? 'Loading…'
+    : !signedIn
+    ? 'Sign in to open'
+    : status === 'opening'
+    ? 'Opening…'
+    : full
+    ? 'Release to open!'
+    : 'Hold spacebar to open';
 
   return (
     <>
@@ -138,13 +169,13 @@ const onKeyDown = (e: KeyboardEvent) => {
           }}
           onPointerCancel={() => { if (chargingRef.current) endHold(); }}
           onContextMenu={(e) => e.preventDefault()}
-          disabled={status === 'opening' || !!reveal}
+          disabled={authLoading || status === 'opening' || !!reveal}
           className={[
             'relative select-none touch-none overflow-hidden rounded-2xl px-12 py-6',
             'text-xl font-bold text-white shadow-lg transition',
             'bg-gradient-to-r from-indigo-500 to-violet-500',
             shaking ? 'animate-[playShake_0.12s_infinite]' : '',
-            status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer',
+            authLoading || status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer',
           ].join(' ')}
         >
           <span
@@ -152,13 +183,7 @@ const onKeyDown = (e: KeyboardEvent) => {
             className="absolute inset-y-0 left-0 bg-white/35"
             style={{ width: `${progress * 100}%` }}
           />
-          <span className="relative z-10">
-            {status === 'opening'
-              ? 'Opening…'
-              : full
-              ? 'Release to open!'
-              : 'Hold spacebar to open'}
-          </span>
+          <span className="relative z-10">{label}</span>
         </button>
 
         {message && (
