@@ -12,8 +12,9 @@ export type PackCard = {
   parentName: string | null;
   rarity: string;
   collection: string;
+  type: string; // <-- Add this
   imageUrl: string;
-  rawImageUrl?: string;
+  rawImageUrl?: string; // <-- Add this
   isChroma: boolean;
   isContraband: boolean;
   contrabandArtist: string | null;
