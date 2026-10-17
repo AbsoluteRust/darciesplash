@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
+    const session = await auth();
+    const userId = session?.user?.id || "";
     
+    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
     if (!botUrl) return NextResponse.json({ puzzle: null, drop: null });
 
-    const res = await fetch(`${botUrl}/api/games/state`, {
+    const res = await fetch(`${botUrl}/api/games/state?userId=${userId}`, {
       headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
       cache: "no-store",
     });

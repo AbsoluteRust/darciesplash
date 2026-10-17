@@ -9,7 +9,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [cardsData, setCardsData] = useState<any[]>([]);
 
-  // Fetch all cards so we can open the correct ProfileCard when an emote is clicked
   useEffect(() => {
     fetch('/api/cards/list')
       .then(r => r.ok ? r.json() : [])
@@ -17,7 +16,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       .catch(() => setCardsData([]));
   }, []);
 
-  // Countdown Timer
   useEffect(() => {
     if (state.solved) {
       setTimeLeft('Solved!');
@@ -29,7 +27,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       const now = new Date();
       const weekStart = new Date(state.weekStart + 'T00:00:00Z');
       
-      // Calculate next event: Friday 13:00 UTC, Saturday 13:00 UTC, or Sunday 08:00 UTC
       const friday = new Date(weekStart.getTime() + 5 * 86400000 + 13 * 3600000);
       const saturday = new Date(weekStart.getTime() + 6 * 86400000 + 13 * 3600000);
       const nextWeek = new Date(weekStart.getTime() + 7 * 86400000 + 8 * 3600000);
@@ -39,10 +36,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       else if (now < saturday) target = saturday;
 
       const diff = target.getTime() - now.getTime();
-      if (diff <= 0) { 
-        setTimeLeft('Event starting...'); 
-        return; 
-      }
+      if (diff <= 0) { setTimeLeft('Event starting...'); return; }
       
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff / 3600000) % 24);
@@ -74,11 +68,11 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
   };
 
   const currentCell = state.nextCell;
+  const currentGuesses = (state.guessesByCell || {})[currentCell] || [];
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
       
-      {/* Timer / Solved Banner */}
       <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors ${
         state.solved 
           ? 'text-green-400 bg-green-950/30 border-green-800' 
@@ -87,7 +81,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         {state.solved ? '🎉 Puzzle Solved!' : `Next Event: ${timeLeft || 'Loading...'}`}
       </div>
 
-      {/* Grid */}
       <div 
         className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5" 
         style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
@@ -125,7 +118,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
                   <span className="opacity-50 text-white/50">❓</span>
                 )}
 
-                {/* Hover Tooltip */}
                 {hoveredCell === idx && !isRevealed && isFocused && (
                   <div className="absolute bottom-full mb-2 w-56 bg-[#181820] text-xs text-white p-3 rounded-xl border border-white/20 z-50 shadow-2xl pointer-events-none">
                     <p className="font-bold border-b border-white/10 pb-2 mb-2 text-indigo-300">Guesses for this cell:</p>
@@ -148,23 +140,24 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       </div>
 
       {/* Emote Keyboard */}
-      <div className="w-full max-w-md bg-[#181820] p-4 rounded-2xl border border-white/10 shrink-0">
+      <div className="w-full max-w-2xl bg-[#181820] p-4 rounded-2xl border border-white/10 shrink-0">
         <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">
           Select an Emote
         </p>
-        <div className="flex flex-wrap justify-center gap-2">
-          {(state.poolEmotes || []).map((emote: any) => {
-            // If the emote has already been revealed successfully, disable it.
-            const isUsed = (state.revealedCounts || {})[emote.id] === true;
+        {/* Made the keyboard scrollable to handle all server emotes */}
+        <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
+          {(state.allStaticEmotes || state.poolEmotes || []).map((emote: any) => {
+            // Check if this emote was guessed incorrectly for THIS specific cell
+            const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
             
             return (
               <button
                 key={emote.id}
-                disabled={isUsed || !isFocused || state.solved}
+                disabled={isIncorrect || !isFocused || state.solved}
                 onClick={() => handleGuess(emote.id)}
                 className={`
                   p-2 rounded-xl border transition-all
-                  ${isUsed ? 'opacity-20 grayscale cursor-not-allowed border-transparent bg-black' : 
+                  ${isIncorrect ? 'opacity-20 grayscale cursor-not-allowed border-transparent bg-black' : 
                     'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 active:scale-95 cursor-pointer'}
                 `}
               >

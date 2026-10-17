@@ -1,88 +1,150 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import ProfileCard from '@/components/ProfileCard';
 
-export default function DropGame({ state, isFocused }: { state: any, isFocused: boolean }) {
-  const [guessed, setGuessed] = useState(false);
+export default function DropGame({ 
+  state, 
+  nextDropAt, 
+  isFocused 
+}: { 
+  state: any, 
+  nextDropAt: number | null, 
+  isFocused: boolean 
+}) {
   const [timeLeft, setTimeLeft] = useState('');
+  const [localGuess, setLocalGuess] = useState<string | null>(null);
+  const [isGuessing, setIsGuessing] = useState(false);
 
-  // Check if the round is currently active or already completed
-  // The bot doesn't currently send an "active" flag for drops, but we can infer it
-  // if the winners array has items and the guesses array matches the participants.
-  // For simplicity, we'll just show the UI to guess unless they already guessed.
+  // Determine if the user has guessed (either from the server state, or locally)
+  const hasGuessed = state.userGuess || localGuess;
+  const guessedEmoteId = state.userGuess || localGuess;
 
   const handleGuess = async (emoteId: string) => {
-    if (!isFocused || guessed) return;
+    if (!isFocused || hasGuessed || isGuessing) return;
+    
+    setIsGuessing(true);
     const res = await fetch('/api/games/guess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emoteId, game: 'drop' }),
+      body: JSON.stringify({ emoteId, game: 'drop', gameType: state.gameType }),
     });
     const data = await res.json();
+    
     if (data.ok) {
-      setGuessed(true);
+      setLocalGuess(emoteId);
       if (data.isCorrect) alert('Correct! You won the card!');
       else alert('Incorrect guess!');
     } else {
       alert(data.error);
     }
+    setIsGuessing(false);
   };
 
-  // Simple countdown to when the next drop *might* happen (24-36h from startedAt)
+  // Exact countdown timer
   useEffect(() => {
-    if (!state.startedAt) return;
+    if (!nextDropAt) return;
+    
     const timer = setInterval(() => {
       const now = Date.now();
-      const end = state.startedAt + (24 * 60 * 60 * 1000); // 24h fallback
-      const diff = end - now;
+      const diff = nextDropAt - now;
+      
       if (diff <= 0) {
-        setTimeLeft('Next drop soon...');
+        setTimeLeft('Dropping now...');
         return;
       }
+      
       const h = Math.floor(diff / (1000 * 60 * 60));
       const m = Math.floor((diff / 1000 / 60) % 60);
-      setTimeLeft(`${h}h ${m}m`);
+      const s = Math.floor((diff / 1000) % 60);
+      
+      setTimeLeft(`${h}h ${m}m ${s}s`);
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, [state.startedAt]);
+  }, [nextDropAt]);
 
   const isCompleted = state.winners && state.winners.length > 0;
 
   return (
-    <div className="w-full flex flex-col items-center gap-6">
-      <div className="text-center">
-        <h3 className="text-xl font-bold text-white mb-2">{state.cardName || 'Unknown Card'}</h3>
-        <p className="text-sm font-bold tracking-widest uppercase" style={{ color: '#a0a0c0' }}>
-          {state.rarity} Drop
-        </p>
+    <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
+      
+      {/* The Card */}
+      <div className="w-[160px] sm:w-[180px] md:w-[200px] mt-4">
+        <div className="
+          [&_.pc-card]:!h-auto 
+          [&_.pc-card]:!max-h-none 
+          [&_.pc-card-wrapper]:!max-w-full
+          [&_.pc-details_h3]:!text-[18px] 
+          [&_.pc-details_p]:!text-[12px]
+          [&_.pc-handle]:!text-[10px]
+          [&_.pc-status]:!text-[10px]
+          [&_.pc-mini-avatar]:!w-[24px]
+          [&_.pc-mini-avatar]:!h-[24px]
+        ">
+          <ProfileCard
+            name={state.cardName || 'Unknown Card'}
+            title={state.cardType || 'Emote'}
+            handle={(state.cardName || 'unknown').toLowerCase().replace(/\s+/g, '-')}
+            status="Online"
+            contactText="View"
+            avatarUrl={state.rawImageUrl || ''}
+            rarity={state.rarity}
+            showUserInfo={false}
+            enableTilt={true}
+            enableMobileTilt={false}
+            behindGlowColor={state.cardColor || '#fff'}
+            iconUrl={null}
+            behindGlowEnabled
+            innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+            isModal={true}
+          />
+        </div>
       </div>
 
-      <div className="flex gap-3">
-        {(state.optionEmotes || []).map((emote: any) => (
-          <button
-            key={emote.id}
-            onClick={() => handleGuess(emote.id)}
-            disabled={guessed || !isFocused || isCompleted}
-            className="p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/20 hover:scale-110 transition disabled:opacity-50"
-          >
-            <img 
-              src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
-              className="w-12 h-12" 
-            />
-          </button>
-        ))}
+      {/* Guess Buttons */}
+      <div className="flex gap-3 flex-wrap justify-center max-w-sm">
+        {(state.optionEmotes || []).map((emote: any) => {
+          const isPicked = guessedEmoteId === emote.id;
+          
+          return (
+            <button
+              key={emote.id}
+              onClick={() => handleGuess(emote.id)}
+              disabled={!!hasGuessed || !isFocused || isCompleted || isGuessing}
+              className={`
+                p-3 rounded-2xl border transition
+                ${isPicked 
+                  ? 'bg-green-600/30 border-green-400 scale-105 shadow-[0_0_15px_rgba(34,197,94,0.5)]' 
+                  : 'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 disabled:opacity-50 disabled:hover:scale-100'
+                }
+              `}
+            >
+              <img 
+                src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
+                className={`w-10 h-10 ${hasGuessed && !isPicked ? 'grayscale opacity-30' : ''}`}
+              />
+            </button>
+          );
+        })}
       </div>
-      
-      {isCompleted ? (
-        <div className="text-center mt-4">
-          <p className="text-green-400 font-bold mb-2">This drop has ended!</p>
-          <p className="text-white/60 text-sm">Winners: {state.winners.map((id: string) => `<@${id}>`).join(', ')}</p>
-        </div>
-      ) : guessed ? (
-        <p className="text-indigo-300 mt-4 animate-pulse">Waiting for the drop to end to reveal the winner...</p>
-      ) : (
-        <p className="text-cyan-400 font-mono mt-4">Next drop in: {timeLeft || '...'}</p>
-      )}
+
+      {/* Status Text */}
+      <div className="text-center h-12 flex items-center justify-center">
+        {isCompleted ? (
+          <div className="text-center">
+            <p className="text-green-400 font-bold mb-1">This drop has ended!</p>
+            <p className="text-white/60 text-sm">Winners: {state.winners.map((id: string) => `<@${id}>`).join(', ')}</p>
+          </div>
+        ) : hasGuessed ? (
+          <p className="text-indigo-300 animate-pulse">Waiting for the drop to end to reveal the winner...</p>
+        ) : (
+          <p className="text-cyan-400 font-mono text-lg font-bold">
+            Next drop in: {timeLeft || 'Calculating...'}
+          </p>
+        )}
+      </div>
+
     </div>
   );
 }

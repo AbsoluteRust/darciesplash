@@ -83,7 +83,11 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
         <div className={panelClass('drop')} onClick={() => setFocused('drop')}>
           <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 lg:mb-6 sticky top-0 z-10">Card Drops</h2>
           {liveState?.drop ? (
-            <DropGame state={liveState.drop} isFocused={focused === 'drop'} />
+            <DropGame 
+              state={liveState.drop} 
+              nextDropAt={liveState.nextDropAt} 
+              isFocused={focused === 'drop'} 
+            />
           ) : (
             <p className="text-white/50 text-center">{loading ? 'Loading...' : 'Waiting for next drop...'}</p>
           )}
