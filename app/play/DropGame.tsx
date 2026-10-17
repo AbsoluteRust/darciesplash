@@ -27,7 +27,11 @@ export default function DropGame({
     const res = await fetch('/api/games/guess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emoteId, game: 'drop', gameType: state.gameType }),
+      body: JSON.stringify({ 
+        emoteId, 
+        game: 'drop', 
+        gameType: state.gameType 
+      }),
     });
     const data = await res.json();
     
@@ -113,7 +117,7 @@ export default function DropGame({
               onClick={() => handleGuess(emote.id)}
               disabled={!!hasGuessed || !isFocused || isCompleted || isGuessing}
               className={`
-                p-3 rounded-2xl border transition
+                p-3 rounded-2xl border transition-all
                 ${isPicked 
                   ? 'bg-green-600/30 border-green-400 scale-105 shadow-[0_0_15px_rgba(34,197,94,0.5)]' 
                   : 'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 disabled:opacity-50 disabled:hover:scale-100'
