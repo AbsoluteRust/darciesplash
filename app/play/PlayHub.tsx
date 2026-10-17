@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { signIn } from 'next-auth/react'; // <-- Add this
 import PlayButton from './PlayButton';
 import PuzzleGame from './PuzzleGame';
 import DropGame from './DropGame';
-import Link from 'next/link';
 
 export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const [focused, setFocused] = useState<'pack' | 'puzzle' | 'drop'>('pack');
@@ -26,8 +26,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     return () => clearInterval(int);
   }, [signedIn]);
 
-  // The classes handle both mobile (hidden when inactive, flex-1 when active)
-  // and desktop (blurred sidebars when inactive, flex-[3] when active).
   const panelClass = (id: string) => `
     transition-all duration-500 ease-in-out relative bg-[#0a0a14]/80 border border-white/10 rounded-3xl
     flex flex-col items-center justify-center p-4 lg:p-6 overflow-hidden
@@ -41,9 +39,13 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-6">
         <p className="text-white text-lg text-center">Sign in with Discord to play.</p>
-        <Link href="/api/auth/signin/discord?callbackUrl=/play" className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white">
+        {/* Use a button here instead of a Link */}
+        <button 
+          onClick={() => signIn('discord', { callbackUrl: '/play' })}
+          className="rounded-lg bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-500 transition"
+        >
           Sign in
-        </Link>
+        </button>
       </div>
     );
   }
