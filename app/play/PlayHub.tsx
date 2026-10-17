@@ -13,8 +13,15 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   useEffect(() => {
     if (!signedIn) return;
     const fetchState = async () => {
-      const res = await fetch('/api/games/state');
-      if (res.ok) setLiveState(await res.json());
+      try {
+        const res = await fetch('/api/games/state');
+        if (res.ok) {
+          const data = await res.json();
+          setLiveState(data);
+        }
+      } catch (err) {
+        // Silent catch to prevent UI crash if fetch fails
+      }
     };
     fetchState();
     const int = setInterval(fetchState, 5000);
@@ -43,7 +50,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen w-full max-w-[1800px] mx-auto p-4 gap-4 overflow-hidden">
-      
       {/* Left: Weekly Puzzle */}
       <div className={panelClass('puzzle')} onClick={() => setFocused('puzzle')}>
         <h2 className="text-2xl font-bold text-white mb-6 sticky top-0">Weekly Puzzle</h2>
@@ -71,7 +77,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           <p className="text-white/50 text-center">No active drop right now.<br/>Check back later!</p>
         )}
       </div>
-
     </div>
   );
 }

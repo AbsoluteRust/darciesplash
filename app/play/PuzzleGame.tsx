@@ -9,18 +9,19 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [cardsData, setCardsData] = useState<any[]>([]);
 
-  // Fetch card data to link emote names to full cards for the modal
   useEffect(() => {
-    fetch('/api/cards/list').then(r => r.json()).then(setCardsData);
+    fetch('/api/cards/list')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setCardsData(Array.isArray(data) ? data : []))
+      .catch(() => setCardsData([]));
   }, []);
 
-  // Countdown Timer
   useEffect(() => {
     const timer = setInterval(() => {
+      if (!state.weekStart) return;
       const now = new Date();
       const weekStart = new Date(state.weekStart + 'T00:00:00Z');
       
-      // Calculate next event: Friday 13:00 UTC, Saturday 13:00 UTC, or Sunday 08:00 UTC
       const friday = new Date(weekStart.getTime() + 5 * 86400000 + 13 * 3600000);
       const saturday = new Date(weekStart.getTime() + 6 * 86400000 + 13 * 3600000);
       const nextWeek = new Date(weekStart.getTime() + 7 * 86400000 + 8 * 3600000);
@@ -54,6 +55,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
   };
 
   const openCardModal = (emoteName: string) => {
+    if (!emoteName || !Array.isArray(cardsData)) return;
     const card = cardsData.find(c => c.name.toLowerCase() === emoteName.toLowerCase());
     if (card) setSelectedCard(card);
   };
@@ -62,22 +64,20 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
-      {/* Timer */}
       <div className="text-xl font-mono text-cyan-400 bg-cyan-950/30 px-6 py-2 rounded-full border border-cyan-800 shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-        Next Event: {timeLeft}
+        Next Event: {timeLeft || 'Loading...'}
       </div>
 
-      {/* Grid */}
       <div 
         className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5" 
-        style={{ gridTemplateColumns: `repeat(${state.width}, minmax(0, 1fr))` }}
+        style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
       >
-        {state.gridEmotes.map((row: any[], r: number) => 
-          row.map((emote: any, c: number) => {
+        {(state.gridEmotes || []).map((row: any[], r: number) => 
+          (row || []).map((emote: any, c: number) => {
             const idx = r * state.width + c;
-            const isRevealed = state.revealedCells.includes(idx);
+            const isRevealed = (state.revealedCells || []).includes(idx);
             const isCurrent = currentCell === idx;
-            const guesses = state.guessesByCell[idx] || [];
+            const guesses = (state.guessesByCell || {})[idx] || [];
 
             return (
               <div 
@@ -104,7 +104,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
                   <span className="opacity-50 text-white/50">❓</span>
                 )}
 
-                {/* Hover Tooltip */}
                 {hoveredCell === idx && !isRevealed && isFocused && (
                   <div className="absolute bottom-full mb-2 w-56 bg-[#181820] text-xs text-white p-3 rounded-xl border border-white/20 z-50 shadow-2xl pointer-events-none">
                     <p className="font-bold border-b border-white/10 pb-2 mb-2 text-indigo-300">Guesses for this cell:</p>
@@ -126,13 +125,11 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         )}
       </div>
 
-      {/* Emote Keyboard */}
       <div className="w-full max-w-md bg-[#181820] p-4 rounded-2xl border border-white/10">
         <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">Select an Emote</p>
         <div className="flex flex-wrap justify-center gap-2">
-          {state.poolEmotes.map((emote: any) => {
-            // If the emote has already been revealed successfully, disable it.
-            const isUsed = state.revealedCounts[emote.id] === true;
+          {(state.poolEmotes || []).map((emote: any) => {
+            const isUsed = (state.revealedCounts || {})[emote.id] === true;
             return (
               <button
                 key={emote.id}
@@ -154,7 +151,6 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         </div>
       </div>
 
-      {/* Card Modal */}
       {selectedCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={() => setSelectedCard(null)}>
           <div className="w-full max-w-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
