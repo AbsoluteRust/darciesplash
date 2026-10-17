@@ -7,15 +7,15 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { shortId } = await req.json();
-    const botUrl = (process.env.BOT_HTTP_URL || "").replace(/\/$/, "");
+    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
 
-    if (!botUrl) return NextResponse.json({ error: "Server config error: missing BOT_HTTP_URL" }, { status: 500 });
+    if (!botUrl) return NextResponse.json({ error: "Server config error: missing PI_BOT_URL" }, { status: 500 });
 
     const res = await fetch(`${botUrl}/api/games/reveal`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.BOT_HTTP_SECRET}`,
+        Authorization: `Bearer ${process.env.PI_BOT_SECRET}`,
       },
       body: JSON.stringify({ shortId }),
     });

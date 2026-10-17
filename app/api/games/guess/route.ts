@@ -7,12 +7,15 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
+    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
 
-    const res = await fetch(`${process.env.BOT_HTTP_URL}/api/games/guess`, {
+    if (!botUrl) return NextResponse.json({ error: "Missing PI_BOT_URL" }, { status: 500 });
+
+    const res = await fetch(`${botUrl}/api/games/guess`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.BOT_HTTP_SECRET}`,
+        Authorization: `Bearer ${process.env.PI_BOT_SECRET}`,
       },
       body: JSON.stringify({ 
         ...body, 
