@@ -1,7 +1,9 @@
 import { ImageResponse } from "next/og";
 import { NextRequest } from "next/server";
+import sharp from "sharp";
 
-export const runtime = "edge";
+// Switch from edge to nodejs so we can use sharp
+export const runtime = "nodejs";
 
 const RARITY_COLORS: Record<string, string> = {
   Common: "#9ca3af",
@@ -19,11 +21,25 @@ export async function GET(req: NextRequest) {
   const rarity = searchParams.get("rarity") || "";
   const collection = searchParams.get("collection") || "";
   let image = searchParams.get("image") || "";
-  // Satori can't resolve relative paths — make them absolute using this route's origin
-  if (image && !image.startsWith("http")) {
-    const origin = new URL(req.url).origin;
-    image = image.startsWith("/") ? `${origin}${image}` : `${origin}/${image}`;
+  
+  const origin = new URL(req.url).origin;
+  
+  // Convert the image (which is likely WebP) to a PNG Data URL for Satori
+  let imageUrl = "";
+  if (image) {
+    try {
+      const fetchUrl = image.startsWith("http") ? image : `${origin}${image.startsWith("/") ? image : `/${image}`}`;
+      const res = await fetch(fetchUrl);
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const pngBuffer = await sharp(buffer).png().toBuffer();
+        imageUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+      }
+    } catch (err) {
+      console.error("[card-image] Failed to convert image:", err);
+    }
   }
+
   const rarityColor = RARITY_COLORS[rarity] || "#9ca3af";
 
   return new ImageResponse(
@@ -50,9 +66,9 @@ export async function GET(req: NextRequest) {
             boxShadow: `0 0 40px ${rarityColor}55`,
           }}
         >
-          {image ? (
+          {imageUrl ? (
             <img
-              src={image}
+              src={imageUrl}
               alt=""
               style={{
                 width: "100%",
