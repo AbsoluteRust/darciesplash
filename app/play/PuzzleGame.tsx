@@ -9,6 +9,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
   const [selectedCard, setSelectedCard] = useState<any>(null);
   const [cardsData, setCardsData] = useState<any[]>([]);
 
+  // Fetch all cards so we can open the correct ProfileCard when an emote is clicked
   useEffect(() => {
     fetch('/api/cards/list')
       .then(r => r.ok ? r.json() : [])
@@ -16,12 +17,19 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       .catch(() => setCardsData([]));
   }, []);
 
+  // Countdown Timer
   useEffect(() => {
+    if (state.solved) {
+      setTimeLeft('Solved!');
+      return;
+    }
+
     const timer = setInterval(() => {
       if (!state.weekStart) return;
       const now = new Date();
       const weekStart = new Date(state.weekStart + 'T00:00:00Z');
       
+      // Calculate next event: Friday 13:00 UTC, Saturday 13:00 UTC, or Sunday 08:00 UTC
       const friday = new Date(weekStart.getTime() + 5 * 86400000 + 13 * 3600000);
       const saturday = new Date(weekStart.getTime() + 6 * 86400000 + 13 * 3600000);
       const nextWeek = new Date(weekStart.getTime() + 7 * 86400000 + 8 * 3600000);
@@ -31,7 +39,10 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       else if (now < saturday) target = saturday;
 
       const diff = target.getTime() - now.getTime();
-      if (diff <= 0) { setTimeLeft('Event starting...'); return; }
+      if (diff <= 0) { 
+        setTimeLeft('Event starting...'); 
+        return; 
+      }
       
       const d = Math.floor(diff / 86400000);
       const h = Math.floor((diff / 3600000) % 24);
@@ -40,11 +51,13 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       
       setTimeLeft(`${d > 0 ? d + 'd ' : ''}${h}h ${m}m ${s}s`);
     }, 1000);
+    
     return () => clearInterval(timer);
-  }, [state.weekStart]);
+  }, [state.weekStart, state.solved]);
 
   const handleGuess = async (emoteId: string) => {
     if (!isFocused || state.solved) return;
+    
     const res = await fetch('/api/games/guess', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -64,10 +77,17 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
-      <div className="text-xl font-mono text-cyan-400 bg-cyan-950/30 px-6 py-2 rounded-full border border-cyan-800 shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-        Next Event: {timeLeft || 'Loading...'}
+      
+      {/* Timer / Solved Banner */}
+      <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors ${
+        state.solved 
+          ? 'text-green-400 bg-green-950/30 border-green-800' 
+          : 'text-cyan-400 bg-cyan-950/30 border-cyan-800'
+      }`}>
+        {state.solved ? '🎉 Puzzle Solved!' : `Next Event: ${timeLeft || 'Loading...'}`}
       </div>
 
+      {/* Grid */}
       <div 
         className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5" 
         style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
@@ -85,8 +105,8 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
                 onMouseEnter={() => setHoveredCell(idx)}
                 onMouseLeave={() => setHoveredCell(null)}
                 className={`
-                  relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center text-2xl
-                  ${isCurrent ? 'bg-indigo-600/30 border-2 border-indigo-400 animate-pulse' : 
+                  relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center text-2xl transition-all
+                  ${isCurrent && !state.solved ? 'bg-indigo-600/30 border-2 border-indigo-400 animate-pulse' : 
                     isRevealed ? 'bg-white/10 border border-white/20' : 'bg-white/5 border border-white/5'}
                 `}
               >
@@ -98,20 +118,22 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
                     <img 
                       src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
                       className="w-10 h-10 md:w-12 md:h-12 drop-shadow-md"
+                      alt={emote.name}
                     />
                   </button>
                 ) : (
                   <span className="opacity-50 text-white/50">❓</span>
                 )}
 
+                {/* Hover Tooltip */}
                 {hoveredCell === idx && !isRevealed && isFocused && (
                   <div className="absolute bottom-full mb-2 w-56 bg-[#181820] text-xs text-white p-3 rounded-xl border border-white/20 z-50 shadow-2xl pointer-events-none">
                     <p className="font-bold border-b border-white/10 pb-2 mb-2 text-indigo-300">Guesses for this cell:</p>
                     {guesses.length === 0 ? <p className="opacity-50 italic">No guesses yet.</p> : (
-                      <ul className="space-y-1 max-h-32 overflow-y-auto">
+                      <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                         {guesses.map((g: any, i: number) => (
                           <li key={i} className="flex justify-between">
-                            <span>{g.username}</span>
+                            <span className="truncate pr-2">{g.username}</span>
                             <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>{g.isCorrect ? '✓' : '✗'}</span>
                           </li>
                         ))}
@@ -125,11 +147,16 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         )}
       </div>
 
-      <div className="w-full max-w-md bg-[#181820] p-4 rounded-2xl border border-white/10">
-        <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">Select an Emote</p>
+      {/* Emote Keyboard */}
+      <div className="w-full max-w-md bg-[#181820] p-4 rounded-2xl border border-white/10 shrink-0">
+        <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">
+          Select an Emote
+        </p>
         <div className="flex flex-wrap justify-center gap-2">
           {(state.poolEmotes || []).map((emote: any) => {
+            // If the emote has already been revealed successfully, disable it.
             const isUsed = (state.revealedCounts || {})[emote.id] === true;
+            
             return (
               <button
                 key={emote.id}
@@ -144,6 +171,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
                 <img 
                   src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
                   className="w-8 h-8" 
+                  alt={emote.name}
                 />
               </button>
             );
@@ -151,9 +179,16 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         </div>
       </div>
 
+      {/* Card Modal */}
       {selectedCard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" onClick={() => setSelectedCard(null)}>
-          <div className="w-full max-w-sm animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
+          onClick={() => setSelectedCard(null)}
+        >
+          <div 
+            className="w-full max-w-sm animate-in zoom-in-95" 
+            onClick={e => e.stopPropagation()}
+          >
             <ProfileCard
               name={selectedCard.name}
               title={selectedCard.type}
