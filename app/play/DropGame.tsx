@@ -16,7 +16,11 @@ export default function DropGame({
   const [localGuess, setLocalGuess] = useState<string | null>(null);
   const [isGuessing, setIsGuessing] = useState(false);
 
-  // Determine if the user has guessed (either from the server state, or locally)
+  // Reset local guess if a new drop starts
+  useEffect(() => {
+    setLocalGuess(null);
+  }, [state.startedAt]);
+
   const hasGuessed = state.userGuess || localGuess;
   const guessedEmoteId = state.userGuess || localGuess;
 
@@ -36,16 +40,14 @@ export default function DropGame({
     const data = await res.json();
     
     if (data.ok) {
+      // No alert! Just set local state so the UI locks in.
       setLocalGuess(emoteId);
-      if (data.isCorrect) alert('Correct! You won the card!');
-      else alert('Incorrect guess!');
     } else {
       alert(data.error);
     }
     setIsGuessing(false);
   };
 
-  // Exact countdown timer
   useEffect(() => {
     if (!nextDropAt) return;
     
@@ -71,10 +73,10 @@ export default function DropGame({
   const isCompleted = state.winners && state.winners.length > 0;
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
+    <div className="w-full h-full flex flex-col items-center justify-between gap-4 overflow-y-auto custom-scrollbar pb-6">
       
       {/* The Card */}
-      <div className="w-[160px] sm:w-[180px] md:w-[200px] mt-4">
+      <div className="w-[160px] sm:w-[180px] md:w-[200px] mt-4 shrink-0">
         <div className="
           [&_.pc-card]:!h-auto 
           [&_.pc-card]:!max-h-none 
@@ -107,7 +109,7 @@ export default function DropGame({
       </div>
 
       {/* Guess Buttons */}
-      <div className="flex gap-3 flex-wrap justify-center max-w-sm">
+      <div className="flex gap-3 flex-wrap justify-center max-w-sm shrink-0">
         {(state.optionEmotes || []).map((emote: any) => {
           const isPicked = guessedEmoteId === emote.id;
           
@@ -134,20 +136,30 @@ export default function DropGame({
       </div>
 
       {/* Status Text */}
-      <div className="text-center h-12 flex items-center justify-center">
-        {isCompleted ? (
-          <div className="text-center">
-            <p className="text-green-400 font-bold mb-1">This drop has ended!</p>
-            <p className="text-white/60 text-sm">Winners: {state.winners.map((id: string) => `<@${id}>`).join(', ')}</p>
-          </div>
-        ) : hasGuessed ? (
-          <p className="text-indigo-300 animate-pulse">Waiting for the drop to end to reveal the winner...</p>
-        ) : (
+      <div className="text-center h-12 flex items-center justify-center shrink-0">
+        {hasGuessed && !isCompleted ? (
+          <p className="text-indigo-300 animate-pulse">Waiting for the next drop to reveal the winner...</p>
+        ) : !isCompleted ? (
           <p className="text-cyan-400 font-mono text-lg font-bold">
             Next drop in: {timeLeft || 'Calculating...'}
           </p>
-        )}
+        ) : null}
       </div>
+
+      {/* Previous Winners Display */}
+      {state.previousWinners && state.previousWinners.length > 0 && (
+        <div className="text-center mt-2 p-3 bg-black/40 rounded-xl border border-white/10 w-full max-w-sm shrink-0">
+          <p className="text-green-400 font-bold text-sm mb-1">Previous Drop Results</p>
+          <p className="text-white/60 text-xs mb-1">
+            Winners: {state.previousWinners.map((id: string) => `<@${id}>`).join(', ')}
+          </p>
+          {state.previousParticipants && state.previousParticipants.length > 0 && (
+            <p className="text-white/40 text-[10px]">
+              {state.previousParticipants.length} total participants
+            </p>
+          )}
+        </div>
+      )}
 
     </div>
   );
