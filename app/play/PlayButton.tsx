@@ -182,6 +182,7 @@ export default function PlayButton() {
           onClose={() => {
             setReveal(null);
             setShortId(null);
+            setCanReroll(false);
           }} 
         />
       )}
