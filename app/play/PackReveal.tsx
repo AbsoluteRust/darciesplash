@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { PackCard } from './PlayButton';
+import ProfileCard from '@/components/ProfileCard';
 
 export default function PackReveal({
   cards,
@@ -97,21 +98,32 @@ function FlipCard({
 
             {/* Front */}
             <div
-              className="absolute inset-0 rounded-2xl bg-zinc-900 [transform:rotateY(180deg)] [backface-visibility:hidden] overflow-hidden ring-1 ring-white/10"
+              className="absolute inset-0 rounded-2xl bg-zinc-900 [transform:rotateY(180deg)] [backface-visibility:hidden] overflow-hidden"
               style={{ boxShadow: `0 0 28px ${card.color}66` }}
             >
-              <img
-  src={card.thumbUrl || card.imageUrl}
-  alt={card.name}
-  className="w-full h-full object-contain"
-  draggable={false}
-/>
-
-              {(card.isChroma || card.isContraband) && (
-                <div className="absolute top-2 left-2 rounded-full bg-black/70 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
-                  {card.isChroma ? '✨ Chroma' : '⬛ Contraband'}
-                </div>
-              )}
+              {/* 
+                This wrapper forces ProfileCard to fit exactly inside the FlipCard. 
+                pointer-events-none allows clicking the FlipCard button to work.
+              */}
+              <div className="absolute inset-0 w-full h-full pointer-events-none [&_.pc-card]:!h-full [&_.pc-card]:!max-h-full [&_.pc-card-wrapper]:!h-full">
+                <ProfileCard
+                  name={card.name}
+                  title={card.rarity}
+                  handle={card.name.toLowerCase().replace(/\s+/g, '-')}
+                  status="Online"
+                  contactText="View"
+                  avatarUrl={card.rawImageUrl || card.thumbUrl || card.imageUrl}
+                  rarity={card.rarity}
+                  showUserInfo={false}
+                  enableTilt={false}
+                  enableMobileTilt={false}
+                  behindGlowColor={card.color}
+                  iconUrl={null}
+                  behindGlowEnabled
+                  innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+                  isModal={true} // <-- This is the magic prop that stops it from grayscaling the art
+                />
+              </div>
             </div>
           </div>
         </div>
