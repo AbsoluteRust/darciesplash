@@ -1,17 +1,38 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { PackCard } from './PlayButton';
 import ProfileCard from '@/components/ProfileCard';
 
 export default function PackReveal({
-  cards,
+  cards: initialCards,
+  shortId,
+  canReroll,
   onClose,
 }: {
   cards: PackCard[];
+  shortId: string;
+  canReroll: boolean;
   onClose: () => void;
 }) {
+  const [cards, setCards] = useState<PackCard[]>(initialCards);
   const [flipped, setFlipped] = useState<Set<number>>(new Set());
+  const [hasRerolled, setHasRerolled] = useState(false);
+  const [isRerolling, setIsRerolling] = useState(false);
+  const [hasRevealedAll, setHasRevealedAll] = useState(false);
+
+  // Trigger the Discord composite update when all cards are flipped
+  useEffect(() => {
+    if (flipped.size === cards.length && cards.length > 0 && !hasRevealedAll && shortId) {
+      setHasRevealedAll(true);
+      
+      fetch('/api/games/reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shortId }),
+      }).catch(err => console.error('Failed to sync composite to Discord', err));
+    }
+  }, [flipped.size, cards.length, shortId, hasRevealedAll]);
 
   const flip = (i: number) =>
     setFlipped(prev => {
@@ -21,6 +42,33 @@ export default function PackReveal({
     });
 
   const flipAll = () => setFlipped(new Set(cards.map((_, i) => i)));
+
+  const handleReroll = async () => {
+    if (!shortId) return;
+    setIsRerolling(true);
+    
+    try {
+      const res = await fetch('/api/games/reroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shortId }),
+      });
+      const data = await res.json();
+      
+      if (data.ok && data.cards) {
+        setCards(data.cards);
+        setFlipped(new Set()); // hide new cards
+        setHasRerolled(true);
+        setHasRevealedAll(false); // reset so the new cards can trigger the reveal again
+      } else {
+        alert(data.error || 'Failed to reroll');
+      }
+    } catch (err) {
+      alert('Error communicating with server');
+    } finally {
+      setIsRerolling(false);
+    }
+  };
 
   const revealedCount = flipped.size;
   const totalCount = cards.length;
@@ -37,7 +85,7 @@ export default function PackReveal({
       <div className="flex flex-wrap justify-center gap-4 max-w-6xl">
         {cards.map((card, i) => (
           <FlipCard
-            key={i}
+            key={`${i}-${card.name}`}
             card={card}
             flipped={flipped.has(i)}
             onFlip={() => flip(i)}
@@ -55,6 +103,18 @@ export default function PackReveal({
             Reveal all
           </button>
         )}
+        
+        {canReroll && !hasRerolled && (
+          <button
+            type="button"
+            onClick={handleReroll}
+            disabled={isRerolling}
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 font-semibold text-white hover:bg-emerald-500 transition disabled:opacity-50"
+          >
+            {isRerolling ? 'Rerolling...' : '🎲 Reroll for 3 new cards'}
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onClose}
@@ -76,20 +136,15 @@ function FlipCard({
   flipped: boolean;
   onFlip: () => void;
 }) {
-  // Match the exact type strings used in CollectionClient
   const isWallpaper = card.type === 'Mobile Wallpaper' || card.type === 'Wallpaper';
   const isSplash = card.type === 'Splash Art';
   const isSticker = card.type === 'Sticker';
   const displayType = isWallpaper ? 'Mobile Wallpaper' : isSplash ? 'Splash Art' : isSticker ? 'Sticker' : 'Emote';
 
   return (
-    <div className="w-[160px] sm:w-[180px] md:w-[200px] flex flex-col items-center">
+    <div className="w-[140px] sm:w-[160px] md:w-[180px] flex flex-col items-center">
       {flipped ? (
         <div className="w-full relative z-10 animate-in fade-in zoom-in-95 duration-300">
-          {/* 
-            We override the CSS variables here to force the massive ProfileCard 
-            down to our 200px grid slot while keeping the proportions and cropping.
-          */}
           <div className="
             [&_.pc-card]:!h-auto 
             [&_.pc-card]:!max-h-none 
@@ -107,7 +162,7 @@ function FlipCard({
               handle={card.name.toLowerCase().replace(/\s+/g, '-')}
               status="Online"
               contactText="View"
-              avatarUrl={card.rawImageUrl || card.imageUrl}
+              avatarUrl={card.rawImageUrl || card.thumbUrl || card.imageUrl}
               rarity={card.rarity}
               showUserInfo={false}
               enableTilt={true}
@@ -116,7 +171,7 @@ function FlipCard({
               iconUrl={null}
               behindGlowEnabled
               innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-              isModal={true} // <-- This keeps the colours vibrant
+              isModal={true}
               isWallpaper={isWallpaper}
               isSplash={isSplash}
             />
@@ -141,7 +196,7 @@ function FlipCard({
             <div className="text-xs" style={{ color: card.color }}>
               {card.emoji} {card.rarity}
             </div>
-            <div className="text-sm font-semibold text-white truncate max-w-[200px]">{card.name}</div>
+            <div className="text-sm font-semibold text-white truncate max-w-[180px]">{card.name}</div>
           </>
         ) : (
           <div className="text-xs text-white/40">Tap to reveal</div>

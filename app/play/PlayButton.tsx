@@ -29,6 +29,8 @@ export default function PlayButton() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [reveal, setReveal] = useState<PackCard[] | null>(null);
+  const [shortId, setShortId] = useState<string | null>(null);
+  const [canReroll, setCanReroll] = useState(false);
 
   const holdStartRef = useRef(0);
   const rafRef = useRef<number | null>(null);
@@ -88,6 +90,8 @@ export default function PlayButton() {
       setMessage('Pack opened — check the game channel!');
       if (Array.isArray(data.cards) && data.cards.length > 0) {
         setReveal(data.cards);
+        setShortId(data.shortId);
+        setCanReroll(data.allCommon);
       }
     } catch (err) {
       setStatus('error');
@@ -170,8 +174,16 @@ export default function PlayButton() {
         )}
       </div>
 
-      {reveal && (
-        <PackReveal cards={reveal} onClose={() => setReveal(null)} />
+      {reveal && shortId && (
+        <PackReveal 
+          cards={reveal} 
+          shortId={shortId}
+          canReroll={canReroll}
+          onClose={() => {
+            setReveal(null);
+            setShortId(null);
+          }} 
+        />
       )}
     </>
   );
