@@ -78,8 +78,6 @@ const COLLECTION_GLOW: Record<string, string> = {
 
 const DEFAULT_GLOW = "rgba(125, 190, 255, 0.67)";
 
-const EMOTE_PX = 48;
-
 const TYPE_DISPLAY: Record<string, string> = {
   emote: "Emote",
   splash: "Splash Art",
@@ -242,7 +240,14 @@ export default function CollectionClient({
 
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameState, setRenameState] = useState<{ canRename: boolean; cooldownRemainingMs: number } | null>(null);
+
   const myMeta = collectionMeta.find(m => m.internalSlug === id);
+
+  const canEdit = useMemo(
+    () => canEditCollectionOrder(userId, id, roles),
+    [userId, id, roles]
+  );
+  const canCopyEmotes = roles?.darsubscribbler === true;
 
   const publicSlugFor = useCallback(
     (internal: string) => {
@@ -404,13 +409,6 @@ export default function CollectionClient({
     if (editMode) return null;
     return buildGroups(displayCards, layout);
   }, [displayCards, layout, editMode]);
-
-  const canEdit = useMemo(
-    () => canEditCollectionOrder(userId, id, roles),
-    [userId, id, roles]
-  );
-
-  const canCopyEmotes = roles?.darsubscribbler === true;
 
   const enterEditMode = useCallback(() => {
     setShowMine(false);
