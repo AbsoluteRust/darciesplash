@@ -148,11 +148,6 @@ function FlipCard({
   onFlip: () => void;
   onInspect: () => void;
 }) {
-  const isWallpaper = card.type === 'Mobile Wallpaper' || card.type === 'Wallpaper';
-  const isSplash = card.type === 'Splash Art';
-  const isSticker = card.type === 'Sticker';
-  const displayType = isWallpaper ? 'Mobile Wallpaper' : isSplash ? 'Splash Art' : isSticker ? 'Sticker' : 'Emote';
-
   return (
     <div className="w-[140px] sm:w-[160px] md:w-[180px] flex flex-col items-center">
       {flipped ? (
@@ -173,7 +168,7 @@ function FlipCard({
           ">
             <ProfileCard
               name={card.name}
-              title={displayType}
+              title={card.type || 'Emote'}
               handle={card.name.toLowerCase().replace(/\s+/g, '-')}
               status="Online"
               contactText="View"
@@ -187,8 +182,6 @@ function FlipCard({
               behindGlowEnabled
               innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
               isModal={true}
-              isWallpaper={isWallpaper}
-              isSplash={isSplash}
             />
           </div>
         </div>

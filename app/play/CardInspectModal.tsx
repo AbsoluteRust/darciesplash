@@ -27,7 +27,6 @@ export default function CardInspectModal({
     }).catch(console.error);
   }, []);
 
-  // Find full metadata for related cards
   const fullCardData = allCards.find(c => c.name.toLowerCase() === currentCard.name.toLowerCase());
   const relatedCardNames = fullCardData?.related || [];
   const relatedCards = relatedCardNames
@@ -43,10 +42,8 @@ export default function CardInspectModal({
   const isSticker = currentCard.type === 'Sticker';
   const isEmote = !isWallpaper && !isSplash && !isSticker;
   
-  // Ensure we grab the right image regardless of where the card data came from
   const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl;
 
-  // Reset current card if a new initialCard is passed
   useEffect(() => {
     setCurrentCard(initialCard);
   }, [initialCard]);
@@ -61,7 +58,6 @@ export default function CardInspectModal({
         onClick={e => e.stopPropagation()}
       >
         
-        {/* Left Side: Chromas */}
         {chromasForActive.length > 0 && (
           <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-2 xl:order-1 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit shrink-0">
             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2 text-center">Chromas</h3>
@@ -77,12 +73,9 @@ export default function CardInspectModal({
           </div>
         )}
 
-        {/* Center: Main Card & Info */}
         <div className="flex flex-col items-center gap-4 w-full max-w-sm order-1 xl:order-2 shrink-0">
-          
           <div className="w-full flex justify-center">
             {isEmote ? (
-              // Added proper wrapper so ProfileCard sizes correctly
               <div className="w-full max-w-[420px] mx-auto block">
                 <ProfileCard
                   key={currentCard.name}
@@ -102,8 +95,6 @@ export default function CardInspectModal({
                   innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
                   isModal={true}
                   onContactClick={onClose}
-                  isWallpaper={isWallpaper}
-                  isSplash={isSplash}
                 />
               </div>
             ) : (
@@ -123,7 +114,6 @@ export default function CardInspectModal({
             )}
           </div>
 
-          {/* Info Boxes */}
           <div className="flex flex-col gap-4 w-full mt-4">
             {(currentCard.description || fullCardData?.description)?.trim() && (
               <div className="bg-[#181820] border border-white/10 p-5 rounded-2xl text-white/90 text-sm leading-relaxed shadow-xl">
@@ -150,7 +140,6 @@ export default function CardInspectModal({
           </div>
         </div>
 
-        {/* Right Side: Related Cards */}
         {relatedCards.length > 0 && (
           <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-3 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit shrink-0">
             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2 text-center">Related</h3>
@@ -168,7 +157,6 @@ export default function CardInspectModal({
 
       </div>
 
-      {/* Chroma Lightbox Overlay */}
       {activeChroma && (
         <div 
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
