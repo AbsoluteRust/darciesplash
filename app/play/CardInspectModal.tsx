@@ -42,8 +42,11 @@ export default function CardInspectModal({
   const isSplash = currentCard.type === 'Splash Art';
   const isSticker = currentCard.type === 'Sticker';
   const isEmote = !isWallpaper && !isSplash && !isSticker;
+  
+  // Ensure we grab the right image regardless of where the card data came from
   const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl;
 
+  // Reset current card if a new initialCard is passed
   useEffect(() => {
     setCurrentCard(initialCard);
   }, [initialCard]);
@@ -57,9 +60,10 @@ export default function CardInspectModal({
         className="flex flex-col xl:flex-row items-center xl:items-start justify-center gap-6 max-w-7xl w-full pb-10" 
         onClick={e => e.stopPropagation()}
       >
+        
         {/* Left Side: Chromas */}
         {chromasForActive.length > 0 && (
-          <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-2 xl:order-1 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit">
+          <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-2 xl:order-1 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit shrink-0">
             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2 text-center">Chromas</h3>
             <div className="grid grid-cols-3 xl:grid-cols-2 gap-2">
               {chromasForActive.map(ch => (
@@ -75,26 +79,33 @@ export default function CardInspectModal({
 
         {/* Center: Main Card & Info */}
         <div className="flex flex-col items-center gap-4 w-full max-w-sm order-1 xl:order-2 shrink-0">
+          
           <div className="w-full flex justify-center">
             {isEmote ? (
-              <ProfileCard
-                key={currentCard.name}
-                name={currentCard.name}
-                title={currentCard.type || 'Emote'}
-                handle={currentCard.name.toLowerCase().replace(/\s+/g, '-')}
-                status="Online"
-                contactText="Close"
-                avatarUrl={imgUrl}
-                rarity={currentCard.rarity}
-                showUserInfo={false}
-                enableTilt={true}
-                behindGlowColor={currentCard.color || '#fff'}
-                iconUrl={null}
-                behindGlowEnabled
-                innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-                isModal={true}
-                onContactClick={onClose}
-              />
+              // Added proper wrapper so ProfileCard sizes correctly
+              <div className="w-full max-w-[420px] mx-auto block">
+                <ProfileCard
+                  key={currentCard.name}
+                  name={currentCard.name}
+                  title={currentCard.type || 'Emote'}
+                  handle={currentCard.name.toLowerCase().replace(/\s+/g, '-')}
+                  status="Online"
+                  contactText="Close"
+                  avatarUrl={imgUrl}
+                  rarity={currentCard.rarity}
+                  showUserInfo={false}
+                  enableTilt={false}
+                  enableMobileTilt={false}
+                  behindGlowColor={currentCard.color || '#fff'}
+                  iconUrl={null}
+                  behindGlowEnabled
+                  innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+                  isModal={true}
+                  onContactClick={onClose}
+                  isWallpaper={isWallpaper}
+                  isSplash={isSplash}
+                />
+              </div>
             ) : (
               <div className="flex flex-col items-center gap-4 bg-[#181820] p-4 rounded-2xl border border-white/10 w-full shadow-2xl">
                 <img
@@ -102,14 +113,18 @@ export default function CardInspectModal({
                   src={imgUrl}
                   alt={currentCard.name}
                 />
-                <button onClick={onClose} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold transition">
+                <button 
+                  onClick={onClose} 
+                  className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold transition"
+                >
                   Close
                 </button>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-4 w-full">
+          {/* Info Boxes */}
+          <div className="flex flex-col gap-4 w-full mt-4">
             {(currentCard.description || fullCardData?.description)?.trim() && (
               <div className="bg-[#181820] border border-white/10 p-5 rounded-2xl text-white/90 text-sm leading-relaxed shadow-xl">
                 <p>{currentCard.description || fullCardData?.description}</p>
@@ -137,7 +152,7 @@ export default function CardInspectModal({
 
         {/* Right Side: Related Cards */}
         {relatedCards.length > 0 && (
-          <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-3 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit">
+          <div className="flex flex-col gap-2 w-full max-w-[200px] xl:w-auto order-3 bg-[#181820]/80 p-4 rounded-2xl border border-white/10 h-fit shrink-0">
             <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2 text-center">Related</h3>
             <div className="grid grid-cols-3 xl:grid-cols-2 gap-2">
               {relatedCards.map(rc => (
@@ -150,9 +165,10 @@ export default function CardInspectModal({
             </div>
           </div>
         )}
+
       </div>
 
-      {/* Chroma Lightbox */}
+      {/* Chroma Lightbox Overlay */}
       {activeChroma && (
         <div 
           className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4"
@@ -167,7 +183,10 @@ export default function CardInspectModal({
               <div className="text-xl font-bold text-white">{activeChroma.name}</div>
               <div className="text-sm text-white/60">{activeChroma.rarity}</div>
             </div>
-            <button onClick={() => setActiveChroma(null)} className="mt-2 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition">
+            <button 
+              onClick={() => setActiveChroma(null)}
+              className="mt-2 px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition"
+            >
               Close
             </button>
           </div>
