@@ -78,10 +78,16 @@ export default function PuzzleGame({
   const currentCell = state.nextCell;
   const currentGuesses = (state.guessesByCell || {})[currentCell] || [];
 
-  // Use the passed allStaticEmotes, fallback to poolEmotes if empty
   const emotesToDisplay = (allStaticEmotes && allStaticEmotes.length > 0) 
     ? allStaticEmotes 
     : (state.poolEmotes || []);
+
+  // Helper to get the emote image URL for the hover tooltip
+  const getEmoteUrl = (id: string) => {
+    const emote = emotesToDisplay.find(e => e.id === id);
+    if (!emote) return "";
+    return `https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`;
+  };
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
@@ -137,9 +143,20 @@ export default function PuzzleGame({
                     {guesses.length === 0 ? <p className="opacity-50 italic">No guesses yet.</p> : (
                       <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                         {guesses.map((g: any, i: number) => (
-                          <li key={i} className="flex justify-between">
-                            <span className="truncate pr-2">{g.username}</span>
-                            <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>{g.isCorrect ? '✓' : '✗'}</span>
+                          <li key={i} className="flex items-center justify-between gap-2">
+                            <span className="truncate max-w-[80px]">{g.username}</span>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {g.emoteId && (
+                                <img 
+                                  src={getEmoteUrl(g.emoteId)} 
+                                  className="w-5 h-5 opacity-90" 
+                                  alt="guess"
+                                />
+                              )}
+                              <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                                {g.isCorrect ? '✓' : '✗'}
+                              </span>
+                            </div>
                           </li>
                         ))}
                       </ul>
