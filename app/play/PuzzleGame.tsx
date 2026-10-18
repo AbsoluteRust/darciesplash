@@ -69,11 +69,17 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
 
   const currentCell = state.nextCell;
   const currentGuesses = (state.guessesByCell || {})[currentCell] || [];
+  
+  // Safely determine which emotes to show. 
+  // If the bot sends allStaticEmotes (even if empty), we check the length.
+  const emotesToDisplay = (state.allStaticEmotes && state.allStaticEmotes.length > 0) 
+    ? state.allStaticEmotes 
+    : (state.poolEmotes || []);
 
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
       
-      <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors ${
+      <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors shrink-0 ${
         state.solved 
           ? 'text-green-400 bg-green-950/30 border-green-800' 
           : 'text-cyan-400 bg-cyan-950/30 border-cyan-800'
@@ -82,7 +88,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       </div>
 
       <div 
-        className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5" 
+        className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5 shrink-0" 
         style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
       >
         {(state.gridEmotes || []).map((row: any[], r: number) => 
@@ -146,7 +152,7 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
         </p>
         {/* Made the keyboard scrollable to handle all server emotes */}
         <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
-          {(state.allStaticEmotes || state.poolEmotes || []).map((emote: any) => {
+          {emotesToDisplay.map((emote: any) => {
             // Check if this emote was guessed incorrectly for THIS specific cell
             const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
             
