@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { permanentRedirect, notFound } from "next/navigation";
+import { resolveSlug, getMeta, getAllMeta } from "@/lib/collection-meta";
 import CollectionClient from "./CollectionClient";
 
 export async function generateMetadata({
@@ -13,7 +15,11 @@ export async function generateMetadata({
   const cardSlug = typeof sp.card === "string" ? sp.card : null;
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://folly.milktruckers.com";
-  const collectionName = id.charAt(0).toUpperCase() + id.slice(1);
+
+  const internalSlug = await resolveSlug(id);
+  const meta = internalSlug ? await getMeta(internalSlug) : null;
+  const collectionName = meta?.displayName || (id.charAt(0).toUpperCase() + id.slice(1));
+  const publicSlug = meta?.publicSlug || id;
 
   if (!cardSlug) {
     return {
@@ -22,7 +28,7 @@ export async function generateMetadata({
       openGraph: {
         title: `The ${collectionName} Collection`,
         description: `Browse the ${collectionName} collection.`,
-        url: `${siteUrl}/collections/${id}`,
+        url: `${siteUrl}/collections/${publicSlug}`,
         siteName: "Folly of Flora",
         images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630 }],
       },
@@ -66,7 +72,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${cardName} — ${collectionName} Collection`,
       description: `A ${cardType} from the ${collectionName} collection.`,
-      url: `${siteUrl}/collections/${id}?card=${cardSlug}`,
+      url: `${siteUrl}/collections/${publicSlug}?card=${cardSlug}`,
       siteName: "Folly of Flora",
       images: [{ url: ogImageUrl, width: 400, height: 560 }],
     },
@@ -80,9 +86,36 @@ export async function generateMetadata({
 
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { id } = await params;
-  return <CollectionClient params={Promise.resolve({ id })} />;
+  const { id: urlSlug } = await params;
+  const sp = await searchParams;
+
+  const internalSlug = await resolveSlug(urlSlug);
+  if (!internalSlug) notFound();
+
+  const meta = await getMeta(internalSlug);
+
+  if (urlSlug !== meta.publicSlug) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (typeof v === "string") qs.set(k, v);
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    permanentRedirect(`/collections/${meta.publicSlug}${suffix}`);
+  }
+
+  const allMeta = await getAllMeta();
+
+  return (
+    <CollectionClient
+      params={Promise.resolve({ id: internalSlug })}
+      displayName={meta.displayName}
+      publicSlug={meta.publicSlug}
+      collectionMeta={allMeta}
+    />
+  );
 }

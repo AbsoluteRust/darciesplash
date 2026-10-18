@@ -1,4 +1,3 @@
-// app/api/collections/rename/route.ts
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { kv } from "@vercel/kv";
@@ -13,6 +12,18 @@ import {
   PUBLIC_SLUG_MAX,
   INTERNAL_SLUGS,
 } from "@/lib/collection-meta";
+
+type AccountRoles = {
+  commissioner: boolean;
+  darsubscribbler: boolean;
+};
+
+function readRoles(raw: any): AccountRoles {
+  return {
+    commissioner: !!raw?.commissioner,
+    darsubscribbler: !!raw?.darsubscribbler,
+  };
+}
 
 export async function POST(req: Request) {
   const session = await auth();
@@ -49,18 +60,15 @@ export async function POST(req: Request) {
     );
   }
 
-  // Auth — reuse the existing owner check
-  const roles = (await kv.get(`account_roles:${session.user.id}`)) || {
-    commissioner: false,
-    darsubscribbler: false,
-  };
+  const rolesRaw = await kv.get(`account_roles:${session.user.id}`);
+  const roles = readRoles(rolesRaw);
+
   if (!canEditCollectionOrder(session.user.id, internalSlug, roles)) {
     return NextResponse.json({ error: "Not authorized" }, { status: 403 });
   }
 
   const existing = await getMeta(internalSlug);
 
-  // Cooldown
   if (!canRenameNow(existing)) {
     const days = Math.ceil(cooldownRemainingMs(existing) / (24 * 60 * 60 * 1000));
     return NextResponse.json(

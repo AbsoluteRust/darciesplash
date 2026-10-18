@@ -1,123 +1,150 @@
-import type { Metadata } from "next";
-import { permanentRedirect, notFound } from "next/navigation";
-import { resolveSlug, getMeta, getAllMeta } from "@/lib/collection-meta";
-import CollectionClient from "./CollectionClient";
+'use client';
 
-export async function generateMetadata({
-  params,
-  searchParams,
+import { useState } from 'react';
+import {
+  DISPLAY_NAME_MAX,
+  PUBLIC_SLUG_MAX,
+  slugify,
+} from '@/lib/collection-meta';
+
+export default function RenameCollectionModal({
+  internalSlug,
+  currentDisplayName,
+  currentPublicSlug,
+  canRename,
+  cooldownRemainingMs,
+  onClose,
+  onRenamed,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}): Promise<Metadata> {
-  const { id } = await params;
-  const sp = await searchParams;
-  const cardSlug = typeof sp.card === "string" ? sp.card : null;
-
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://folly.milktruckers.com";
-
-  // Resolve public/historical slug → internal slug → meta
-  const internalSlug = await resolveSlug(id);
-  const meta = internalSlug ? await getMeta(internalSlug) : null;
-  const collectionName = meta?.displayName || (id.charAt(0).toUpperCase() + id.slice(1));
-  const publicSlug = meta?.publicSlug || id;
-
-  if (!cardSlug) {
-    return {
-      title: `The ${collectionName} Collection`,
-      description: `Browse the ${collectionName} collection.`,
-      openGraph: {
-        title: `The ${collectionName} Collection`,
-        description: `Browse the ${collectionName} collection.`,
-        url: `${siteUrl}/collections/${publicSlug}`,
-        siteName: "Folly of Flora",
-        images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630 }],
-      },
-      twitter: { card: "summary_large_image" },
-    };
-  }
-
-  let cardName = cardSlug;
-  let cardType = "Emote";
-  let cardImage = "";
-
-  try {
-    const res = await fetch(`${siteUrl}/api/cards/list`, { cache: "no-store" });
-    if (res.ok) {
-      const cards = await res.json();
-      const match = cards.find(
-        (c: any) =>
-          c.name.toLowerCase().replace(/\s+/g, "-") === cardSlug.toLowerCase()
-      );
-      if (match) {
-        cardName = match.name;
-        cardType = match.type || "Emote";
-        cardImage = match.image || "";
-      }
-    }
-  } catch {
-    // fall through
-  }
-
-  const imageParams = new URLSearchParams();
-  imageParams.set("name", cardName);
-  imageParams.set("type", cardType);
-  imageParams.set("collection", collectionName);
-  if (cardImage) imageParams.set("image", cardImage);
-
-  const ogImageUrl = `${siteUrl}/api/card-image?${imageParams.toString()}`;
-
-  return {
-    title: `${cardName} — ${collectionName} Collection`,
-    description: `A ${cardType} from the ${collectionName} collection.`,
-    openGraph: {
-      title: `${cardName} — ${collectionName} Collection`,
-      description: `A ${cardType} from the ${collectionName} collection.`,
-      url: `${siteUrl}/collections/${publicSlug}?card=${cardSlug}`,
-      siteName: "Folly of Flora",
-      images: [{ url: ogImageUrl, width: 400, height: 560 }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title: `${cardName} — ${collectionName} Collection`,
-      images: [ogImageUrl],
-    },
-  };
-}
-
-export default async function Page({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+  internalSlug: string;
+  currentDisplayName: string;
+  currentPublicSlug: string;
+  canRename: boolean;
+  cooldownRemainingMs: number;
+  onClose: () => void;
+  onRenamed: (next: { displayName: string; publicSlug: string }) => void;
 }) {
-  const { id: urlSlug } = await params;
-  const sp = await searchParams;
+  const [displayName, setDisplayName] = useState(currentDisplayName);
+  const [publicSlug, setPublicSlug] = useState(currentPublicSlug);
+  const [slugTouched, setSlugTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const internalSlug = await resolveSlug(urlSlug);
-  if (!internalSlug) notFound();
+  const remainingDays = Math.ceil(cooldownRemainingMs / (24 * 60 * 60 * 1000));
 
-  const meta = await getMeta(internalSlug);
+  const handleDisplayNameChange = (v: string) => {
+    setDisplayName(v.slice(0, DISPLAY_NAME_MAX));
+    if (!slugTouched) setPublicSlug(slugify(v).slice(0, PUBLIC_SLUG_MAX));
+  };
 
-  // Historical slug → 308 redirect to current public slug
-  if (urlSlug !== meta.publicSlug) {
-    const qs = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) {
-      if (typeof v === "string") qs.set(k, v);
+  const submit = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch('/api/collections/rename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ internalSlug, displayName, publicSlug }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Rename failed');
+      onRenamed({ displayName, publicSlug: slugify(publicSlug) });
+    } catch (e: any) {
+      setError(e?.message || 'Rename failed');
+    } finally {
+      setBusy(false);
     }
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
-    permanentRedirect(`/collections/${meta.publicSlug}${suffix}`);
-  }
-
-  const allMeta = await getAllMeta();
+  };
 
   return (
-    <CollectionClient
-      params={Promise.resolve({ id: internalSlug })}
-      displayName={meta.displayName}
-      publicSlug={meta.publicSlug}
-      collectionMeta={allMeta}
-    />
+    <div className="rename-modal-overlay" onClick={onClose}>
+      <div className="rename-modal" onClick={e => e.stopPropagation()}>
+        <h2>Rename collection</h2>
+
+        {!canRename ? (
+          <>
+            <p className="rename-modal__warning">
+              You've already renamed this collection. You can rename it again
+              in <strong>{remainingDays} day{remainingDays === 1 ? '' : 's'}</strong>.
+            </p>
+            <div className="rename-modal__actions">
+              <button
+                type="button"
+                className="collection-edit-btn collection-edit-btn--cancel"
+                onClick={onClose}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <label className="rename-modal__label">
+              Display name
+              <input
+                type="text"
+                className="rename-modal__input"
+                value={displayName}
+                onChange={e => handleDisplayNameChange(e.target.value)}
+                maxLength={DISPLAY_NAME_MAX}
+              />
+              <span className="rename-modal__counter">
+                {displayName.length}/{DISPLAY_NAME_MAX}
+              </span>
+            </label>
+
+            <label className="rename-modal__label">
+              URL slug
+              <input
+                type="text"
+                className="rename-modal__input"
+                value={publicSlug}
+                onChange={e => {
+                  setSlugTouched(true);
+                  setPublicSlug(slugify(e.target.value).slice(0, PUBLIC_SLUG_MAX));
+                }}
+                maxLength={PUBLIC_SLUG_MAX}
+              />
+              <span className="rename-modal__hint">
+                Preview: <code>/collections/{publicSlug || '...'}</code>
+              </span>
+            </label>
+
+            <p className="rename-modal__warning">
+              ⚠️ The old URL (<code>/collections/{currentPublicSlug}</code>)
+              will redirect to the new one. <br />
+              This can be done once every <strong>90 days</strong>.
+            </p>
+
+            {error && <p className="rename-modal__error">{error}</p>}
+
+            <div className="rename-modal__actions">
+              <button
+                type="button"
+                className="collection-edit-btn collection-edit-btn--cancel"
+                onClick={onClose}
+                disabled={busy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="collection-edit-btn collection-edit-btn--save"
+                onClick={submit}
+                disabled={
+                  busy ||
+                  !displayName ||
+                  !publicSlug ||
+                  (displayName === currentDisplayName &&
+                    publicSlug === currentPublicSlug)
+                }
+              >
+                {busy ? 'Renaming…' : 'Rename'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
