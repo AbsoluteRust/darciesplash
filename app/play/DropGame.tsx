@@ -151,7 +151,7 @@ export default function DropGame({
         <div className="text-center mt-2 p-3 bg-black/40 rounded-xl border border-white/10 w-full max-w-sm shrink-0">
           <p className="text-green-400 font-bold text-sm mb-1">Previous Drop Results</p>
           <p className="text-white/60 text-xs mb-1">
-            Winners: {state.previousWinners.map((id: string) => `<@${id}>`).join(', ')}
+            Winners: {state.previousWinners.map((w: any) => w.name).join(', ')}
           </p>
           {state.previousParticipants && state.previousParticipants.length > 0 && (
             <p className="text-white/40 text-[10px]">
