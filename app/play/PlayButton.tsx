@@ -164,10 +164,10 @@ export default function PlayButton() {
             status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]',
           ].join(' ')}
         >
-          {/* Progress Fill Overlay - Made much brighter with a glowing edge */}
+          {/* Removed the CSS transition here so it tracks the JS state instantly */}
           <span
             aria-hidden
-            className="absolute inset-y-0 left-0 bg-white/40 shadow-[0_0_20px_rgba(255,255,255,0.7)] z-0 transition-all duration-75 ease-linear"
+            className="absolute inset-y-0 left-0 bg-white/40 shadow-[0_0_20px_rgba(255,255,255,0.7)] z-0"
             style={{ width: `${progress * 100}%` }}
           />
 
