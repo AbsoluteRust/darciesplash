@@ -155,28 +155,27 @@ export default function PlayButton() {
           onContextMenu={(e) => e.preventDefault()}
           disabled={status === 'opening' || !!reveal}
           className={[
-            // Changed from a wide button to a card-shaped pack
             'relative select-none touch-none overflow-hidden rounded-3xl',
             'w-64 sm:w-72 md:w-80 aspect-[3/4]', 
             'shadow-2xl transition-all duration-200',
-            // Added a richer gradient to look like a pack
             'bg-gradient-to-br from-indigo-600 via-purple-700 to-violet-900',
-            // Subtle inner ring
             'ring-1 ring-white/20',
             shaking ? 'animate-[playShake_0.12s_infinite]' : '',
             status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]',
           ].join(' ')}
         >
-          {/* Progress Fill Overlay */}
+          {/* Progress Fill Overlay - Made much brighter with a glowing edge */}
           <span
             aria-hidden
-            className="absolute inset-y-0 left-0 bg-white/20 transition-all duration-75 ease-linear"
+            className="absolute inset-y-0 left-0 bg-white/40 shadow-[0_0_20px_rgba(255,255,255,0.7)] z-0 transition-all duration-75 ease-linear"
             style={{ width: `${progress * 100}%` }}
           />
 
           {/* Center Icon (Pack styling) */}
-          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-7xl font-black text-white/20 select-none drop-shadow-lg">?</span>
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <span className={`text-7xl font-black select-none drop-shadow-xl transition-colors duration-200 ${full ? 'text-white' : 'text-white/30'}`}>
+              ?
+            </span>
           </span>
         </button>
 
