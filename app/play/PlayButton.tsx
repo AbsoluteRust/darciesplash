@@ -131,6 +131,12 @@ export default function PlayButton() {
   const full = progress >= 1;
   const shaking = charging && progress > 0;
 
+  const label = status === 'opening'
+    ? 'Opening…'
+    : full
+    ? 'Release to open!'
+    : 'Hold spacebar to open';
+
   return (
     <>
       <div className="flex flex-col items-center gap-4">
@@ -149,26 +155,35 @@ export default function PlayButton() {
           onContextMenu={(e) => e.preventDefault()}
           disabled={status === 'opening' || !!reveal}
           className={[
-            'relative select-none touch-none overflow-hidden rounded-2xl px-12 py-6',
-            'text-xl font-bold text-white shadow-lg transition',
-            'bg-gradient-to-r from-indigo-500 to-violet-500',
+            // Changed from a wide button to a card-shaped pack
+            'relative select-none touch-none overflow-hidden rounded-3xl',
+            'w-64 sm:w-72 md:w-80 aspect-[3/4]', 
+            'shadow-2xl transition-all duration-200',
+            // Added a richer gradient to look like a pack
+            'bg-gradient-to-br from-indigo-600 via-purple-700 to-violet-900',
+            // Subtle inner ring
+            'ring-1 ring-white/20',
             shaking ? 'animate-[playShake_0.12s_infinite]' : '',
-            status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer',
+            status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]',
           ].join(' ')}
         >
+          {/* Progress Fill Overlay */}
           <span
             aria-hidden
-            className="absolute inset-y-0 left-0 bg-white/35"
+            className="absolute inset-y-0 left-0 bg-white/20 transition-all duration-75 ease-linear"
             style={{ width: `${progress * 100}%` }}
           />
-          <span className="relative z-10">
-            {status === 'opening'
-              ? 'Opening…'
-              : full
-              ? 'Release to open!'
-              : 'Hold spacebar to open'}
+
+          {/* Center Icon (Pack styling) */}
+          <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-7xl font-black text-white/20 select-none drop-shadow-lg">?</span>
           </span>
         </button>
+
+        {/* Text moved below the button */}
+        <span className="text-lg font-bold text-white/80 tracking-wide">
+          {label}
+        </span>
 
         {message && (
           <p className={status === 'error' ? 'text-sm text-red-400' : 'text-sm text-emerald-400'}>
