@@ -3,7 +3,15 @@
 import { useState, useEffect } from 'react';
 import ProfileCard from '@/components/ProfileCard';
 
-export default function PuzzleGame({ state, isFocused }: { state: any, isFocused: boolean }) {
+export default function PuzzleGame({ 
+  state, 
+  allStaticEmotes, 
+  isFocused 
+}: { 
+  state: any; 
+  allStaticEmotes?: any[];
+  isFocused: boolean;
+}) {
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState('');
   const [selectedCard, setSelectedCard] = useState<any>(null);
@@ -69,11 +77,10 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
 
   const currentCell = state.nextCell;
   const currentGuesses = (state.guessesByCell || {})[currentCell] || [];
-  
-  // Safely determine which emotes to show. 
-  // If the bot sends allStaticEmotes (even if empty), we check the length.
-  const emotesToDisplay = (state.allStaticEmotes && state.allStaticEmotes.length > 0) 
-    ? state.allStaticEmotes 
+
+  // Use the passed allStaticEmotes, fallback to poolEmotes if empty
+  const emotesToDisplay = (allStaticEmotes && allStaticEmotes.length > 0) 
+    ? allStaticEmotes 
     : (state.poolEmotes || []);
 
   return (
@@ -148,12 +155,10 @@ export default function PuzzleGame({ state, isFocused }: { state: any, isFocused
       {/* Emote Keyboard */}
       <div className="w-full max-w-2xl bg-[#181820] p-4 rounded-2xl border border-white/10 shrink-0">
         <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">
-          Select an Emote
+          Select an Emote ({emotesToDisplay.length})
         </p>
-        {/* Made the keyboard scrollable to handle all server emotes */}
         <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
           {emotesToDisplay.map((emote: any) => {
-            // Check if this emote was guessed incorrectly for THIS specific cell
             const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
             
             return (

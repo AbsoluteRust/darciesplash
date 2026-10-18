@@ -65,7 +65,11 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
         <div className={panelClass('puzzle')} onClick={() => setFocused('puzzle')}>
           <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 lg:mb-6 sticky top-0 z-10">Weekly Puzzle</h2>
           {liveState?.puzzle ? (
-            <PuzzleGame state={liveState.puzzle} isFocused={focused === 'puzzle'} />
+            <PuzzleGame 
+              state={liveState.puzzle} 
+              allStaticEmotes={liveState.allStaticEmotes} 
+              isFocused={focused === 'puzzle'} 
+            />
           ) : (
             <p className="text-white/50 text-center">{loading ? 'Loading...' : 'No puzzle found.'}</p>
           )}
