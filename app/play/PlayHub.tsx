@@ -31,7 +31,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
 
   const panelClass = (id: string) => `
     transition-all duration-500 ease-in-out relative bg-[#0a0a14]/80 border border-white/10 rounded-3xl
-    flex flex-col items-center justify-center p-4 lg:p-6 overflow-hidden
+    flex flex-col items-center justify-center p-4 lg:p-6 overflow-hidden min-h-0
     ${focused === id 
       ? 'flex-1 lg:flex-[3] scale-100 opacity-100 z-20 shadow-[0_0_50px_rgba(0,0,0,0.5)] cursor-default' 
       : 'hidden lg:flex lg:flex-1 scale-95 opacity-30 blur-sm grayscale-[50%] cursor-pointer hover:opacity-50 hover:scale-95'
@@ -53,14 +53,14 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full max-w-[1800px] mx-auto lg:p-4 lg:gap-4 overflow-hidden">
-      <div className="lg:hidden flex items-center justify-between bg-black/60 border-b border-white/10 p-2 shrink-0 z-50">
+    <div className="flex flex-col h-dvh w-full max-w-[1800px] mx-auto lg:p-4 lg:gap-4 overflow-hidden">
+      <div className="lg:hidden flex items-center justify-between bg-black/60 border-b border-white/10 p-2 shrink-0 z-50 w-full">
         <button onClick={() => setFocused('puzzle')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-colors ${focused === 'puzzle' ? 'bg-indigo-600 text-white' : 'text-white/50 hover:bg-white/5'}`}>🧩 Puzzle</button>
         <button onClick={() => setFocused('pack')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-colors ${focused === 'pack' ? 'bg-indigo-600 text-white' : 'text-white/50 hover:bg-white/5'}`}>🎴 Packs</button>
         <button onClick={() => setFocused('drop')} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-colors ${focused === 'drop' ? 'bg-indigo-600 text-white' : 'text-white/50 hover:bg-white/5'}`}>🎁 Drops</button>
       </div>
 
-      <div className="flex flex-col lg:flex-row flex-1 w-full gap-4 overflow-hidden p-4 lg:p-0">
+      <div className="flex flex-col lg:flex-row flex-1 w-full gap-4 overflow-hidden p-4 lg:p-0 min-h-0">
         {/* Left: Weekly Puzzle */}
         <div className={panelClass('puzzle')} onClick={() => setFocused('puzzle')}>
           <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 lg:mb-6 sticky top-0 z-10">Weekly Puzzle</h2>
