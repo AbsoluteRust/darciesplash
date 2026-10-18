@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ProfileCard from '@/components/ProfileCard';
+import CardInspectModal from './CardInspectModal';
 
 export default function DropGame({ 
   state, 
@@ -16,7 +17,6 @@ export default function DropGame({
   const [localGuess, setLocalGuess] = useState<string | null>(null);
   const [isGuessing, setIsGuessing] = useState(false);
   
-  // State for the inspection modal
   const [selectedCard, setSelectedCard] = useState<any | null>(null);
 
   const hasGuessed = state.userGuess || localGuess;
@@ -163,33 +163,20 @@ export default function DropGame({
 
       {/* Card Inspection Modal */}
       {selectedCard && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
-          onClick={() => setSelectedCard(null)}
-        >
-          <div 
-            className="w-full max-w-sm animate-in zoom-in-95" 
-            onClick={e => e.stopPropagation()}
-          >
-            <ProfileCard
-              name={selectedCard.cardName || 'Unknown Card'}
-              title={selectedCard.cardType || 'Emote'}
-              handle={(selectedCard.cardName || 'unknown').toLowerCase().replace(/\s+/g, '-')}
-              status="Online"
-              contactText="Close"
-              avatarUrl={selectedCard.rawImageUrl || ''}
-              rarity={selectedCard.rarity}
-              showUserInfo={false}
-              enableTilt={true}
-              behindGlowColor={selectedCard.cardColor || '#fff'}
-              iconUrl={null}
-              behindGlowEnabled
-              innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-              isModal={true}
-              onContactClick={() => setSelectedCard(null)}
-            />
-          </div>
-        </div>
+        <CardInspectModal 
+          initialCard={{
+            name: selectedCard.cardName || 'Unknown Card',
+            type: selectedCard.cardType || 'Emote',
+            rawImageUrl: selectedCard.rawImageUrl,
+            imageUrl: selectedCard.rawImageUrl,
+            rarity: selectedCard.rarity,
+            color: selectedCard.cardColor,
+            description: selectedCard.description,
+            details: selectedCard.details,
+            link: selectedCard.link,
+          }} 
+          onClose={() => setSelectedCard(null)} 
+        />
       )}
 
     </div>

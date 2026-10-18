@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import type { PackCard } from './PlayButton';
 import ProfileCard from '@/components/ProfileCard';
+import CardInspectModal from './CardInspectModal';
 
 export default function PackReveal({
   cards: initialCards,
@@ -21,7 +22,6 @@ export default function PackReveal({
   const [isRerolling, setIsRerolling] = useState(false);
   const [hasRevealedAll, setHasRevealedAll] = useState(false);
   
-  // State for the inspection modal
   const [selectedCard, setSelectedCard] = useState<PackCard | null>(null);
 
   useEffect(() => {
@@ -127,35 +127,11 @@ export default function PackReveal({
         </button>
       </div>
 
-      {/* Card Inspection Modal */}
       {selectedCard && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
-          onClick={() => setSelectedCard(null)}
-        >
-          <div 
-            className="w-full max-w-sm animate-in zoom-in-95" 
-            onClick={e => e.stopPropagation()}
-          >
-            <ProfileCard
-              name={selectedCard.name}
-              title={selectedCard.type}
-              handle={selectedCard.name.toLowerCase().replace(/\s+/g, '-')}
-              status="Online"
-              contactText="Close"
-              avatarUrl={selectedCard.rawImageUrl || selectedCard.thumbUrl || selectedCard.imageUrl}
-              rarity={selectedCard.rarity}
-              showUserInfo={false}
-              enableTilt={true}
-              behindGlowColor={selectedCard.color}
-              iconUrl={null}
-              behindGlowEnabled
-              innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-              isModal={true}
-              onContactClick={() => setSelectedCard(null)}
-            />
-          </div>
-        </div>
+        <CardInspectModal 
+          initialCard={selectedCard} 
+          onClose={() => setSelectedCard(null)} 
+        />
       )}
     </div>
   );

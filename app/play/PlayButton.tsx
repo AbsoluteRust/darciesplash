@@ -12,15 +12,18 @@ export type PackCard = {
   parentName: string | null;
   rarity: string;
   collection: string;
-  type: string; // <-- Add this
+  type: string;
   imageUrl: string;
-  rawImageUrl?: string; // <-- Add this
+  rawImageUrl?: string;
   isChroma: boolean;
   isContraband: boolean;
   contrabandArtist: string | null;
   color: string;
   emoji: string;
   thumbUrl?: string | null;
+  description?: string;
+  details?: string;
+  link?: string;
 };
 
 export default function PlayButton() {
