@@ -28,6 +28,9 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { normalizeLayout, validateLayout, type CollectionLayout, type SortMode } from '@/lib/collection-layout';
+import { buildGroups } from '@/lib/collection-layout-sort';
+import CollectionSectionEditor from './CollectionSectionEditor';
 
 type Card = {
   name: string;
@@ -206,6 +209,8 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
   const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
   const [savedOrder, setSavedOrder] = useState<string[]>([]);
+  const [layout, setLayout] = useState<CollectionLayout>({ mode: 'auto', sortBy: 'default', randomised: false });
+const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
@@ -284,7 +289,7 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
           setEmoteTotals(emoteTotals);
           setChromas(chromaList);
           setMyInv(inv);
-          setSavedOrder(Array.isArray(orderData.order) ? orderData.order : []);
+          setLayout(normalizeLayout(orderData));
         }
       } catch (err) {
         console.error("Failed to load cards:", err);
@@ -340,16 +345,16 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   }, [myInv]);
 
 const displayCards = useMemo(() => {
-  if (editMode && editOrder) return editOrder;
-
   if (showMine && ownedNames) {
     return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
   }
+  return mergedCards.filter(c => !c.contraband);
+}, [mergedCards, showMine, ownedNames]);
 
-  // Public view — contraband cards are only visible in My Collection mode.
-  const publicCards = mergedCards.filter(c => !c.contraband);
-  return applySavedOrder(publicCards, savedOrder);
-}, [mergedCards, showMine, ownedNames, savedOrder, editMode, editOrder]);
+const groups = useMemo(() => {
+  if (editMode) return null;
+  return buildGroups(displayCards, layout);
+}, [displayCards, layout, editMode]);
 
   const canEdit = useMemo(
     () => canEditCollectionOrder(userId, id, roles),
@@ -358,36 +363,64 @@ const displayCards = useMemo(() => {
 
   const canCopyEmotes = roles?.darsubscribbler === true;
 
-  const enterEditMode = useCallback(() => {
-    setShowMine(false);
-    setEditOrder([...applySavedOrder(mergedCards, savedOrder)]);
-    setEditMode(true);
-  }, [mergedCards, savedOrder, setShowMine]);
+const enterEditMode = useCallback(() => {
+  setShowMine(false);
+  const initialOrder = applySavedOrder(mergedCards, layout.manualOrder || []);
+  setEditLayout({
+    ...layout,
+    manualOrder: initialOrder.map(c => c.name),
+  });
+  setEditOrder(initialOrder);
+  setEditMode(true);
+}, [layout, mergedCards, setShowMine]);
 
-  const cancelEdit = useCallback(() => {
+const cancelEdit = useCallback(() => {
+  setEditMode(false);
+  setEditOrder(null);
+  setEditLayout(null);
+}, []);
+
+const saveEdit = useCallback(async () => {
+  if (!editLayout) return;
+
+  let finalLayout: CollectionLayout = { ...editLayout };
+  if (finalLayout.mode === 'auto' && finalLayout.sortBy === 'default' && editOrder) {
+    finalLayout.manualOrder = editOrder.map(c => c.name);
+  }
+
+  const validation = validateLayout(finalLayout, mergedCards.map(c => c.name));
+  if (!validation.ok) {
+    alert(validation.error);
+    return;
+  }
+
+  setSaving(true);
+  try {
+    const res = await fetch('/api/collection-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        collection: id,
+        mode: finalLayout.mode,
+        sortBy: finalLayout.sortBy,
+        manualOrder: finalLayout.manualOrder,
+        sections: finalLayout.sections,
+        randomised: finalLayout.randomised,
+      }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    setLayout(normalizeLayout(data.layout || finalLayout));
     setEditMode(false);
     setEditOrder(null);
-  }, []);
-
-  const saveEdit = useCallback(async () => {
-    if (!editOrder) return;
-    setSaving(true);
-    try {
-      const res = await fetch("/api/collection-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ collection: id, order: editOrder.map(c => c.name) }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      setSavedOrder(editOrder.map(c => c.name));
-      setEditMode(false);
-      setEditOrder(null);
-    } catch (err) {
-      console.error("[collection-order] save failed:", err);
-    } finally {
-      setSaving(false);
-    }
-  }, [editOrder, id]);
+    setEditLayout(null);
+  } catch (err) {
+    console.error('[collection-order] save failed:', err);
+    alert('Save failed — check the console.');
+  } finally {
+    setSaving(false);
+  }
+}, [editLayout, editOrder, mergedCards, id]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -1151,12 +1184,86 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
         </div>
       )}
 
-      {editMode && (
-        <div className="collection-edit-banner">
-          <span className="collection-edit-banner__text">
-            Drag cards to rearrange. Order saves for everyone.
-          </span>
-          <div className="collection-edit-banner__actions">
+      {editMode && editLayout && (
+        <div className="collection-edit-toolbar">
+          <div className="toolbar-row">
+            <label className="toolbar-label">Layout</label>
+            <div className="toolbar-tabs">
+              <button
+                type="button"
+                className={`toolbar-tab ${editLayout.mode === 'auto' ? 'active' : ''}`}
+                onClick={() => setEditLayout({ ...editLayout, mode: 'auto' })}
+              >
+                Auto sections
+              </button>
+              <button
+                type="button"
+                className={`toolbar-tab ${editLayout.mode === 'custom' ? 'active' : ''}`}
+                onClick={() =>
+                  setEditLayout({
+                    ...editLayout,
+                    mode: 'custom',
+                    sections:
+                      editLayout.sections && editLayout.sections.length > 0
+                        ? editLayout.sections
+                        : [{
+                            id: crypto.randomUUID(),
+                            title: 'Section 1',
+                            description: '',
+                            cards: mergedCards.map(c => c.name),
+                          }],
+                  })
+                }
+              >
+                Custom sections
+              </button>
+            </div>
+          </div>
+
+          {editLayout.mode === 'auto' && (
+            <div className="toolbar-row">
+              <label className="toolbar-label">Sort by</label>
+              <select
+                className="toolbar-select"
+                value={editLayout.sortBy}
+                onChange={e =>
+                  setEditLayout({ ...editLayout, sortBy: e.target.value as SortMode })
+                }
+              >
+                <option value="default">Default (drag to reorder)</option>
+                <option value="creation">Creation date</option>
+                <option value="type">Art type</option>
+                <option value="rarity">Rarity (highest → lowest)</option>
+              </select>
+            </div>
+          )}
+
+          <div className="toolbar-row">
+            <label className="toolbar-checkbox">
+              <input
+                type="checkbox"
+                checked={editLayout.randomised}
+                onChange={e =>
+                  setEditLayout({ ...editLayout, randomised: e.target.checked })
+                }
+              />
+              Shuffle cards within each section (re-rolls each page load)
+            </label>
+          </div>
+
+          {editLayout.mode === 'auto' && editLayout.sortBy === 'default' && (
+            <div className="toolbar-hint">Drag cards below to set the default order.</div>
+          )}
+
+          {editLayout.mode === 'custom' && editLayout.sections && (
+            <CollectionSectionEditor
+              sections={editLayout.sections}
+              allCards={mergedCards}
+              onChange={sections => setEditLayout({ ...editLayout, sections })}
+            />
+          )}
+
+          <div className="toolbar-row toolbar-actions">
             <button
               type="button"
               className="collection-edit-btn collection-edit-btn--cancel"
@@ -1171,7 +1278,7 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
               onClick={saveEdit}
               disabled={saving}
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
@@ -1182,44 +1289,90 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
           <div className="collection-empty">
             You haven't collected any {art?.label ?? "cards"} yet.
           </div>
-        ) : editMode && editOrder ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={editOrder.map(c => c.name)} strategy={rectSortingStrategy}>
-              <div className="card-grid">
-                {editOrder.map((piece) => (
-                  <SortableCard key={piece.name} id={piece.name}>
-                    <LazyMount rootMargin="600px" placeholderHeight={560}>
-                      {renderCard(piece, 0)}
-                    </LazyMount>
-                  </SortableCard>
+        ) : editMode && editLayout ? (
+          <>
+            {editLayout.mode === 'auto' && editLayout.sortBy === 'default' && editOrder && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={editOrder.map(c => c.name)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="card-grid">
+                    {editOrder.map(piece => (
+                      <SortableCard key={piece.name} id={piece.name}>
+                        <LazyMount rootMargin="600px" placeholderHeight={560}>
+                          {renderCard(piece, 0)}
+                        </LazyMount>
+                      </SortableCard>
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+
+            {!(editLayout.mode === 'auto' && editLayout.sortBy === 'default') && (
+              <div className="section-editor-preview">
+                {buildGroups(mergedCards, editLayout).map(group => (
+                  <div key={group.id} className="collection-section">
+                    {group.title && (
+                      <div className="collection-section-header">
+                        <h3>{group.title}</h3>
+                        <hr className="collection-section-rule" />
+                        {group.description && <p>{group.description}</p>}
+                      </div>
+                    )}
+                    <div className="card-grid">
+                      {group.cards.map((piece, i) => (
+                        <LazyMount
+                          key={`${piece.name}|${i}`}
+                          rootMargin="600px"
+                          placeholderHeight={560}
+                        >
+                          {renderCard(piece, i)}
+                        </LazyMount>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </SortableContext>
-          </DndContext>
+            )}
+          </>
         ) : (
-          <div
-            className="card-grid"
-            style={{
-              transform: `translateY(${nudge}px)`,
-              transition: nudge === 0
-                ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
-                : "transform 80ms ease-out",
-            }}
-          >
-            {displayCards.map((piece, idx) => (
-              <LazyMount
-                key={`${piece.name}|${idx}`}
-                rootMargin="600px"
-                placeholderHeight={560}
+          (groups || []).map(group => (
+            <div key={group.id} className="collection-section">
+              {group.title && (
+                <div className="collection-section-header">
+                  <h3>{group.title}</h3>
+                  <hr className="collection-section-rule" />
+                  {group.description && <p>{group.description}</p>}
+                </div>
+              )}
+              <div
+                className="card-grid"
+                style={{
+                  transform: `translateY(${nudge}px)`,
+                  transition:
+                    nudge === 0
+                      ? "transform 300ms cubic-bezier(0.22, 1, 0.36, 1)"
+                      : "transform 80ms ease-out",
+                }}
               >
-                {renderCard(piece, idx)}
-              </LazyMount>
-            ))}
-          </div>
+                {group.cards.map((piece, idx) => (
+                  <LazyMount
+                    key={`${piece.name}|${idx}`}
+                    rootMargin="600px"
+                    placeholderHeight={560}
+                  >
+                    {renderCard(piece, idx)}
+                  </LazyMount>
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
 

@@ -844,3 +844,325 @@ html.entering-prev .collections-page {
 .collections-page.is-editing-order .card-grid {
   cursor: default;
 }
+
+/* ============================================================
+   Section layout feature — appended below
+   ============================================================ */
+
+/* The old fixed edit banner is gone; the toolbar is inline now, so
+   remove the 60px gap the old rule above reserved for it. */
+.collections-page.is-editing-order .grid-container {
+  padding-top: 0;
+}
+
+/* ---- Section headers (viewer + edit preview) ---- */
+
+.collection-section {
+  margin-bottom: 2.5rem;
+}
+
+.collection-section-header {
+  margin-bottom: 1rem;
+}
+
+.collection-section-header h3 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fff;
+  margin: 0 0 0.5rem 0;
+}
+
+.collection-section-rule {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
+  margin: 0 0 0.5rem 0;
+}
+
+.collection-section-header p {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+/* ---- Edit toolbar (replaces the old fixed banner) ---- */
+
+.collection-edit-toolbar {
+  background: rgba(10, 10, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.toolbar-actions {
+  justify-content: flex-end;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.75rem;
+}
+
+.toolbar-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.5);
+  min-width: 70px;
+}
+
+.toolbar-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.toolbar-tab {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolbar-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toolbar-tab.active {
+  background: rgba(99, 102, 241, 0.4);
+  border-color: rgba(99, 102, 241, 0.7);
+  color: #fff;
+}
+
+.toolbar-select {
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(10, 10, 20, 0.9);
+  color: #fff;
+  font-size: 0.875rem;
+}
+
+.toolbar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+}
+
+.toolbar-hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.45);
+  font-style: italic;
+}
+
+/* ---- Custom section editor ---- */
+
+.section-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.section-editor__section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+
+.section-editor__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.section-editor__title-input {
+  flex: 1;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.section-editor__desc-input {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.section-editor__counter {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  margin-left: 0.25rem;
+}
+
+.section-editor__remove {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.section-editor__remove:hover:not(:disabled) {
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff8888;
+}
+
+.section-editor__remove:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.section-editor__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  min-height: 40px;
+}
+
+.section-editor__chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.section-editor__chip img {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.section-editor__chip-name {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-editor__card-wrap {
+  position: relative;
+}
+
+.section-editor__card-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(220, 50, 50, 0.9);
+  color: #fff;
+  font-size: 10px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-editor__card-wrap:hover .section-editor__card-remove {
+  display: flex;
+}
+
+.section-editor__empty {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+  margin: 0.5rem 0;
+}
+
+.section-editor__picker {
+  margin-top: 0.5rem;
+}
+
+.section-editor__picker summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.section-editor__picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.4rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 0.5rem;
+}
+
+.section-editor__picker-item {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+}
+
+.section-editor__picker-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.section-editor__add {
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.section-editor__add:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.section-editor__warning {
+  color: rgba(255, 160, 60, 0.9);
+  font-size: 0.8rem;
+  margin: 0;
+}
