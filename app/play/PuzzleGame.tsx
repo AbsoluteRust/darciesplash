@@ -88,17 +88,72 @@ export default function PuzzleGame({
     return `https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`;
   };
 
+  // Replicate Discord's logic for showing the emote counts
+  const revealedLegend: { emote: any, count: string | number }[] = [];
+  const processedIds = new Set();
+
+  // 1. Guessed emotes
+  if (state.revealedCounts) {
+    for (const id of Object.keys(state.revealedCounts)) {
+      const emote = emotesToDisplay.find(e => e.id === id);
+      if (emote) {
+        revealedLegend.push({ emote, count: state.emoteCounts?.[id] || 0 });
+        processedIds.add(id);
+      }
+    }
+  }
+
+  // 2. Friday reveal
+  if (state.fridayReveal && !processedIds.has(state.fridayReveal)) {
+    const emote = emotesToDisplay.find(e => e.id === state.fridayReveal);
+    if (emote) {
+      revealedLegend.push({ emote, count: '?' });
+      processedIds.add(state.fridayReveal);
+    }
+  }
+
+  // 3. Saturday reveal
+  if (state.saturdayReveal && !processedIds.has(state.saturdayReveal)) {
+    const emote = emotesToDisplay.find(e => e.id === state.saturdayReveal);
+    if (emote) {
+      revealedLegend.push({ emote, count: state.emoteCounts?.[state.saturdayReveal] || 0 });
+      processedIds.add(state.saturdayReveal);
+    }
+  }
+
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
       
-      <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors shrink-0 ${
-        state.solved 
-          ? 'text-green-400 bg-green-950/30 border-green-800' 
-          : 'text-cyan-400 bg-cyan-950/30 border-cyan-800'
-      }`}>
-        {state.solved ? '🎉 Puzzle Solved!' : `Next Event: ${timeLeft || 'Loading...'}`}
+      {/* Timer & Emote Counts Header */}
+      <div className="flex flex-col items-center gap-3 shrink-0">
+        <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors ${
+          state.solved 
+            ? 'text-green-400 bg-green-950/30 border-green-800' 
+            : 'text-cyan-400 bg-cyan-950/30 border-cyan-800'
+        }`}>
+          {state.solved ? '🎉 Puzzle Solved!' : `Next Event: ${timeLeft || 'Loading...'}`}
+        </div>
+
+        {revealedLegend.length > 0 && (
+          <div className="flex flex-col items-center bg-[#181820] px-4 py-2 rounded-xl border border-white/10 animate-in fade-in slide-in-from-top-2">
+            <span className="text-[10px] text-white/50 uppercase tracking-wider font-bold mb-1.5">Revealed Emote Counts</span>
+            <div className="flex flex-wrap justify-center gap-3">
+              {revealedLegend.map((item, i) => (
+                <div key={i} className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
+                  <img 
+                    src={`https://cdn.discordapp.com/emojis/${item.emote.id}.${item.emote.animated ? 'gif' : 'png'}`} 
+                    className="w-5 h-5" 
+                    alt={item.emote.name} 
+                  />
+                  <span className="text-sm font-bold text-white font-mono">{item.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* Grid */}
       <div 
         className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5 shrink-0" 
         style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
@@ -175,10 +230,8 @@ export default function PuzzleGame({
         </p>
         <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
           {emotesToDisplay.map((emote: any) => {
-            // Check if this emote was guessed incorrectly for THIS specific cell
             const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
             
-            // NEW: Calculate if the emote has been fully revealed in previous cells
             const totalInGrid = state.emoteCounts?.[emote.id] || 0;
             let revealedCount = 0;
             for (const idx of (state.revealedCells || [])) {
