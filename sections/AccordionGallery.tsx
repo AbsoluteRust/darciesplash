@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { gsap } from 'gsap';
-import './AccordionGallery.css';import { useRouter } from 'next/navigation';
-
+import './AccordionGallery.css';
+import { useRouter } from 'next/navigation';
 
 const DEFAULT_ITEMS = [
   { image: '/artpieces/darcie/darCollection.webp', label: 'The Darcie Collection', slug: "darcie", link: "#" },
@@ -14,8 +14,7 @@ const DEFAULT_ITEMS = [
   { image: '/artpieces/allcomms/haloCollection.webp', label: 'The Halo Collection', slug: "halo", link: "#" },
 ];
 
-
-
+type NavMeta = { displayName: string; publicSlug: string };
 
 const AccordionGallery = ({
   items = DEFAULT_ITEMS,
@@ -38,19 +37,54 @@ const AccordionGallery = ({
   grayscale = true,
   className = ''
 }) => {
-	
-  const rootRef = useRef(null);
-  const panelRefs = useRef([]);
-  const mediaRefs = useRef([]);
-  const barRefs = useRef([]);
-  const textRefs = useRef([]);
-  const tlRef = useRef(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const panelRefs = useRef<(HTMLElement | null)[]>([]);
+  const mediaRefs = useRef<(HTMLElement | null)[]>([]);
+  const barRefs = useRef<(HTMLElement | null)[]>([]);
+  const textRefs = useRef<(HTMLElement | null)[]>([]);
+  const tlRef = useRef<any>(null);
   const firstRunRef = useRef(true);
   const mediaSizeRef = useRef(320);
   const router = useRouter();
 
+  // Fetch collection meta so labels and URLs follow renames
+  const [metaMap, setMetaMap] = useState<Map<string, NavMeta>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/collections/meta', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (cancelled || !d?.collections) return;
+        const map = new Map<string, NavMeta>();
+        for (const c of d.collections) {
+          map.set(c.meta.internalSlug, {
+            displayName: c.meta.displayName,
+            publicSlug: c.meta.publicSlug,
+          });
+        }
+        setMetaMap(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const resolvedItems = useMemo(() => {
+    return items.map(item => {
+      const meta = metaMap.get(item.slug);
+      if (!meta) return item;
+      return {
+        ...item,
+        label: `The ${meta.displayName} Collection`,
+        slug: meta.publicSlug,
+      };
+    });
+  }, [items, metaMap]);
+
   const vertical = orientation === 'vertical';
-  const count = items.length;
+  const count = resolvedItems.length;
   const [active, setActive] = useState(Math.min(Math.max(defaultIndex, 0), count - 1));
 
   const prefersReduced =
@@ -59,7 +93,7 @@ const AccordionGallery = ({
       : false;
 
   const applyLayout = useCallback(
-    animate => {
+    (animate: boolean) => {
       const panels = panelRefs.current;
       if (!panels.length) return;
 
@@ -83,22 +117,22 @@ const AccordionGallery = ({
 
         tl.to(panel, { flexGrow: isActive ? grow : 1, ...rotProp, duration: dur, ease }, 0);
 
-if (media) {
-  const drift = Math.max(-1.5, Math.min(1.5, active - i));
-  const shift = drift * parallax * mediaSize * 0.06;
-  tl.to(
-    media,
-    {
-      xPercent: -50,
-      yPercent: -50,
-      x: vertical ? 0 : isActive ? 0 : shift,
-      y: vertical ? (isActive ? 0 : shift) : 0,
-      duration: dur,
-      ease
-    },
-    0
-  );
-}
+        if (media) {
+          const drift = Math.max(-1.5, Math.min(1.5, active - i));
+          const shift = drift * parallax * mediaSize * 0.06;
+          tl.to(
+            media,
+            {
+              xPercent: -50,
+              yPercent: -50,
+              x: vertical ? 0 : isActive ? 0 : shift,
+              y: vertical ? (isActive ? 0 : shift) : 0,
+              duration: dur,
+              ease
+            },
+            0
+          );
+        }
 
         if (showLabels && bar && text) {
           if (isActive) {
@@ -159,18 +193,15 @@ if (media) {
     []
   );
 
-  const handleEnter = i => {
+  const handleEnter = (i: number) => {
     if (trigger === 'hover') setActive(i);
   };
 
-const [selectedImage, setSelectedImage] = useState(null);
+  const handleClick = (item: { slug: string }) => {
+    router.push(`/collections/${item.slug}`);
+  };
 
-const handleClick = (item) => {
-  router.push(`/collections/${item.slug}`);
-};
-
-
-  const handleKeyDown = (i, e) => {
+  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
     if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
       e.preventDefault();
       setActive((i + 1) % count);
@@ -180,74 +211,60 @@ const handleClick = (item) => {
     }
   };
 
-return (
-  <>
-    <div
-      ref={rootRef}
-      className={`accordion-gallery${vertical ? ' accordion-gallery--vertical' : ''}${className ? ` ${className}` : ''}`}
-      style={{
-        '--ag-accent': accentColor,
-        '--ag-overlay': overlayColor,
-        '--ag-text': textColor,
-        '--ag-gap': `${gap}px`,
-        '--ag-radius': `${radius}px`,
-        height: vertical ? `${Math.round(height * 1.6)}px` : `${height}px`
-      }}
-      role="list"
-      aria-label="Image accordion gallery"
-    >
-      {items.map((item, i) => {
-        const isActive = i === active;
-        const Tag = 'div';
-        return (
-          <Tag
-            key={i}
-            ref={el => (panelRefs.current[i] = el)}
-            className={`ag-panel${isActive ? ' ag-panel--active' : ''}`}
-            style={{ borderRadius: `${radius}px` }}
-            onClick={() => handleClick(item)}
-            onMouseEnter={() => handleEnter(i)}
-            onFocus={() => setActive(i)}
-            onKeyDown={e => handleKeyDown(i, e)}
-            role="listitem"
-            tabIndex={0}
-            aria-current={isActive ? 'true' : undefined}
-            aria-label={item.label}
-          >
-            <span className="ag-panel__frame">
-              <span className="ag-panel__media" ref={el => (mediaRefs.current[i] = el)}>
-                <img src={item.image} alt={item.alt || item.label || ''} draggable="false" />
-              </span>
-              <span className="ag-panel__overlay" aria-hidden="true" />
-            </span>
-            {showLabels && (
-              <span className="ag-panel__label" aria-hidden="true">
-                <span className="ag-panel__bar" ref={el => (barRefs.current[i] = el)} />
-                <span className="ag-panel__text" ref={el => (textRefs.current[i] = el)}>
-                  {item.label}
+  return (
+    <>
+      <div
+        ref={rootRef}
+        className={`accordion-gallery${vertical ? ' accordion-gallery--vertical' : ''}${className ? ` ${className}` : ''}`}
+        style={{
+          ['--ag-accent' as any]: accentColor,
+          ['--ag-overlay' as any]: overlayColor,
+          ['--ag-text' as any]: textColor,
+          ['--ag-gap' as any]: `${gap}px`,
+          ['--ag-radius' as any]: `${radius}px`,
+          height: vertical ? `${Math.round(height * 1.6)}px` : `${height}px`,
+        }}
+        role="list"
+        aria-label="Image accordion gallery"
+      >
+        {resolvedItems.map((item, i) => {
+          const isActive = i === active;
+          return (
+            <div
+              key={i}
+              ref={el => { panelRefs.current[i] = el; }}
+              className={`ag-panel${isActive ? ' ag-panel--active' : ''}`}
+              style={{ borderRadius: `${radius}px` }}
+              onClick={() => handleClick(item)}
+              onMouseEnter={() => handleEnter(i)}
+              onFocus={() => setActive(i)}
+              onKeyDown={e => handleKeyDown(i, e)}
+              role="listitem"
+              tabIndex={0}
+              aria-current={isActive ? 'true' : undefined}
+              aria-label={item.label}
+            >
+              <span className="ag-panel__frame">
+                <span className="ag-panel__media" ref={el => { mediaRefs.current[i] = el; }}>
+                  <img src={item.image} alt={(item as any).alt || item.label || ''} draggable="false" />
                 </span>
+                <span className="ag-panel__overlay" aria-hidden="true" />
               </span>
-            )}
-          </Tag>
-        );
-      })}
-    </div>
-
-    {/* Fullscreen overlay */}
-    {selectedImage && (
-      <div className="ag-lightbox" onClick={() => setSelectedImage(null)}>
-        <div className="ag-lightbox__bg">
-  <img src={selectedImage} alt="" />
-</div>
-
-<div className="ag-lightbox__sidebar">
-  {/* Line Sidebar will go here */}
-</div>
-
+              {showLabels && (
+                <span className="ag-panel__label" aria-hidden="true">
+                  <span className="ag-panel__bar" ref={el => { barRefs.current[i] = el; }} />
+                  <span className="ag-panel__text" ref={el => { textRefs.current[i] = el; }}>
+                    {item.label}
+                  </span>
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
-    )}
-  </>
-);
+    </>
+  );
 };
+
 export default AccordionGallery;
 export const ITEMS = DEFAULT_ITEMS;

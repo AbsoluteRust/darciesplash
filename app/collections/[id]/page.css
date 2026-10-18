@@ -1166,3 +1166,110 @@ html.entering-prev .collections-page {
   font-size: 0.8rem;
   margin: 0;
 }
+
+/* ---- Rename modal ---- */
+
+.collection-edit-btn--rename {
+  background: rgba(99, 102, 241, 0.35);
+  border-color: rgba(99, 102, 241, 0.7);
+  color: #fff;
+}
+
+.collection-edit-btn--rename:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.55);
+}
+
+.rename-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  z-index: 10005;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.rename-modal {
+  background: #0f0f1a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 100%;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rename-modal h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.rename-modal__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.rename-modal__input {
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: 0.95rem;
+}
+
+.rename-modal__counter {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  align-self: flex-end;
+}
+
+.rename-modal__hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.rename-modal__hint code,
+.rename-modal__warning code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+
+.rename-modal__warning {
+  font-size: 0.8rem;
+  color: rgba(255, 200, 100, 0.85);
+  background: rgba(255, 200, 100, 0.08);
+  border-left: 3px solid rgba(255, 200, 100, 0.5);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.35rem;
+  margin: 0;
+}
+
+.rename-modal__error {
+  font-size: 0.8rem;
+  color: #ff8888;
+  background: rgba(255, 80, 80, 0.1);
+  border-left: 3px solid rgba(255, 80, 80, 0.5);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.35rem;
+  margin: 0;
+}
+
+.rename-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}

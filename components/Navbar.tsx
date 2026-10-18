@@ -1,34 +1,63 @@
 'use client'
 import { MenuIcon, XIcon, HomeIcon } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import WarpText from "@/components/WarpText";
 import RarityModeToggle from "@/components/RarityModeToggle";
 
-const COLLECTIONS = [
-  { slug: "darcie",    label: "Darcie" },
-  { slug: "tobi",      label: "Tobi" },
-  { slug: "madolche",  label: "Madolche" },
-  { slug: "celestial", label: "Celestial" },
-  { slug: "lunalux",   label: "LunaLux" },
-  { slug: "halo",      label: "Halo" },
+type NavCollection = {
+  internalSlug: string;
+  displayName: string;
+  publicSlug: string;
+};
+
+const FALLBACK_COLLECTIONS: NavCollection[] = [
+  { internalSlug: "darcie",    displayName: "Darcie",    publicSlug: "darcie" },
+  { internalSlug: "tobi",      displayName: "Tobi",      publicSlug: "tobi" },
+  { internalSlug: "madolche",  displayName: "Madolche",  publicSlug: "madolche" },
+  { internalSlug: "celestial", displayName: "Celestial", publicSlug: "celestial" },
+  { internalSlug: "lunalux",   displayName: "LunaLux",   publicSlug: "lunalux" },
+  { internalSlug: "halo",      displayName: "Halo",      publicSlug: "halo" },
 ];
 
 export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [collections, setCollections] = useState<NavCollection[]>(FALLBACK_COLLECTIONS);
     const pathname = usePathname();
     const router = useRouter();
 
+    useEffect(() => {
+        let cancelled = false;
+        fetch("/api/collections/meta", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => {
+                if (cancelled) return;
+                if (d?.collections) {
+                    setCollections(
+                        d.collections.map((c: any) => ({
+                            internalSlug: c.meta.internalSlug,
+                            displayName: c.meta.displayName,
+                            publicSlug: c.meta.publicSlug,
+                        }))
+                    );
+                }
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const match = pathname?.match(/^\/collections\/([^/]+)/);
-    const currentSlug = match ? match[1] : null;
-    const currentIdx = currentSlug ? COLLECTIONS.findIndex(c => c.slug === currentSlug) : -1;
+    const urlSlug = match ? match[1] : null;
+    const currentIdx = urlSlug ? collections.findIndex((c) => c.publicSlug === urlSlug) : -1;
 
     const isCollectionPage = currentIdx >= 0;
-    const before = isCollectionPage ? COLLECTIONS.slice(0, currentIdx) : [];
-    const after = isCollectionPage ? COLLECTIONS.slice(currentIdx + 1) : COLLECTIONS;
-    const currentLabel = isCollectionPage ? COLLECTIONS[currentIdx].label : null;
+    const before = isCollectionPage ? collections.slice(0, currentIdx) : [];
+    const after = isCollectionPage ? collections.slice(currentIdx + 1) : collections;
+    const currentLabel = isCollectionPage ? collections[currentIdx].displayName : null;
 
     return (
         <>
@@ -57,13 +86,13 @@ export default function Navbar() {
                         <HomeIcon size={20} />
                     </button>
                     <div className="hidden md:flex items-center gap-6">
-                        {before.map(c => (
+                        {before.map((c) => (
                             <Link
-                                key={c.slug}
-                                href={`/collections/${c.slug}`}
+                                key={c.internalSlug}
+                                href={`/collections/${c.publicSlug}`}
                                 className="transition text-sm text-white/40 hover:text-pink-400"
                             >
-                                {c.label}
+                                {c.displayName}
                             </Link>
                         ))}
                     </div>
@@ -103,15 +132,15 @@ export default function Navbar() {
                     </div>
                 )}
 
-                {/* RIGHT — Upcoming collections (smaller reserved padding now) */}
+                {/* RIGHT — Upcoming collections */}
                 <div className={`hidden md:flex items-center gap-6 relative z-10 ${isCollectionPage ? "pr-24" : ""}`}>
-                    {after.map(c => (
+                    {after.map((c) => (
                         <Link
-                            key={c.slug}
-                            href={`/collections/${c.slug}`}
+                            key={c.internalSlug}
+                            href={`/collections/${c.publicSlug}`}
                             className="transition text-sm text-white/40 hover:text-pink-400"
                         >
-                            {c.label}
+                            {c.displayName}
                         </Link>
                     ))}
                 </div>
@@ -136,13 +165,13 @@ export default function Navbar() {
                 }`}
             >
                 <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
-                {COLLECTIONS.map(c => (
+                {collections.map((c) => (
                     <Link
-                        key={c.slug}
-                        href={`/collections/${c.slug}`}
+                        key={c.internalSlug}
+                        href={`/collections/${c.publicSlug}`}
                         onNavigate={() => setIsOpen(false)}
                     >
-                        {c.label}
+                        {c.displayName}
                     </Link>
                 ))}
                 {isCollectionPage && <RarityModeToggle />}

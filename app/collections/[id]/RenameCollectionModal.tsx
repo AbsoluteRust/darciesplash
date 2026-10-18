@@ -1,0 +1,123 @@
+import type { Metadata } from "next";
+import { permanentRedirect, notFound } from "next/navigation";
+import { resolveSlug, getMeta, getAllMeta } from "@/lib/collection-meta";
+import CollectionClient from "./CollectionClient";
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  const sp = await searchParams;
+  const cardSlug = typeof sp.card === "string" ? sp.card : null;
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://folly.milktruckers.com";
+
+  // Resolve public/historical slug → internal slug → meta
+  const internalSlug = await resolveSlug(id);
+  const meta = internalSlug ? await getMeta(internalSlug) : null;
+  const collectionName = meta?.displayName || (id.charAt(0).toUpperCase() + id.slice(1));
+  const publicSlug = meta?.publicSlug || id;
+
+  if (!cardSlug) {
+    return {
+      title: `The ${collectionName} Collection`,
+      description: `Browse the ${collectionName} collection.`,
+      openGraph: {
+        title: `The ${collectionName} Collection`,
+        description: `Browse the ${collectionName} collection.`,
+        url: `${siteUrl}/collections/${publicSlug}`,
+        siteName: "Folly of Flora",
+        images: [{ url: `${siteUrl}/opengraph-image`, width: 1200, height: 630 }],
+      },
+      twitter: { card: "summary_large_image" },
+    };
+  }
+
+  let cardName = cardSlug;
+  let cardType = "Emote";
+  let cardImage = "";
+
+  try {
+    const res = await fetch(`${siteUrl}/api/cards/list`, { cache: "no-store" });
+    if (res.ok) {
+      const cards = await res.json();
+      const match = cards.find(
+        (c: any) =>
+          c.name.toLowerCase().replace(/\s+/g, "-") === cardSlug.toLowerCase()
+      );
+      if (match) {
+        cardName = match.name;
+        cardType = match.type || "Emote";
+        cardImage = match.image || "";
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  const imageParams = new URLSearchParams();
+  imageParams.set("name", cardName);
+  imageParams.set("type", cardType);
+  imageParams.set("collection", collectionName);
+  if (cardImage) imageParams.set("image", cardImage);
+
+  const ogImageUrl = `${siteUrl}/api/card-image?${imageParams.toString()}`;
+
+  return {
+    title: `${cardName} — ${collectionName} Collection`,
+    description: `A ${cardType} from the ${collectionName} collection.`,
+    openGraph: {
+      title: `${cardName} — ${collectionName} Collection`,
+      description: `A ${cardType} from the ${collectionName} collection.`,
+      url: `${siteUrl}/collections/${publicSlug}?card=${cardSlug}`,
+      siteName: "Folly of Flora",
+      images: [{ url: ogImageUrl, width: 400, height: 560 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${cardName} — ${collectionName} Collection`,
+      images: [ogImageUrl],
+    },
+  };
+}
+
+export default async function Page({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const { id: urlSlug } = await params;
+  const sp = await searchParams;
+
+  const internalSlug = await resolveSlug(urlSlug);
+  if (!internalSlug) notFound();
+
+  const meta = await getMeta(internalSlug);
+
+  // Historical slug → 308 redirect to current public slug
+  if (urlSlug !== meta.publicSlug) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (typeof v === "string") qs.set(k, v);
+    }
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    permanentRedirect(`/collections/${meta.publicSlug}${suffix}`);
+  }
+
+  const allMeta = await getAllMeta();
+
+  return (
+    <CollectionClient
+      params={Promise.resolve({ id: internalSlug })}
+      displayName={meta.displayName}
+      publicSlug={meta.publicSlug}
+      collectionMeta={allMeta}
+    />
+  );
+}

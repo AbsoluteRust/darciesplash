@@ -28,9 +28,16 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { normalizeLayout, validateLayout, type CollectionLayout, type SortMode } from '@/lib/collection-layout';
-import { buildGroups } from '@/lib/collection-layout-sort';
-import CollectionSectionEditor from './CollectionSectionEditor';
+import {
+  normalizeLayout,
+  validateLayout,
+  type CollectionLayout,
+  type SortMode,
+} from "@/lib/collection-layout";
+import { buildGroups } from "@/lib/collection-layout-sort";
+import CollectionSectionEditor from "./CollectionSectionEditor";
+import RenameCollectionModal from "./RenameCollectionModal";
+import type { CollectionMeta } from "@/lib/collection-meta";
 
 type Card = {
   name: string;
@@ -190,7 +197,17 @@ function SortableCard({ id, children }: { id: string; children: React.ReactNode 
   );
 }
 
-export default function CollectionClient({ params }: { params: Promise<{ id: string }> }) {
+export default function CollectionClient({
+  params,
+  displayName,
+  publicSlug,
+  collectionMeta,
+}: {
+  params: Promise<{ id: string }>;
+  displayName: string;
+  publicSlug: string;
+  collectionMeta: CollectionMeta[];
+}) {
   const router = useRouter();
   const rawParams = use(params);
   const id = rawParams.id;
@@ -208,16 +225,32 @@ export default function CollectionClient({ params }: { params: Promise<{ id: str
   const [chromas, setChromas] = useState<Chroma[]>([]);
   const [activeChroma, setActiveChroma] = useState<Chroma | null>(null);
   const [myInv, setMyInv] = useState<Record<string, number> | null>(null);
-  const [savedOrder, setSavedOrder] = useState<string[]>([]);
-  const [layout, setLayout] = useState<CollectionLayout>({ mode: 'auto', sortBy: 'default', randomised: false });
-const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
   const [leaving, setLeaving] = useState<"next" | "prev" | null>(null);
   const [hintDirection, setHintDirection] = useState<"next" | "prev" | null>(null);
   const [hintProgress, setHintProgress] = useState(0);
 
+  const [layout, setLayout] = useState<CollectionLayout>({
+    mode: "auto",
+    sortBy: "default",
+    randomised: false,
+  });
+  const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
+
   const [editMode, setEditMode] = useState(false);
   const [editOrder, setEditOrder] = useState<Card[] | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameState, setRenameState] = useState<{ canRename: boolean; cooldownRemainingMs: number } | null>(null);
+  const myMeta = collectionMeta.find(m => m.internalSlug === id);
+
+  const publicSlugFor = useCallback(
+    (internal: string) => {
+      const m = collectionMeta.find(x => x.internalSlug === internal);
+      return m?.publicSlug || internal;
+    },
+    [collectionMeta]
+  );
 
   const [cardTransition, setCardTransition] = useState<{
     phase: "leaving" | "entering";
@@ -243,9 +276,9 @@ const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
       sessionStorage.setItem("collection-transition-entry", direction);
     }
     setTimeout(() => {
-      router.push(`/collections/${slug}`);
+      router.push(`/collections/${publicSlugFor(slug)}`);
     }, 300);
-  }, [leaving, router, editMode]);
+  }, [leaving, router, editMode, publicSlugFor]);
 
   const triggerTransitionRef = useRef(triggerTransition);
   useEffect(() => { triggerTransitionRef.current = triggerTransition; }, [triggerTransition]);
@@ -282,7 +315,7 @@ const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
         const emoteTotals = emotesRes.ok ? await emotesRes.json() : {};
         const chromaList = chromasRes.ok ? await chromasRes.json() : [];
         const inv = meRes.ok ? await meRes.json() : null;
-        const orderData = orderRes.ok ? await orderRes.json() : { order: [] };
+        const orderData = orderRes.ok ? await orderRes.json() : null;
         if (!cancelled) {
           setKvCards(cards);
           setDeletedNames(deleted);
@@ -298,6 +331,22 @@ const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
     load();
     return () => { cancelled = true; };
   }, [id]);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    let cancelled = false;
+    fetch(`/api/collections/meta?internal=${encodeURIComponent(id)}`, { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!cancelled && d) {
+          setRenameState({ canRename: d.canRename, cooldownRemainingMs: d.cooldownRemainingMs });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id, canEdit]);
 
   const allCardsByCollection = useMemo(() => {
     const deletedSet = new Set(deletedNames.map(n => n.toLowerCase()));
@@ -344,17 +393,17 @@ const [editLayout, setEditLayout] = useState<CollectionLayout | null>(null);
     return set;
   }, [myInv]);
 
-const displayCards = useMemo(() => {
-  if (showMine && ownedNames) {
-    return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
-  }
-  return mergedCards.filter(c => !c.contraband);
-}, [mergedCards, showMine, ownedNames]);
+  const displayCards = useMemo(() => {
+    if (showMine && ownedNames) {
+      return mergedCards.filter(c => ownedNames.has(c.name.toLowerCase()));
+    }
+    return mergedCards.filter(c => !c.contraband);
+  }, [mergedCards, showMine, ownedNames]);
 
-const groups = useMemo(() => {
-  if (editMode) return null;
-  return buildGroups(displayCards, layout);
-}, [displayCards, layout, editMode]);
+  const groups = useMemo(() => {
+    if (editMode) return null;
+    return buildGroups(displayCards, layout);
+  }, [displayCards, layout, editMode]);
 
   const canEdit = useMemo(
     () => canEditCollectionOrder(userId, id, roles),
@@ -363,64 +412,64 @@ const groups = useMemo(() => {
 
   const canCopyEmotes = roles?.darsubscribbler === true;
 
-const enterEditMode = useCallback(() => {
-  setShowMine(false);
-  const initialOrder = applySavedOrder(mergedCards, layout.manualOrder || []);
-  setEditLayout({
-    ...layout,
-    manualOrder: initialOrder.map(c => c.name),
-  });
-  setEditOrder(initialOrder);
-  setEditMode(true);
-}, [layout, mergedCards, setShowMine]);
-
-const cancelEdit = useCallback(() => {
-  setEditMode(false);
-  setEditOrder(null);
-  setEditLayout(null);
-}, []);
-
-const saveEdit = useCallback(async () => {
-  if (!editLayout) return;
-
-  let finalLayout: CollectionLayout = { ...editLayout };
-  if (finalLayout.mode === 'auto' && finalLayout.sortBy === 'default' && editOrder) {
-    finalLayout.manualOrder = editOrder.map(c => c.name);
-  }
-
-  const validation = validateLayout(finalLayout, mergedCards.map(c => c.name));
-  if (!validation.ok) {
-    alert(validation.error);
-    return;
-  }
-
-  setSaving(true);
-  try {
-    const res = await fetch('/api/collection-order', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        collection: id,
-        mode: finalLayout.mode,
-        sortBy: finalLayout.sortBy,
-        manualOrder: finalLayout.manualOrder,
-        sections: finalLayout.sections,
-        randomised: finalLayout.randomised,
-      }),
+  const enterEditMode = useCallback(() => {
+    setShowMine(false);
+    const initialOrder = applySavedOrder(mergedCards, layout.manualOrder || []);
+    setEditLayout({
+      ...layout,
+      manualOrder: initialOrder.map(c => c.name),
     });
-    if (!res.ok) throw new Error(await res.text());
-    const data = await res.json();
-    setLayout(normalizeLayout(data.layout || finalLayout));
+    setEditOrder(initialOrder);
+    setEditMode(true);
+  }, [layout, mergedCards, setShowMine]);
+
+  const cancelEdit = useCallback(() => {
     setEditMode(false);
     setEditOrder(null);
     setEditLayout(null);
-  } catch (err) {
-    console.error('[collection-order] save failed:', err);
-    alert('Save failed — check the console.');
-  } finally {
-    setSaving(false);
-  }
-}, [editLayout, editOrder, mergedCards, id]);
+  }, []);
+
+  const saveEdit = useCallback(async () => {
+    if (!editLayout) return;
+
+    let finalLayout: CollectionLayout = { ...editLayout };
+    if (finalLayout.mode === "auto" && finalLayout.sortBy === "default" && editOrder) {
+      finalLayout.manualOrder = editOrder.map(c => c.name);
+    }
+
+    const validation = validateLayout(finalLayout, mergedCards.map(c => c.name));
+    if (!validation.ok) {
+      alert(validation.error);
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch("/api/collection-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection: id,
+          mode: finalLayout.mode,
+          sortBy: finalLayout.sortBy,
+          manualOrder: finalLayout.manualOrder,
+          sections: finalLayout.sections,
+          randomised: finalLayout.randomised,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setLayout(normalizeLayout(data.layout || finalLayout));
+      setEditMode(false);
+      setEditOrder(null);
+      setEditLayout(null);
+    } catch (err) {
+      console.error("[collection-order] save failed:", err);
+      alert("Save failed — check the console.");
+    } finally {
+      setSaving(false);
+    }
+  }, [editLayout, editOrder, mergedCards, id]);
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -705,7 +754,7 @@ const saveEdit = useCallback(async () => {
       preloadAdjacent(nextColl, nextIdx);
 
       const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
-      router.replace(`/collections/${nextColl}?card=${slug}`, { scroll: false });
+      router.replace(`/collections/${publicSlugFor(nextColl)}?card=${slug}`, { scroll: false });
 
       setCardTransition({ phase: "entering", direction: dirLabel, crossing });
 
@@ -715,7 +764,7 @@ const saveEdit = useCallback(async () => {
       cardTimeoutsRef.current.push(t2);
     }, exitMs);
     cardTimeoutsRef.current.push(t1);
-  }, [router, preloadAdjacent]);
+  }, [router, preloadAdjacent, publicSlugFor]);
 
   const navigateModalCardRef = useRef(navigateModalCard);
   useEffect(() => { navigateModalCardRef.current = navigateModalCard; }, [navigateModalCard]);
@@ -866,8 +915,8 @@ const saveEdit = useCallback(async () => {
     setActiveEmote(null);
     setModalCollection(null);
     setModalIndex(-1);
-    router.replace(`/collections/${coll}`, { scroll: false });
-  }, [modalCollection, id, router]);
+    router.replace(`/collections/${publicSlugFor(coll)}`, { scroll: false });
+  }, [modalCollection, id, router, publicSlugFor]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -947,8 +996,8 @@ const saveEdit = useCallback(async () => {
     setModalIndex(index);
     preloadAdjacent(id, index);
     const slug = piece.name.toLowerCase().replace(/\s+/g, "-");
-    router.push(`/collections/${id}?card=${slug}`, { scroll: false });
-  }, [id, router, preloadAdjacent, editMode]);
+    router.push(`/collections/${publicSlug}?card=${slug}`, { scroll: false });
+  }, [id, router, preloadAdjacent, editMode, publicSlug]);
 
   const openCardByName = useCallback((name: string) => {
     for (const coll of COLLECTION_ORDER) {
@@ -967,16 +1016,20 @@ const saveEdit = useCallback(async () => {
         setModalIndex(idx);
         preloadAdjacent(coll, idx);
         const slug = newCard.name.toLowerCase().replace(/\s+/g, "-");
-        router.replace(`/collections/${coll}?card=${slug}`, { scroll: false });
+        router.replace(`/collections/${publicSlugFor(coll)}?card=${slug}`, { scroll: false });
         return;
       }
     }
-  }, [allCardsByCollection, preloadAdjacent, router]);
+  }, [allCardsByCollection, preloadAdjacent, router, publicSlugFor]);
 
   if (!art) return null;
 
-  const nextLabel = nextSlug ? (ITEMS.find(i => i.slug === nextSlug)?.label ?? "Next Collection") : "";
-  const prevLabel = prevSlug ? (ITEMS.find(i => i.slug === prevSlug)?.label ?? "Previous Collection") : "";
+  const nextLabel = nextSlug
+    ? (collectionMeta.find(m => m.internalSlug === nextSlug)?.displayName ?? "Next Collection")
+    : "";
+  const prevLabel = prevSlug
+    ? (collectionMeta.find(m => m.internalSlug === prevSlug)?.displayName ?? "Previous Collection")
+    : "";
 
   const modalTransitionClass = cardTransition
     ? ` card-${cardTransition.phase}-${cardTransition.direction}${cardTransition.crossing ? " card-crossing" : ""}`
@@ -986,7 +1039,7 @@ const saveEdit = useCallback(async () => {
     ? COLLECTION_ORDER[COLLECTION_ORDER.indexOf(modalCollection || "") + 1]
     : COLLECTION_ORDER[COLLECTION_ORDER.indexOf(modalCollection || "") - 1];
   const modalHintTargetLabel = modalHintTargetSlug
-    ? (ITEMS.find(i => i.slug === modalHintTargetSlug)?.label ?? "Next Collection")
+    ? (collectionMeta.find(m => m.internalSlug === modalHintTargetSlug)?.displayName ?? "Next Collection")
     : "";
 
   const renderCard = (piece: Card, idx: number) => {
@@ -994,19 +1047,15 @@ const saveEdit = useCallback(async () => {
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
-// Build the copy-to-clipboard markdown URL. Uses the original image URL
-// directly so Discord's embed scraper recognises it as an image. Next.js's
-// /_next/image endpoint doesn't end in a file extension and Discord won't
-// embed it.
-let copyEmote: { name: string; url: string } | null = null;
-if (canCopyEmotes && piece.type === "Emote" && piece.image) {
-  const origin = typeof window !== "undefined" ? window.location.origin : null;
-  if (origin) {
-    const isAbsolute = /^https?:\/\//i.test(piece.image);
-    const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
-    copyEmote = { name: piece.name, url };
-  }
-}
+    let copyEmote: { name: string; url: string } | null = null;
+    if (canCopyEmotes && piece.type === "Emote" && piece.image) {
+      const origin = typeof window !== "undefined" ? window.location.origin : null;
+      if (origin) {
+        const isAbsolute = /^https?:\/\//i.test(piece.image);
+        const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
+        copyEmote = { name: piece.name, url };
+      }
+    }
 
     return (
       <ProfileCard
@@ -1191,27 +1240,29 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
             <div className="toolbar-tabs">
               <button
                 type="button"
-                className={`toolbar-tab ${editLayout.mode === 'auto' ? 'active' : ''}`}
-                onClick={() => setEditLayout({ ...editLayout, mode: 'auto' })}
+                className={`toolbar-tab ${editLayout.mode === "auto" ? "active" : ""}`}
+                onClick={() => setEditLayout({ ...editLayout, mode: "auto" })}
               >
                 Auto sections
               </button>
               <button
                 type="button"
-                className={`toolbar-tab ${editLayout.mode === 'custom' ? 'active' : ''}`}
+                className={`toolbar-tab ${editLayout.mode === "custom" ? "active" : ""}`}
                 onClick={() =>
                   setEditLayout({
                     ...editLayout,
-                    mode: 'custom',
+                    mode: "custom",
                     sections:
                       editLayout.sections && editLayout.sections.length > 0
                         ? editLayout.sections
-                        : [{
-                            id: crypto.randomUUID(),
-                            title: 'Section 1',
-                            description: '',
-                            cards: mergedCards.map(c => c.name),
-                          }],
+                        : [
+                            {
+                              id: crypto.randomUUID(),
+                              title: "Section 1",
+                              description: "",
+                              cards: mergedCards.map(c => c.name),
+                            },
+                          ],
                   })
                 }
               >
@@ -1220,7 +1271,7 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
             </div>
           </div>
 
-          {editLayout.mode === 'auto' && (
+          {editLayout.mode === "auto" && (
             <div className="toolbar-row">
               <label className="toolbar-label">Sort by</label>
               <select
@@ -1251,11 +1302,11 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
             </label>
           </div>
 
-          {editLayout.mode === 'auto' && editLayout.sortBy === 'default' && (
+          {editLayout.mode === "auto" && editLayout.sortBy === "default" && (
             <div className="toolbar-hint">Drag cards below to set the default order.</div>
           )}
 
-          {editLayout.mode === 'custom' && editLayout.sections && (
+          {editLayout.mode === "custom" && editLayout.sections && (
             <CollectionSectionEditor
               sections={editLayout.sections}
               allCards={mergedCards}
@@ -1264,6 +1315,21 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
           )}
 
           <div className="toolbar-row toolbar-actions">
+            {canEdit && renameState && myMeta && (
+              <button
+                type="button"
+                className="collection-edit-btn collection-edit-btn--rename"
+                onClick={() => setRenameOpen(true)}
+                title={
+                  renameState.canRename
+                    ? "Rename this collection"
+                    : `Cooldown: ${Math.ceil(renameState.cooldownRemainingMs / (24 * 60 * 60 * 1000))} days remaining`
+                }
+                style={{ marginRight: "auto" }}
+              >
+                ✏️ Rename collection
+              </button>
+            )}
             <button
               type="button"
               className="collection-edit-btn collection-edit-btn--cancel"
@@ -1278,7 +1344,7 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
               onClick={saveEdit}
               disabled={saving}
             >
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
@@ -1287,11 +1353,11 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
       <div className="grid-container">
         {showMine && displayCards.length === 0 ? (
           <div className="collection-empty">
-            You haven't collected any {art?.label ?? "cards"} yet.
+            You haven't collected any {displayName} yet.
           </div>
         ) : editMode && editLayout ? (
           <>
-            {editLayout.mode === 'auto' && editLayout.sortBy === 'default' && editOrder && (
+            {editLayout.mode === "auto" && editLayout.sortBy === "default" && editOrder && (
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
@@ -1314,7 +1380,7 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
               </DndContext>
             )}
 
-            {!(editLayout.mode === 'auto' && editLayout.sortBy === 'default') && (
+            {!(editLayout.mode === "auto" && editLayout.sortBy === "default") && (
               <div className="section-editor-preview">
                 {buildGroups(mergedCards, editLayout).map(group => (
                   <div key={group.id} className="collection-section">
@@ -1403,6 +1469,21 @@ if (canCopyEmotes && piece.type === "Emote" && piece.image) {
             {hintDirection === "next" ? nextLabel : prevLabel}
           </span>
         </div>
+      )}
+
+      {renameOpen && canEdit && myMeta && renameState && (
+        <RenameCollectionModal
+          internalSlug={id}
+          currentDisplayName={myMeta.displayName}
+          currentPublicSlug={myMeta.publicSlug}
+          canRename={renameState.canRename}
+          cooldownRemainingMs={renameState.cooldownRemainingMs}
+          onClose={() => setRenameOpen(false)}
+          onRenamed={next => {
+            setRenameOpen(false);
+            window.location.href = `/collections/${next.publicSlug}`;
+          }}
+        />
       )}
     </div>
   );
