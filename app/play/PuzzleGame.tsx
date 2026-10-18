@@ -82,7 +82,6 @@ export default function PuzzleGame({
     ? allStaticEmotes 
     : (state.poolEmotes || []);
 
-  // Helper to get the emote image URL for the hover tooltip
   const getEmoteUrl = (id: string) => {
     const emote = emotesToDisplay.find(e => e.id === id);
     if (!emote) return "";
@@ -176,16 +175,29 @@ export default function PuzzleGame({
         </p>
         <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
           {emotesToDisplay.map((emote: any) => {
+            // Check if this emote was guessed incorrectly for THIS specific cell
             const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
             
+            // NEW: Calculate if the emote has been fully revealed in previous cells
+            const totalInGrid = state.emoteCounts?.[emote.id] || 0;
+            let revealedCount = 0;
+            for (const idx of (state.revealedCells || [])) {
+              const r = Math.floor(idx / state.width);
+              const c = idx % state.width;
+              if (state.gridEmotes?.[r]?.[c]?.id === emote.id) {
+                revealedCount++;
+              }
+            }
+            const isUsedUp = totalInGrid > 0 && revealedCount >= totalInGrid;
+
             return (
               <button
                 key={emote.id}
-                disabled={isIncorrect || !isFocused || state.solved}
+                disabled={isIncorrect || isUsedUp || !isFocused || state.solved}
                 onClick={() => handleGuess(emote.id)}
                 className={`
                   p-2 rounded-xl border transition-all
-                  ${isIncorrect ? 'opacity-20 grayscale cursor-not-allowed border-transparent bg-black' : 
+                  ${isIncorrect || isUsedUp ? 'opacity-20 grayscale cursor-not-allowed border-transparent bg-black' : 
                     'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 active:scale-95 cursor-pointer'}
                 `}
               >
