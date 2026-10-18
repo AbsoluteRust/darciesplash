@@ -15,11 +15,9 @@ export default function DropGame({
   const [timeLeft, setTimeLeft] = useState('');
   const [localGuess, setLocalGuess] = useState<string | null>(null);
   const [isGuessing, setIsGuessing] = useState(false);
-
-  // Reset local guess if a new drop starts
-  useEffect(() => {
-    setLocalGuess(null);
-  }, [state.startedAt]);
+  
+  // State for the inspection modal
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
 
   const hasGuessed = state.userGuess || localGuess;
   const guessedEmoteId = state.userGuess || localGuess;
@@ -40,7 +38,6 @@ export default function DropGame({
     const data = await res.json();
     
     if (data.ok) {
-      // No alert! Just set local state so the UI locks in.
       setLocalGuess(emoteId);
     } else {
       alert(data.error);
@@ -75,8 +72,11 @@ export default function DropGame({
   return (
     <div className="w-full h-full flex flex-col items-center justify-between gap-4 overflow-y-auto custom-scrollbar pb-6">
       
-      {/* The Card */}
-      <div className="w-[160px] sm:w-[180px] md:w-[200px] mt-4 shrink-0">
+      {/* The Card (Clickable to inspect) */}
+      <div 
+        className="w-[160px] sm:w-[180px] md:w-[200px] mt-4 shrink-0 cursor-pointer hover:scale-105 transition-transform duration-200"
+        onClick={() => setSelectedCard(state)}
+      >
         <div className="
           [&_.pc-card]:!h-auto 
           [&_.pc-card]:!max-h-none 
@@ -158,6 +158,37 @@ export default function DropGame({
               {state.previousParticipants.length} total participants
             </p>
           )}
+        </div>
+      )}
+
+      {/* Card Inspection Modal */}
+      {selectedCard && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
+          onClick={() => setSelectedCard(null)}
+        >
+          <div 
+            className="w-full max-w-sm animate-in zoom-in-95" 
+            onClick={e => e.stopPropagation()}
+          >
+            <ProfileCard
+              name={selectedCard.cardName || 'Unknown Card'}
+              title={selectedCard.cardType || 'Emote'}
+              handle={(selectedCard.cardName || 'unknown').toLowerCase().replace(/\s+/g, '-')}
+              status="Online"
+              contactText="Close"
+              avatarUrl={selectedCard.rawImageUrl || ''}
+              rarity={selectedCard.rarity}
+              showUserInfo={false}
+              enableTilt={true}
+              behindGlowColor={selectedCard.cardColor || '#fff'}
+              iconUrl={null}
+              behindGlowEnabled
+              innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+              isModal={true}
+              onContactClick={() => setSelectedCard(null)}
+            />
+          </div>
         </div>
       )}
 

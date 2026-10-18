@@ -20,8 +20,10 @@ export default function PackReveal({
   const [hasRerolled, setHasRerolled] = useState(false);
   const [isRerolling, setIsRerolling] = useState(false);
   const [hasRevealedAll, setHasRevealedAll] = useState(false);
+  
+  // State for the inspection modal
+  const [selectedCard, setSelectedCard] = useState<PackCard | null>(null);
 
-  // Trigger the Discord composite update when all cards are flipped
   useEffect(() => {
     if (flipped.size === cards.length && cards.length > 0 && !hasRevealedAll && shortId) {
       setHasRevealedAll(true);
@@ -57,9 +59,9 @@ export default function PackReveal({
       
       if (data.ok && data.cards) {
         setCards(data.cards);
-        setFlipped(new Set()); // hide new cards
+        setFlipped(new Set()); 
         setHasRerolled(true);
-        setHasRevealedAll(false); // reset so the new cards can trigger the reveal again
+        setHasRevealedAll(false); 
       } else {
         alert(data.error || 'Failed to reroll');
       }
@@ -89,6 +91,7 @@ export default function PackReveal({
             card={card}
             flipped={flipped.has(i)}
             onFlip={() => flip(i)}
+            onInspect={() => setSelectedCard(card)}
           />
         ))}
       </div>
@@ -123,6 +126,37 @@ export default function PackReveal({
           {allRevealed ? 'Done' : 'Skip'}
         </button>
       </div>
+
+      {/* Card Inspection Modal */}
+      {selectedCard && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
+          onClick={() => setSelectedCard(null)}
+        >
+          <div 
+            className="w-full max-w-sm animate-in zoom-in-95" 
+            onClick={e => e.stopPropagation()}
+          >
+            <ProfileCard
+              name={selectedCard.name}
+              title={selectedCard.type}
+              handle={selectedCard.name.toLowerCase().replace(/\s+/g, '-')}
+              status="Online"
+              contactText="Close"
+              avatarUrl={selectedCard.rawImageUrl || selectedCard.thumbUrl || selectedCard.imageUrl}
+              rarity={selectedCard.rarity}
+              showUserInfo={false}
+              enableTilt={true}
+              behindGlowColor={selectedCard.color}
+              iconUrl={null}
+              behindGlowEnabled
+              innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+              isModal={true}
+              onContactClick={() => setSelectedCard(null)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -131,10 +165,12 @@ function FlipCard({
   card,
   flipped,
   onFlip,
+  onInspect,
 }: {
   card: PackCard;
   flipped: boolean;
   onFlip: () => void;
+  onInspect: () => void;
 }) {
   const isWallpaper = card.type === 'Mobile Wallpaper' || card.type === 'Wallpaper';
   const isSplash = card.type === 'Splash Art';
@@ -144,7 +180,10 @@ function FlipCard({
   return (
     <div className="w-[140px] sm:w-[160px] md:w-[180px] flex flex-col items-center">
       {flipped ? (
-        <div className="w-full relative z-10 animate-in fade-in zoom-in-95 duration-300">
+        <div 
+          className="w-full relative z-10 animate-in fade-in zoom-in-95 duration-300 cursor-pointer"
+          onClick={onInspect}
+        >
           <div className="
             [&_.pc-card]:!h-auto 
             [&_.pc-card]:!max-h-none 
