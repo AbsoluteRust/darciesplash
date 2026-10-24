@@ -9,6 +9,7 @@ import { PageLoadingProvider } from "@/components/PageLoadingContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
+import Heartbeat from "@/components/Heartbeat"; // <-- Add this import
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -27,6 +28,7 @@ export default function RootLayout({ children, }: Readonly<{
                 <link rel="preload" href="/assets/background-splash.svg" as="image" />
             </head>
             <body>
+                <Heartbeat /> {/* <-- Add it here */}
                 <LenisScroll />
                 <PageLoadingProvider>
                     <RarityModeProvider>
