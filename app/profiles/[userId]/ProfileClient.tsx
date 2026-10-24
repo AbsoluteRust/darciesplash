@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Gift, Users, Star, Award } from 'lucide-react';
 
 type ProfileData = {
   id: string;
@@ -13,7 +12,15 @@ type ProfileData = {
     gifts: number;
     referrals: number;
     subMonths: number;
+    isCommissioner: boolean;
     loyalty: string[];
+  };
+  emotes: {
+    heart: string | null;
+    sparkle: string | null;
+    gift: string | null;
+    banana: string | null;
+    love: string | null;
   };
 };
 
@@ -23,6 +30,17 @@ function formatSubTime(months: number) {
   const rem = months % 12;
   if (rem === 0) return `${years} Year${years === 1 ? '' : 's'}`;
   return `${years} Year${years === 1 ? '' : 's'}, ${rem} Month${rem === 1 ? '' : 's'}`;
+}
+
+function BadgeIcon({ emoteId, fallbackText }: { emoteId: string | null, fallbackText: string }) {
+  if (!emoteId) return <span className="text-white/50 text-sm font-bold">{fallbackText}</span>;
+  return (
+    <img 
+      src={`https://cdn.discordapp.com/emojis/${emoteId}.png`} 
+      alt={fallbackText} 
+      className="w-8 h-8 object-contain" 
+    />
+  );
 }
 
 export default function ProfileClient({ userId }: { userId: string }) {
@@ -40,7 +58,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
     };
     fetchProfile();
     
-    // Poll every 30 seconds to keep online status accurate
     const int = setInterval(fetchProfile, 30000);
     return () => clearInterval(int);
   }, [userId]);
@@ -72,10 +89,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
         {/* User Info */}
         <div className="flex flex-col items-center md:items-start flex-1">
-          <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60 mb-2">
+          <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60 mb-6">
             {data.name}
           </h1>
-          <p className="text-white/40 font-mono text-sm mb-6">ID: {data.id}</p>
 
           {/* Badges Row */}
           <div className="flex flex-wrap gap-4 justify-center md:justify-start">
@@ -83,9 +99,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
             {/* Subscriber Badge */}
             {data.badges.subMonths > 0 && (
               <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <Star className="text-yellow-400 w-8 h-8" />
+                <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
                 <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
                   Subscribed: {formatSubTime(data.badges.subMonths)}
+                </span>
+              </div>
+            )}
+
+            {/* Commissioner Badge */}
+            {data.badges.isCommissioner && (
+              <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                <BadgeIcon emoteId={data.emotes.sparkle} fallbackText="✨" />
+                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
+                  Commissioner
                 </span>
               </div>
             )}
@@ -93,7 +119,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
             {/* Gifts Badge */}
             {data.badges.gifts > 0 && (
               <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <Gift className="text-pink-400 w-8 h-8" />
+                <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
                 <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
                   {data.badges.gifts} Gift{data.badges.gifts === 1 ? '' : 's'} Sent
                 </span>
@@ -103,7 +129,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
             {/* Referrals Badge */}
             {data.badges.referrals > 0 && (
               <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <Users className="text-blue-400 w-8 h-8" />
+                <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
                 <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
                   {data.badges.referrals} Referral{data.badges.referrals === 1 ? '' : 's'}
                 </span>
@@ -113,7 +139,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
             {/* Loyalty Badges */}
             {data.badges.loyalty.map(year => (
               <div key={year} className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <Award className="text-purple-400 w-8 h-8" />
+                <BadgeIcon emoteId={data.emotes.love} fallbackText="💜" />
                 <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
                   {year} Loyalty Card
                 </span>
