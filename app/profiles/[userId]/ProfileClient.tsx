@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -45,13 +44,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   
   // Edit state
-  const { data: session } = useSession();
-  const { roles } = useCollectionFilter();
+  const { userId: currentUserId, roles } = useCollectionFilter();
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffffff');
   const [savingColor, setSavingColor] = useState(false);
 
-  const isOwnProfile = session?.user?.id === userId;
+  const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
 
   const fetchProfile = async () => {
