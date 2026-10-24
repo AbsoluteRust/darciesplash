@@ -1,29 +1,39 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
   const { userId } = await params;
 
-  // 1. Fetch name & avatar from the Bot
   let userInfo = { name: "Unknown User", avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png" };
+  let debugError = null;
+
   try {
     const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
+    if (!botUrl) throw new Error("PI_BOT_URL is missing in Vercel");
+    
     const res = await fetch(`${botUrl}/api/user/profile?userId=${userId}`, {
       headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
       cache: "no-store",
     });
-    if (res.ok) userInfo = await res.json();
-  } catch (err) {
-    console.error("Failed to fetch user from bot:", err);
+    
+    if (res.ok) {
+      userInfo = await res.json();
+    } else {
+      const text = await res.text();
+      debugError = `Bot returned ${res.status}: ${text}`;
+    }
+  } catch (err: any) {
+    debugError = `Fetch failed: ${err.message}`;
   }
 
-  // 2. Fetch Badges from KV
+  // Fetch Badges from KV
   const rawBadges = (await kv.hgetall(`user_badges:${userId}`)) || {};
   
-  // Parse loyalty (stored as stringified array by the bot)
   let loyalty: string[] = [];
   if (rawBadges.loyalty) {
     try {
@@ -40,15 +50,15 @@ export async function GET(
     loyalty,
   };
 
-  // 3. Check Online Status (Heartbeat)
   const heartbeats = (await kv.hgetall("user_heartbeats")) || {};
   const lastPing = Number(heartbeats[userId] || 0);
-  const isOnline = Date.now() - lastPing < 120000; // 2 minutes
+  const isOnline = Date.now() - lastPing < 120000; 
 
   return NextResponse.json({
     id: userId,
     ...userInfo,
     isOnline,
     badges,
+    _debug: debugError // <--- This will tell us what broke
   });
 }
