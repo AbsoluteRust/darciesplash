@@ -14,29 +14,121 @@ const RARITY_COLORS: Record<string, string> = {
   Mythic: "#ef4444",
 };
 
+// ---------- SSRF protection ----------
+
+const ALLOWED_IMAGE_HOSTS: Set<string> = (() => {
+  const hosts = new Set<string>();
+  const add = (raw: string | undefined) => {
+    if (!raw) return;
+    try {
+      hosts.add(new URL(raw).hostname.toLowerCase());
+    } catch {}
+  };
+  add(process.env.R2_PUBLIC_URL);
+  add(process.env.NEXT_PUBLIC_SITE_URL);
+  add(process.env.SITE_BASE_URL);
+  return hosts;
+})();
+
+const FETCH_TIMEOUT_MS = 8000;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
+const MAX_URL_LENGTH = 2048;
+
+function resolveSafeImageUrl(raw: string, origin: string): URL | null {
+  if (!raw || raw.length > MAX_URL_LENGTH) return null;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw, origin);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+  if (parsed.username || parsed.password) return null;
+
+  const host = parsed.hostname.toLowerCase();
+  let requestHost = "";
+  try {
+    requestHost = new URL(origin).hostname.toLowerCase();
+  } catch {}
+
+  // Same-origin (relative paths, or absolute URLs pointing at the site itself)
+  if (requestHost && host === requestHost) return parsed;
+
+  // Cross-origin: must be explicitly allowlisted (e.g. R2 CDN)
+  if (ALLOWED_IMAGE_HOSTS.has(host)) return parsed;
+
+  return null;
+}
+
+async function fetchImageBuffer(url: URL): Promise<Buffer | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url.toString(), {
+      signal: controller.signal,
+      redirect: "manual",
+      cache: "no-store",
+      headers: { Accept: "image/*" },
+    });
+
+    // Explicitly reject redirects (fetch with redirect: "manual" leaves 3xx as-is)
+    if (res.status >= 300 && res.status < 400) return null;
+    if (!res.ok) return null;
+
+    const ct = (res.headers.get("content-type") || "").toLowerCase();
+    if (!ct.startsWith("image/")) return null;
+
+    const cl = Number(res.headers.get("content-length") || 0);
+    if (cl > MAX_IMAGE_BYTES) return null;
+
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > MAX_IMAGE_BYTES) return null;
+    return buf;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------- handler ----------
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const name = searchParams.get("name") || "Unknown Card";
   const type = searchParams.get("type") || "Emote";
   const rarity = searchParams.get("rarity") || "";
   const collection = searchParams.get("collection") || "";
-  let image = searchParams.get("image") || "";
-  
-  const origin = new URL(req.url).origin;
-  
-  // Convert the image (which is likely WebP) to a PNG Data URL for Satori
+  const image = searchParams.get("image") || "";
+
+  // Use the configured site URL as origin so a spoofed Host header can't
+  // redirect relative-path resolution. Falls back to req.url origin for dev.
+  let origin: string;
+  try {
+    origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
+  } catch {
+    origin = "http://localhost:3000";
+  }
+
   let imageUrl = "";
   if (image) {
-    try {
-      const fetchUrl = image.startsWith("http") ? image : `${origin}${image.startsWith("/") ? image : `/${image}`}`;
-      const res = await fetch(fetchUrl);
-      if (res.ok) {
-        const buffer = Buffer.from(await res.arrayBuffer());
-        const pngBuffer = await sharp(buffer).png().toBuffer();
-        imageUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+    const safe = resolveSafeImageUrl(image, origin);
+    if (safe) {
+      const buf = await fetchImageBuffer(safe);
+      if (buf) {
+        try {
+          const pngBuffer = await sharp(buf).png().toBuffer();
+          imageUrl = `data:image/png;base64,${pngBuffer.toString("base64")}`;
+        } catch (err) {
+          console.error("[card-image] sharp conversion failed:", err);
+        }
+      } else {
+        console.warn("[card-image] image fetch failed:", safe.toString());
       }
-    } catch (err) {
-      console.error("[card-image] Failed to convert image:", err);
+    } else {
+      console.warn("[card-image] rejected unsafe image URL:", image.slice(0, 200));
     }
   }
 
