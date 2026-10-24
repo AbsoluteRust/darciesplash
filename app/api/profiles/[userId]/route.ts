@@ -58,6 +58,19 @@ export async function GET(
   const lastPing = Number(heartbeats[userId] || 0);
   const isOnline = Date.now() - lastPing < 120000; 
 
+    // 5. Fetch custom color
+  const userColors = (await kv.hgetall("user_profile_colors")) || {};
+  const customColor = userColors[userId] || null;
+
+  return NextResponse.json({
+    id: userId,
+    ...userInfo,
+    isOnline,
+    badges,
+    emotes,
+    customColor, // <-- Add this
+  });
+
   return NextResponse.json({
     id: userId,
     ...userInfo,

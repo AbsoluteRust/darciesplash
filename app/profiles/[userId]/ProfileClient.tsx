@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'motion/react';
+import { useSession } from 'next-auth/react';
+import { useCollectionFilter } from '@/components/CollectionFilterContext';
+import { motion, AnimatePresence } from 'motion/react';
 
 type ProfileData = {
   id: string;
   name: string;
   avatarUrl: string;
   isOnline: boolean;
+  customColor: string | null;
   badges: {
     gifts: number;
     referrals: number;
@@ -34,121 +37,180 @@ function formatSubTime(months: number) {
 
 function BadgeIcon({ emoteId, fallbackText }: { emoteId: string | null, fallbackText: string }) {
   if (!emoteId) return <span className="text-white/50 text-sm font-bold">{fallbackText}</span>;
-  return (
-    <img 
-      src={`https://cdn.discordapp.com/emojis/${emoteId}.png`} 
-      alt={fallbackText} 
-      className="w-8 h-8 object-contain" 
-    />
-  );
+  return <img src={`https://cdn.discordapp.com/emojis/${emoteId}.png`} alt={fallbackText} className="w-8 h-8 object-contain" />;
 }
 
 export default function ProfileClient({ userId }: { userId: string }) {
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Edit state
+  const { data: session } = useSession();
+  const { roles } = useCollectionFilter();
+  const [isColorModalOpen, setIsColorModalOpen] = useState(false);
+  const [selectedColor, setSelectedColor] = useState('#ffffff');
+  const [savingColor, setSavingColor] = useState(false);
+
+  const isOwnProfile = session?.user?.id === userId;
+  const canEdit = isOwnProfile && roles?.darsubscribbler;
+
+  const fetchProfile = async () => {
+    try {
+      const res = await fetch(`/api/profiles/${userId}`, { cache: 'no-store' });
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+        if (json.customColor) setSelectedColor(json.customColor);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const res = await fetch(`/api/profiles/${userId}`, { cache: 'no-store' });
-        if (res.ok) setData(await res.json());
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchProfile();
-    
     const int = setInterval(fetchProfile, 30000);
     return () => clearInterval(int);
   }, [userId]);
+
+  const handleSaveColor = async () => {
+    setSavingColor(true);
+    try {
+      const res = await fetch('/api/profiles/color', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colorHex: selectedColor }),
+      });
+      if (res.ok) {
+        setIsColorModalOpen(false);
+        fetchProfile(); // Refresh to get new color
+      } else {
+        alert('Failed to save color.');
+      }
+    } finally {
+      setSavingColor(false);
+    }
+  };
 
   if (loading) return <div className="text-white/50 text-center animate-pulse">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center">User not found.</div>;
 
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden"
-    >
-      {/* Background Glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-indigo-500/10 blur-[100px] pointer-events-none" />
+    <>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden"
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-indigo-500/10 blur-[100px] pointer-events-none" />
 
-      <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
-        {/* Avatar & Status */}
-        <div className="relative">
-          <img 
-            src={data.avatarUrl} 
-            alt={data.name} 
-            className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white/10 shadow-lg object-cover bg-black/50"
-          />
-          {data.isOnline && (
-            <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-4 border-[#0a0a14] rounded-full shadow-lg" title="Online on Website" />
-          )}
-        </div>
-
-        {/* User Info */}
-        <div className="flex flex-col items-center md:items-start flex-1">
-          <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60 mb-6">
-            {data.name}
-          </h1>
-
-          {/* Badges Row */}
-          <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-            
-            {/* Subscriber Badge */}
-            {data.badges.subMonths > 0 && (
-              <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
-                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                  Subscribed: {formatSubTime(data.badges.subMonths)}
-                </span>
-              </div>
+        <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
+          <div className="relative">
+            <img src={data.avatarUrl} alt={data.name} className="w-32 h-32 md:w-40 md:h-40 rounded-full border-4 border-white/10 shadow-lg object-cover bg-black/50" />
+            {data.isOnline && (
+              <div className="absolute bottom-2 right-2 w-6 h-6 bg-green-500 border-4 border-[#0a0a14] rounded-full shadow-lg" title="Online on Website" />
             )}
+          </div>
 
-            {/* Commissioner Badge */}
-            {data.badges.isCommissioner && (
-              <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <BadgeIcon emoteId={data.emotes.sparkle} fallbackText="✨" />
-                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                  Commissioner
-                </span>
-              </div>
-            )}
+          <div className="flex flex-col items-center md:items-start flex-1">
+            <div className="flex items-center gap-3 mb-6">
+              {data.customColor ? (
+                <h1 className="text-3xl md:text-5xl font-black" style={{ color: data.customColor }}>
+                  {data.name}
+                </h1>
+              ) : (
+                <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60">
+                  {data.name}
+                </h1>
+              )}
 
-            {/* Gifts Badge */}
-            {data.badges.gifts > 0 && (
-              <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
-                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                  {data.badges.gifts} Gift{data.badges.gifts === 1 ? '' : 's'} Sent
-                </span>
-              </div>
-            )}
+              {canEdit && (
+                <button 
+                  onClick={() => setIsColorModalOpen(true)}
+                  className="text-white/30 hover:text-white/80 transition-colors p-2"
+                  title="Edit Name Color"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                  </svg>
+                </button>
+              )}
+            </div>
 
-            {/* Referrals Badge */}
-            {data.badges.referrals > 0 && (
-              <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
-                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                  {data.badges.referrals} Referral{data.badges.referrals === 1 ? '' : 's'}
-                </span>
-              </div>
-            )}
-
-            {/* Loyalty Badges */}
-            {data.badges.loyalty.map(year => (
-              <div key={year} className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                <BadgeIcon emoteId={data.emotes.love} fallbackText="💜" />
-                <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                  {year} Loyalty Card
-                </span>
-              </div>
-            ))}
-
+            {/* Badges Row */}
+            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
+              {data.badges.subMonths > 0 && (
+                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                  <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
+                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
+                    Subscribed: {formatSubTime(data.badges.subMonths)}
+                  </span>
+                </div>
+              )}
+              {data.badges.isCommissioner && (
+                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                  <BadgeIcon emoteId={data.emotes.sparkle} fallbackText="✨" />
+                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">Commissioner</span>
+                </div>
+              )}
+              {data.badges.gifts > 0 && (
+                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                  <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
+                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{data.badges.gifts} Gifts Sent</span>
+                </div>
+              )}
+              {data.badges.referrals > 0 && (
+                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                  <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
+                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{data.badges.referrals} Referrals</span>
+                </div>
+              )}
+              {data.badges.loyalty.map(year => (
+                <div key={year} className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
+                  <BadgeIcon emoteId={data.emotes.love} fallbackText="💜" />
+                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{year} Loyalty Card</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      {/* Color Picker Modal */}
+      <AnimatePresence>
+        {isColorModalOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-[#0a0a14] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+            >
+              <h3 className="text-xl font-bold text-white mb-4">Choose Name Color</h3>
+              <p className="text-sm text-white/50 mb-6">This will create a cosmetic role in the Discord server to match your color.</p>
+              
+              <div className="flex justify-center mb-6">
+                <input 
+                  type="color" 
+                  value={selectedColor} 
+                  onChange={(e) => setSelectedColor(e.target.value)}
+                  className="w-24 h-24 rounded cursor-pointer bg-transparent border-0 p-0"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setIsColorModalOpen(false)} className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition">
+                  Cancel
+                </button>
+                <button onClick={handleSaveColor} disabled={savingColor} className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-medium transition disabled:opacity-50">
+                  {savingColor ? 'Saving...' : 'Save Color'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
