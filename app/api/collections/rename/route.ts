@@ -102,9 +102,9 @@ export async function POST(req: Request) {
       cooldownRemainingMs: cooldownRemainingMs(updated),
     });
   } catch (err: any) {
+    console.error("[rename] error:", err);
     return NextResponse.json(
-      { error: err?.message || "Rename failed" },
+      { error: "Rename failed due to an internal error." },
       { status: 400 }
     );
   }
-}
