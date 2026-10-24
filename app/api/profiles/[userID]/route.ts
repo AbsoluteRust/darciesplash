@@ -10,12 +10,8 @@ export async function GET(
   const { userId } = await params;
 
   let userInfo = { name: "Unknown User", avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png" };
-  let debugError = null;
-
   try {
     const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
-    if (!botUrl) throw new Error("PI_BOT_URL is missing in Vercel");
-    
     const res = await fetch(`${botUrl}/api/user/profile?userId=${userId}`, {
       headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
       cache: "no-store",
@@ -24,14 +20,12 @@ export async function GET(
     if (res.ok) {
       userInfo = await res.json();
     } else {
-      const text = await res.text();
-      debugError = `Bot returned ${res.status}: ${text}`;
+      console.error("Bot returned error:", res.status, await res.text());
     }
-  } catch (err: any) {
-    debugError = `Fetch failed: ${err.message}`;
+  } catch (err) {
+    console.error("Failed to fetch user from bot:", err);
   }
 
-  // Fetch Badges from KV
   const rawBadges = (await kv.hgetall(`user_badges:${userId}`)) || {};
   
   let loyalty: string[] = [];
@@ -59,6 +53,5 @@ export async function GET(
     ...userInfo,
     isOnline,
     badges,
-    _debug: debugError // <--- This will tell us what broke
   });
 }
