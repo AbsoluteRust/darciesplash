@@ -81,9 +81,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
       });
       if (res.ok) {
         setIsColorModalOpen(false);
-        fetchProfile(); // Refresh to get new color
+        fetchProfile();
       } else {
-        alert('Failed to save color.');
+        const errData = await res.json();
+        alert(`Failed to save color: ${errData.error || 'Unknown error'}`);
       }
     } finally {
       setSavingColor(false);

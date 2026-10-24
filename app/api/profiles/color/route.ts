@@ -30,10 +30,13 @@ export async function POST(req: Request) {
       body: JSON.stringify({ userId: session.user.id, colorHex }),
     });
 
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Bot failed to update role');
+    }
     return NextResponse.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to update color role:', err);
-    return NextResponse.json({ error: 'Bot failed to update role' }, { status: 500 });
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
