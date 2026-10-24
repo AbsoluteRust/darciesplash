@@ -11,6 +11,14 @@ import {
 
 const KEY = (collection: string) => `collection_order:${collection}`;
 
+// In-memory rate limit (2 seconds between saves)
+const rateLimit = new Map<string, number>();
+const RATE_LIMIT_MS = 2000;
+
+const MAX_MANUAL_ORDER = 1000;
+const MAX_SECTIONS = 50;
+const MAX_CARDS_PER_SECTION = 1000;
+
 function roleDefaults(roles: any) {
   return {
     commissioner: !!roles?.commissioner,
@@ -42,6 +50,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
+  // 1. Rate Limit
+  const now = Date.now();
+  const lastCall = rateLimit.get(session.user.id) || 0;
+  if (now - lastCall < RATE_LIMIT_MS) {
+    return NextResponse.json({ error: "Please wait a moment before saving again." }, { status: 429 });
+  }
+  rateLimit.set(session.user.id, now);
+
   let body: any;
   try {
     body = await req.json();
@@ -52,6 +68,23 @@ export async function POST(req: Request) {
   const collection = body?.collection;
   if (!collection || typeof collection !== "string") {
     return NextResponse.json({ error: "Missing collection" }, { status: 400 });
+  }
+
+  // 2. Length Caps (Prevent memory/CPU exhaustion)
+  if (body.manualOrder) {
+    if (!Array.isArray(body.manualOrder) || body.manualOrder.length > MAX_MANUAL_ORDER) {
+      return NextResponse.json({ error: `manualOrder cannot exceed ${MAX_MANUAL_ORDER} cards` }, { status: 400 });
+    }
+  }
+  if (body.sections) {
+    if (!Array.isArray(body.sections) || body.sections.length > MAX_SECTIONS) {
+      return NextResponse.json({ error: `Cannot have more than ${MAX_SECTIONS} sections` }, { status: 400 });
+    }
+    for (const s of body.sections) {
+      if (!Array.isArray(s.cards) || s.cards.length > MAX_CARDS_PER_SECTION) {
+        return NextResponse.json({ error: `A section cannot contain more than ${MAX_CARDS_PER_SECTION} cards` }, { status: 400 });
+      }
+    }
   }
 
   const roles = roleDefaults(
@@ -67,7 +100,7 @@ export async function POST(req: Request) {
     ? {
         mode: "auto",
         sortBy: "default",
-        manualOrder: body.order.filter((x: any) => typeof x === "string"),
+        manualOrder: body.order.filter((x: any) => typeof x === "string").slice(0, MAX_MANUAL_ORDER),
         randomised: false,
       }
     : normalizeLayout({

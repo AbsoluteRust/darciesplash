@@ -18,6 +18,10 @@ type AccountRoles = {
   darsubscribbler: boolean;
 };
 
+// In-memory rate limit (5 seconds between requests)
+const rateLimit = new Map<string, number>();
+const RATE_LIMIT_MS = 5000;
+
 function readRoles(raw: any): AccountRoles {
   return {
     commissioner: !!raw?.commissioner,
@@ -30,6 +34,14 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
+
+  // 1. Rate Limit
+  const now = Date.now();
+  const lastCall = rateLimit.get(session.user.id) || 0;
+  if (now - lastCall < RATE_LIMIT_MS) {
+    return NextResponse.json({ error: "Please wait a moment before trying again." }, { status: 429 });
+  }
+  rateLimit.set(session.user.id, now);
 
   let body: any;
   try {
