@@ -16,6 +16,7 @@ export async function GET() {
     if (!res.ok) throw new Error(await res.text());
     return NextResponse.json(await res.json());
   } catch (err) {
+    console.error("Failed to fetch minipacks:", err);
     return NextResponse.json({ error: "Failed to fetch minipacks" }, { status: 500 });
   }
 }
