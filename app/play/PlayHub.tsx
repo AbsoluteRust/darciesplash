@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
-import PlayButton from './PlayButton';
 import PuzzleGame from './PuzzleGame';
 import DropGame from './DropGame';
+import PackArea from './PackArea';
 
 export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const [focused, setFocused] = useState<'pack' | 'puzzle' | 'drop'>('pack');
@@ -80,7 +80,9 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           <h2 className="text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 mb-6 lg:mb-8 tracking-widest uppercase w-full text-center">
             Open Packs
           </h2>
-          <PlayButton />
+          
+          <PackArea />
+
         </div>
 
         {/* Right: Random Drops */}
