@@ -96,7 +96,7 @@ export default function DropGame({
             rarity={state.rarity}
             collection={state.collection}
             isPlay={true}
-            isModal={true}
+            isModal={false}
           />
         </div>
       </div>

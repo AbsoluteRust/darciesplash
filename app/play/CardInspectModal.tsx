@@ -4,21 +4,19 @@ import { useState, useEffect } from 'react';
 import StandardCard from '@/components/StandardCard';
 import RelatedCardMini from '@/components/RelatedCardMini';
 
-const TYPE_DISPLAY: Record<string, string> = {
-  emote: "Emote",
-  splash: "Splash Art",
-  wallpaper: "Mobile Wallpaper",
-  sticker: "Sticker",
-  Emote: "Emote",
-  "Splash Art": "Splash Art",
-  "Mobile Wallpaper": "Mobile Wallpaper",
-  Wallpaper: "Mobile Wallpaper",
-  Sticker: "Sticker",
-};
-
 function normalizeType(t: string | undefined): string {
   if (!t) return "Emote";
-  return TYPE_DISPLAY[t] || t;
+  const n = String(t).toLowerCase().trim();
+  const map: Record<string, string> = {
+    'emote': 'Emote',
+    'splash': 'Splash Art',
+    'splash art': 'Splash Art',
+    'splashart': 'Splash Art',
+    'wallpaper': 'Mobile Wallpaper',
+    'mobile wallpaper': 'Mobile Wallpaper',
+    'sticker': 'Sticker',
+  };
+  return map[n] || t;
 }
 
 export default function CardInspectModal({ 
@@ -58,12 +56,13 @@ export default function CardInspectModal({
     c => String(c.parent).toLowerCase() === currentCard.name.toLowerCase()
   );
 
-  // Match the collection logic exactly by normalizing the type
-  const normType = normalizeType(currentCard.type);
+  // Fallback to the database if the drop/pack data is missing properties
+  const effectiveType = currentCard.type || fullCardData?.type || 'Emote';
+  const normType = normalizeType(effectiveType);
   const isEmote = normType === "Emote";
   
   // Robust image fallback
-  const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl || currentCard.thumbUrl;
+  const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl || fullCardData?.thumbUrl || fullCardData?.image;
 
   return (
     <div className="emote-modal-overlay" onClick={onClose}>
@@ -79,8 +78,8 @@ export default function CardInspectModal({
               title="Emote"
               image={imgUrl}
               thumbUrl={imgUrl}
-              rarity={currentCard.rarity}
-              collection={currentCard.collection}
+              rarity={currentCard.rarity || fullCardData?.rarity}
+              collection={currentCard.collection || fullCardData?.collection}
               glow={currentCard.color}
               isPlay={true}
               isModal={true}
