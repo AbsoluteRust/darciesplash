@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProfileCard from '@/components/ProfileCard';
+import StandardCard from '@/components/StandardCard';
 import CardInspectModal from './CardInspectModal';
 
 export default function DropGame({ 
@@ -88,21 +88,14 @@ export default function DropGame({
           [&_.pc-mini-avatar]:!w-[24px]
           [&_.pc-mini-avatar]:!h-[24px]
         ">
-          <ProfileCard
+          <StandardCard
             name={state.cardName || 'Unknown Card'}
             title={state.cardType || 'Emote'}
-            handle={(state.cardName || 'unknown').toLowerCase().replace(/\s+/g, '-')}
-            status="Online"
-            contactText="View"
-            avatarUrl={state.rawImageUrl || ''}
+            image={state.rawImageUrl || ''}
+            thumbUrl={state.rawImageUrl || ''}
             rarity={state.rarity}
-            showUserInfo={false}
-            enableTilt={true}
-            enableMobileTilt={false}
-            behindGlowColor={state.cardColor || '#fff'}
-            iconUrl={null}
-            behindGlowEnabled
-            innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+            collection={state.collection}
+            isPlay={true}
             isModal={true}
           />
         </div>
@@ -151,7 +144,7 @@ export default function DropGame({
         <div className="text-center mt-2 p-3 bg-black/40 rounded-xl border border-white/10 w-full max-w-sm shrink-0">
           <p className="text-green-400 font-bold text-sm mb-1">Previous Drop Results</p>
           <p className="text-white/60 text-xs mb-1">
-            Winners: {state.previousWinners.map((w: any) => w.name).join(', ')}
+            Winners: {state.previousWinners.map((w: any) => typeof w === 'string' ? 'User ' + String(w).slice(-4) : w.name).join(', ')}
           </p>
           {state.previousParticipants && state.previousParticipants.length > 0 && (
             <p className="text-white/40 text-[10px]">
@@ -174,6 +167,7 @@ export default function DropGame({
             description: selectedCard.description,
             details: selectedCard.details,
             link: selectedCard.link,
+            collection: selectedCard.collection,
           }} 
           onClose={() => setSelectedCard(null)} 
         />

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import ProfileCard from '@/components/ProfileCard';
+import StandardCard from '@/components/StandardCard';
 import RelatedCardMini from '@/components/RelatedCardMini';
 
 export default function CardInspectModal({ 
@@ -77,24 +77,19 @@ export default function CardInspectModal({
           <div className="w-full flex justify-center">
             {isEmote ? (
               <div className="w-full max-w-[420px] mx-auto block">
-                <ProfileCard
+                <StandardCard
                   key={currentCard.name}
                   name={currentCard.name}
                   title={currentCard.type || 'Emote'}
-                  handle={currentCard.name.toLowerCase().replace(/\s+/g, '-')}
-                  status="Online"
-                  contactText="Close"
-                  avatarUrl={imgUrl}
+                  image={imgUrl}
+                  thumbUrl={imgUrl}
                   rarity={currentCard.rarity}
-                  showUserInfo={false}
-                  enableTilt={false}
-                  enableMobileTilt={false}
-                  behindGlowColor={currentCard.color || '#fff'}
-                  iconUrl={null}
-                  behindGlowEnabled
-                  innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+                  collection={currentCard.collection}
+                  glow={currentCard.color}
+                  isPlay={true}
                   isModal={true}
-                  onContactClick={onClose}
+                  onClick={onClose}
+                  enableTilt={false}
                 />
               </div>
             ) : (
