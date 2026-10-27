@@ -4,6 +4,23 @@ import { useState, useEffect } from 'react';
 import StandardCard from '@/components/StandardCard';
 import RelatedCardMini from '@/components/RelatedCardMini';
 
+const TYPE_DISPLAY: Record<string, string> = {
+  emote: "Emote",
+  splash: "Splash Art",
+  wallpaper: "Mobile Wallpaper",
+  sticker: "Sticker",
+  Emote: "Emote",
+  "Splash Art": "Splash Art",
+  "Mobile Wallpaper": "Mobile Wallpaper",
+  Wallpaper: "Mobile Wallpaper",
+  Sticker: "Sticker",
+};
+
+function normalizeType(t: string | undefined): string {
+  if (!t) return "Emote";
+  return TYPE_DISPLAY[t] || t;
+}
+
 export default function CardInspectModal({ 
   initialCard, 
   onClose 
@@ -41,9 +58,12 @@ export default function CardInspectModal({
     c => String(c.parent).toLowerCase() === currentCard.name.toLowerCase()
   );
 
-  // Match the collection logic exactly
-  const isEmote = currentCard.type === "Emote" || !currentCard.type;
-  const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl;
+  // Match the collection logic exactly by normalizing the type
+  const normType = normalizeType(currentCard.type);
+  const isEmote = normType === "Emote";
+  
+  // Robust image fallback
+  const imgUrl = currentCard.rawImageUrl || currentCard.thumbUrl || currentCard.image || currentCard.imageUrl || currentCard.thumbUrl;
 
   return (
     <div className="emote-modal-overlay" onClick={onClose}>
@@ -52,20 +72,22 @@ export default function CardInspectModal({
         onClick={e => e.stopPropagation()}
       >
         {isEmote ? (
-          <StandardCard
-            key={currentCard.name}
-            name={currentCard.name}
-            title="Emote"
-            image={imgUrl}
-            thumbUrl={imgUrl}
-            rarity={currentCard.rarity}
-            collection={currentCard.collection}
-            glow={currentCard.color}
-            isPlay={true}
-            isModal={true}
-            onClick={onClose}
-            enableTilt={false}
-          />
+          <div className="w-full max-w-[420px] mx-auto block">
+            <StandardCard
+              key={currentCard.name}
+              name={currentCard.name}
+              title="Emote"
+              image={imgUrl}
+              thumbUrl={imgUrl}
+              rarity={currentCard.rarity}
+              collection={currentCard.collection}
+              glow={currentCard.color}
+              isPlay={true}
+              isModal={true}
+              onClick={onClose}
+              enableTilt={false}
+            />
+          </div>
         ) : (
           <div className="art-layout">
             <img className="full-wallpaper" src={imgUrl} alt={currentCard.name} />
