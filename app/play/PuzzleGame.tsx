@@ -2,11 +2,6 @@
 
 import { useState } from 'react';
 
-function formatEmote(emote: any) {
-  if (!emote) return '❓';
-  return `<${emote.animated ? 'a' : ''}:${emote.name}:${emote.id}>`;
-}
-
 export default function PuzzleGame({
   state,
   allStaticEmotes,
@@ -33,6 +28,11 @@ export default function PuzzleGame({
       .filter((g: any) => !g.isCorrect)
       .map((g: any) => g.emoteId)
   );
+
+  // Build the keyboard using the raw pool IDs and the allStaticEmotes passed to the component
+  const poolEmotes = (state.pool || []).map((id: string) => {
+    return allStaticEmotes.find((e: any) => e.id === id);
+  }).filter(Boolean);
 
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
@@ -152,9 +152,9 @@ export default function PuzzleGame({
       </div>
 
       {/* The Keyboard */}
-      {!state.solved && (
+      {!state.solved && poolEmotes.length > 0 && (
         <div className="flex gap-3 mt-2">
-          {state.poolEmotes?.map((emote: any) => {
+          {poolEmotes.map((emote: any) => {
             const isIncorrect = incorrectEmotes.has(emote.id);
             const isSpinning = isGuessing === emote.id;
 
