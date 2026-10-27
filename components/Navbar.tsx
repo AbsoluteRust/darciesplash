@@ -55,8 +55,6 @@ export default function Navbar() {
     const currentIdx = urlSlug ? collections.findIndex((c) => c.publicSlug === urlSlug) : -1;
 
     const isCollectionPage = currentIdx >= 0;
-    const before = isCollectionPage ? collections.slice(0, currentIdx) : [];
-    const after = isCollectionPage ? collections.slice(currentIdx + 1) : collections;
     const currentLabel = isCollectionPage ? collections[currentIdx].displayName : null;
 
     return (
@@ -69,7 +67,7 @@ export default function Navbar() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 250, damping: 70, mass: 1 }}
             >
-                {/* LEFT — Home + past collections */}
+                {/* LEFT — Home */}
                 <div className="flex items-center gap-6 relative z-10">
                     <button
                         type="button"
@@ -85,17 +83,6 @@ export default function Navbar() {
                     >
                         <HomeIcon size={20} />
                     </button>
-                    <div className="hidden md:flex items-center gap-6">
-                        {before.map((c) => (
-                            <Link
-                                key={c.internalSlug}
-                                href={`/collections/${c.publicSlug}`}
-                                className="transition text-sm text-white/40 hover:text-pink-400"
-                            >
-                                {c.displayName}
-                            </Link>
-                        ))}
-                    </div>
                 </div>
 
                 {/* CENTER — WarpText (collection pages only) */}
@@ -132,54 +119,55 @@ export default function Navbar() {
                     </div>
                 )}
 
-                {/* RIGHT — Upcoming collections */}
-                <div className={`hidden md:flex items-center gap-6 relative z-10 ${isCollectionPage ? "pr-24" : ""}`}>
-                    {after.map((c) => (
-                        <Link
-                            key={c.internalSlug}
-                            href={`/collections/${c.publicSlug}`}
-                            className="transition text-sm text-white/40 hover:text-pink-400"
-                        >
-                            {c.displayName}
-                        </Link>
-                    ))}
-                </div>
-
-                {/* RARITY TOGGLE — pinned near right edge */}
-                {isCollectionPage && (
-                    <div className="hidden md:block absolute right-3 md:right-5 lg:right-6 xl:right-8 top-1/2 -translate-y-1/2 z-20">
-                        <RarityModeToggle />
-                    </div>
-                )}
-
-                {/* Mobile menu button */}
-                <button onClick={() => setIsOpen(true)} className="md:hidden">
-                    <MenuIcon size={26} className="active:scale-90 transition" />
+                {/* RIGHT — Menu Button */}
+                <button 
+                    onClick={() => setIsOpen(true)} 
+                    className="relative z-10 text-white/60 hover:text-white transition-colors"
+                    aria-label="Open Menu"
+                >
+                    <MenuIcon size={28} className="active:scale-90 transition" />
                 </button>
             </motion.nav>
 
-            {/* Mobile menu */}
+            {/* Full-Screen Menu Overlay (Now used for both desktop and mobile) */}
             <div
-                className={`fixed inset-0 z-100 bg-black/40 backdrop-blur flex flex-col items-center justify-center text-lg gap-8 md:hidden transition-transform duration-400 ${
+                className={`fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center text-lg gap-6 transition-transform duration-400 ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
-                <Link href="/" onClick={() => setIsOpen(false)}>Home</Link>
+                <Link href="/" onClick={() => setIsOpen(false)} className="hover:text-pink-400 transition-colors">
+                    Home
+                </Link>
+                
+                <Link href="/play" onClick={() => setIsOpen(false)} className="hover:text-pink-400 transition-colors text-pink-500 font-bold">
+                    Play
+                </Link>
+
+                <div className="w-12 h-px bg-white/20 my-2" />
+
                 {collections.map((c) => (
                     <Link
                         key={c.internalSlug}
                         href={`/collections/${c.publicSlug}`}
-                        onNavigate={() => setIsOpen(false)}
+                        onClick={() => setIsOpen(false)}
+                        className="hover:text-pink-400 transition-colors text-white/80"
                     >
                         {c.displayName}
                     </Link>
                 ))}
-                {isCollectionPage && <RarityModeToggle />}
+
+                {isCollectionPage && (
+                    <div className="mt-4">
+                        <RarityModeToggle />
+                    </div>
+                )}
+
                 <button
                     onClick={() => setIsOpen(false)}
-                    className="active:ring-3 active:ring-white aspect-square size-10 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-md flex"
+                    className="absolute top-6 right-6 md:top-8 md:right-8 active:ring-3 active:ring-white aspect-square size-12 p-1 items-center justify-center bg-pink-600 hover:bg-pink-700 transition text-white rounded-full flex shadow-lg"
+                    aria-label="Close Menu"
                 >
-                    <XIcon />
+                    <XIcon size={24} />
                 </button>
             </div>
         </>
