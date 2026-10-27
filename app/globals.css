@@ -207,6 +207,310 @@ button {
   100% { transform: translate(0, 0)      rotate(0deg); }
 }
 
+/* ============================================================
+   Modal Styles (Moved from page.css to be global)
+   ============================================================ */
+
+.emote-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  z-index: 9999;
+
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.emote-modal-overlay::-webkit-scrollbar {
+  display: none;
+}
+
+.emote-modal {
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10000;
+  max-height: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.full-wallpaper {
+  width: auto;
+  height: auto;
+
+  max-width: 100%;
+  max-height: 100%;
+
+  object-fit: contain;
+  display: block;
+}
+
+.emote-modal::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ---- Related cards panel (desktop only) ---- */
+
+.related-panel {
+  display: none;
+  position: fixed;
+  top: 12vh;
+  right: 6vw;
+  width: 260px;
+  z-index: 10001;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  flex-direction: column;
+  gap: 10px;
+  max-height: 72vh;
+  overflow: hidden;
+}
+
+@media (min-width: 1200px) {
+  .related-panel {
+    display: flex;
+  }
+}
+
+.related-panel__label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  user-select: none;
+}
+
+.related-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-right: 2px;
+}
+
+.related-panel__grid::-webkit-scrollbar {
+  display: none;
+}
+
+.related-card-mini {
+  position: relative;
+  aspect-ratio: 0.718;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.2s ease, border-color 0.2s ease, filter 0.2s ease;
+  filter: grayscale(0.85) brightness(0.65);
+}
+
+.related-card-mini:hover {
+  filter: grayscale(0.15) brightness(1);
+  border-color: rgba(255, 255, 255, 0.35);
+  transform: scale(1.04);
+  z-index: 2;
+}
+
+.related-card-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  box-sizing: border-box;
+  padding: 4px;
+  display: block;
+}
+
+.related-card-mini__name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 6px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+/* ---- Chroma panel (mirror of related panel, on the left) ---- */
+
+.chroma-panel {
+  display: none;
+  position: fixed;
+  top: 12vh;
+  left: 6vw;
+  width: 260px;
+  z-index: 10001;
+  padding: 14px;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  flex-direction: column;
+  gap: 10px;
+  max-height: 72vh;
+  overflow: hidden;
+}
+
+@media (min-width: 1200px) {
+  .chroma-panel {
+    display: flex;
+  }
+}
+
+.chroma-panel__label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  user-select: none;
+}
+
+.chroma-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-right: 2px;
+}
+
+.chroma-panel__grid::-webkit-scrollbar {
+  display: none;
+}
+
+/* ---- Chroma lightbox ---- */
+
+.chroma-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  z-index: 10002;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+  animation: fadeIn 180ms ease-out;
+}
+
+.chroma-lightbox__inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: min(90vw, 700px);
+  max-height: 90vh;
+  cursor: default;
+}
+
+.chroma-lightbox__inner img {
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+  display: block;
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.75);
+}
+
+.chroma-lightbox__name {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.chroma-lightbox__rarity {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: -6px;
+}
+
+/* ---- Mobile edge padding for modals ---- */
+@media (max-width: 900px) {
+  .emote-modal-overlay {
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-bottom: 260px;
+  }
+
+  .emote-layout {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .emote-info-boxes {
+    padding-left: 4px;
+    padding-right: 4px;
+  }
+}
+
+@media (max-width: 600px) {
+  .emote-modal-overlay {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-bottom: 260px;
+  }
+
+  .emote-layout {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+}
+
+@media (max-width: 900px) {
+  .emote-modal-overlay::after {
+    content: "Tap outside to close";
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
 /* ===========================================================
    Firefox performance overrides
    Firefox software-renders backdrop-filter and doesn't GPU-
@@ -215,19 +519,11 @@ button {
    completely alone — the card art must look identical.
    =========================================================== */
 @supports (-moz-appearance: none) {
-  /* 1. Stop the two infinite animations. Firefox repaints the
-     whole card every frame for these; Chrome composites them
-     on the GPU. The gradient stays at its initial frame, so
-     the card looks the same — just without the shimmer motion. */
   .pc-card,
   .pc-shine {
     animation: none !important;
   }
 
-  /* 2. Kill backdrop-filter. This is the single biggest cost
-     in Firefox because it re-reads the framebuffer behind the
-     element every frame. Swap in a solid background that's
-     visually equivalent to the blurred glass. */
   .pc-user-info,
   .pc-contact-btn,
   .emote-info-box {
@@ -241,9 +537,6 @@ button {
     background: rgba(15, 15, 24, 0.65) !important;
   }
 
-  /* 3. Ease the will-change pressure. Firefox promotes each of
-     these to its own compositor layer and thrashes when there
-     are many on one page. */
   .pc-avatar-content .avatar,
   .ag-panel,
   .ag-panel__media {
