@@ -16,7 +16,7 @@ export default function PuzzleGame({
   allStaticEmotes: any[];
   isFocused: boolean;
 }) {
-  const [hoveredCell, setHoveredCell] = useState<number | null>(null);
+  const [isGuessing, setIsGuessing] = useState<string | null>(null);
 
   if (!state) return null;
 
@@ -24,6 +24,15 @@ export default function PuzzleGame({
   const height = state.height;
   const revealedCells = new Set(state.revealedCells || []);
   const guessesByCell = state.guessesByCell || {};
+
+  // Calculate incorrect emotes for the current cell to grey them out on the keyboard
+  const currentCell = state.nextCell;
+  const cellGuesses = guessesByCell[currentCell] || [];
+  const incorrectEmotes = new Set(
+    cellGuesses
+      .filter((g: any) => !g.isCorrect)
+      .map((g: any) => g.emoteId)
+  );
 
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
@@ -47,6 +56,24 @@ export default function PuzzleGame({
         className="w-8 h-8 object-contain"
       />
     );
+  };
+
+  const handleGuess = async (emoteId: string) => {
+    if (!isFocused || state.solved || isGuessing) return;
+    setIsGuessing(emoteId);
+    try {
+      const res = await fetch('/api/games/guess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoteId, game: 'puzzle' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Guess failed');
+      }
+    } finally {
+      setIsGuessing(null);
+    }
   };
 
   return (
@@ -74,8 +101,6 @@ export default function PuzzleGame({
               <div 
                 key={idx} 
                 className="relative group flex justify-center"
-                onMouseEnter={() => setHoveredCell(idx)}
-                onMouseLeave={() => setHoveredCell(null)}
               >
                 {/* The Cell Itself */}
                 <div 
@@ -90,10 +115,10 @@ export default function PuzzleGame({
                   {isRevealed && id ? renderEmote(id) : <span className="text-white/30 text-lg">❓</span>}
                 </div>
 
-                {/* The Tooltip */}
+                {/* The Tooltip (with pb-2 bridge to keep hover active) */}
                 {!isRevealed && grouped.length > 0 && (
-                  <div className="absolute bottom-full pb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-50">
-                    <div className="bg-[#181820] border border-white/20 rounded-xl p-3 shadow-2xl w-48 max-h-40 overflow-y-auto custom-scrollbar">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 pb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="bg-[#181820] border border-white/20 rounded-xl p-3 shadow-2xl w-56 max-h-40 overflow-y-auto custom-scrollbar pointer-events-auto">
                       <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-2 sticky top-0 bg-[#181820]">
                         Guesses
                       </p>
@@ -109,7 +134,7 @@ export default function PuzzleGame({
                                 <img
                                   key={eIdx}
                                   src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
-                                  className="w-4 h-4 object-contain"
+                                  className="w-5 h-5 object-contain"
                                   alt={emote.name}
                                 />
                               ) : null;
@@ -126,13 +151,49 @@ export default function PuzzleGame({
         )}
       </div>
 
+      {/* The Keyboard */}
+      {!state.solved && (
+        <div className="flex gap-3 mt-2">
+          {state.poolEmotes?.map((emote: any) => {
+            const isIncorrect = incorrectEmotes.has(emote.id);
+            const isSpinning = isGuessing === emote.id;
+
+            return (
+              <button
+                key={emote.id}
+                disabled={isIncorrect || state.solved || !!isGuessing}
+                onClick={() => handleGuess(emote.id)}
+                className={`
+                  relative w-14 h-14 rounded-xl flex items-center justify-center border transition-all
+                  ${isIncorrect 
+                    ? 'bg-black/20 border-white/5 opacity-30 grayscale cursor-not-allowed' 
+                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:scale-105 cursor-pointer'
+                  }
+                `}
+              >
+                {isSpinning && (
+                  <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  </div>
+                )}
+                <img
+                  src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
+                  alt={emote.name}
+                  className="w-8 h-8 object-contain"
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Status / Rules */}
       <div className="text-center max-w-sm text-sm text-white/50 space-y-2">
         {state.solved ? (
           <p className="text-green-400 font-bold text-lg">🎉 Puzzle Solved!</p>
         ) : (
           <>
-            <p>Post a single static emote in the Discord thread to guess the next cell.</p>
+            <p>Click an emote above, or post a static emote in the Discord thread.</p>
             <p>
               Each player has <strong className="text-white">4</strong> guesses +<strong className="text-white">1 per day</strong>.
             </p>
