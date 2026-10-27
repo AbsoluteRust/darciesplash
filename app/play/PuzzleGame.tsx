@@ -29,11 +29,6 @@ export default function PuzzleGame({
       .map((g: any) => g.emoteId)
   );
 
-  // Build the keyboard using the raw pool IDs and the allStaticEmotes passed to the component
-  const poolEmotes = (state.pool || []).map((id: string) => {
-    return allStaticEmotes.find((e: any) => e.id === id);
-  }).filter(Boolean);
-
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
     const grouped: Record<string, { username: string; emotes: string[] }> = {};
@@ -151,39 +146,42 @@ export default function PuzzleGame({
         )}
       </div>
 
-      {/* The Keyboard */}
-      {!state.solved && poolEmotes.length > 0 && (
-        <div className="flex gap-3 mt-2">
-          {poolEmotes.map((emote: any) => {
-            const isIncorrect = incorrectEmotes.has(emote.id);
-            const isSpinning = isGuessing === emote.id;
+      {/* The Keyboard (All Server Emotes) */}
+      {!state.solved && (
+        <div className="w-full max-w-2xl mt-2">
+          <div className="max-h-48 overflow-y-auto custom-scrollbar bg-[#0a0a14] p-3 rounded-2xl border border-white/10 shadow-inner flex flex-wrap gap-2 justify-center">
+            {allStaticEmotes.map((emote: any) => {
+              const isIncorrect = incorrectEmotes.has(emote.id);
+              const isSpinning = isGuessing === emote.id;
 
-            return (
-              <button
-                key={emote.id}
-                disabled={isIncorrect || state.solved || !!isGuessing}
-                onClick={() => handleGuess(emote.id)}
-                className={`
-                  relative w-14 h-14 rounded-xl flex items-center justify-center border transition-all
-                  ${isIncorrect 
-                    ? 'bg-black/20 border-white/5 opacity-30 grayscale cursor-not-allowed' 
-                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:scale-105 cursor-pointer'
-                  }
-                `}
-              >
-                {isSpinning && (
-                  <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  </div>
-                )}
-                <img
-                  src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
-                  alt={emote.name}
-                  className="w-8 h-8 object-contain"
-                />
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={emote.id}
+                  disabled={isIncorrect || state.solved || !!isGuessing}
+                  onClick={() => handleGuess(emote.id)}
+                  title={emote.name}
+                  className={`
+                    relative w-10 h-10 rounded-lg flex items-center justify-center border transition-all shrink-0
+                    ${isIncorrect 
+                      ? 'bg-black/20 border-white/5 opacity-30 grayscale cursor-not-allowed' 
+                      : 'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer'
+                    }
+                  `}
+                >
+                  {isSpinning && (
+                    <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    </div>
+                  )}
+                  <img
+                    src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
+                    alt={emote.name}
+                    className="w-6 h-6 object-contain"
+                  />
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
