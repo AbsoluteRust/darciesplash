@@ -1,220 +1,123 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import ProfileCard from '@/components/ProfileCard';
+import { useState } from 'react';
 
-export default function PuzzleGame({ 
-  state, 
-  allStaticEmotes, 
-  isFocused 
-}: { 
-  state: any; 
-  allStaticEmotes?: any[];
+function formatEmote(emote: any) {
+  if (!emote) return '❓';
+  return `<${emote.animated ? 'a' : ''}:${emote.name}:${emote.id}>`;
+}
+
+export default function PuzzleGame({
+  state,
+  allStaticEmotes,
+  isFocused,
+}: {
+  state: any;
+  allStaticEmotes: any[];
   isFocused: boolean;
 }) {
   const [hoveredCell, setHoveredCell] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState('');
-  const [selectedCard, setSelectedCard] = useState<any>(null);
-  const [cardsData, setCardsData] = useState<any[]>([]);
 
-  useEffect(() => {
-    fetch('/api/cards/list')
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setCardsData(Array.isArray(data) ? data : []))
-      .catch(() => setCardsData([]));
-  }, []);
+  if (!state) return null;
 
-  useEffect(() => {
-    if (state.solved) {
-      setTimeLeft('Solved!');
-      return;
-    }
+  const width = state.width;
+  const height = state.height;
+  const revealedCells = new Set(state.revealedCells || []);
+  const guessesByCell = state.guessesByCell || {};
 
-    const timer = setInterval(() => {
-      if (!state.weekStart) return;
-      const now = new Date();
-      const weekStart = new Date(state.weekStart + 'T00:00:00Z');
-      
-      const friday = new Date(weekStart.getTime() + 5 * 86400000 + 13 * 3600000);
-      const saturday = new Date(weekStart.getTime() + 6 * 86400000 + 13 * 3600000);
-      const nextWeek = new Date(weekStart.getTime() + 7 * 86400000 + 8 * 3600000);
-
-      let target = nextWeek;
-      if (now < friday) target = friday;
-      else if (now < saturday) target = saturday;
-
-      const diff = target.getTime() - now.getTime();
-      if (diff <= 0) { setTimeLeft('Event starting...'); return; }
-      
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff / 3600000) % 24);
-      const m = Math.floor((diff / 60000) % 60);
-      const s = Math.floor((diff / 1000) % 60);
-      
-      setTimeLeft(`${d > 0 ? d + 'd ' : ''}${h}h ${m}m ${s}s`);
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [state.weekStart, state.solved]);
-
-  const handleGuess = async (emoteId: string) => {
-    if (!isFocused || state.solved) return;
-    
-    const res = await fetch('/api/games/guess', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emoteId, game: 'puzzle' }),
-    });
-    const data = await res.json();
-    if (data.error) alert(data.error);
-  };
-
-  const openCardModal = (emoteName: string) => {
-    if (!emoteName || !Array.isArray(cardsData)) return;
-    const card = cardsData.find(c => c.name.toLowerCase() === emoteName.toLowerCase());
-    if (card) setSelectedCard(card);
-  };
-
-  const currentCell = state.nextCell;
-  const currentGuesses = (state.guessesByCell || {})[currentCell] || [];
-
-  const emotesToDisplay = (allStaticEmotes && allStaticEmotes.length > 0) 
-    ? allStaticEmotes 
-    : (state.poolEmotes || []);
-
-  const getEmoteUrl = (id: string) => {
-    const emote = emotesToDisplay.find(e => e.id === id);
-    if (!emote) return "";
-    return `https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`;
-  };
-
-  // Replicate Discord's logic for showing the emote counts
-  const revealedLegend: { emote: any, count: string | number }[] = [];
-  const processedIds = new Set();
-
-  // 1. Guessed emotes
-  if (state.revealedCounts) {
-    for (const id of Object.keys(state.revealedCounts)) {
-      const emote = emotesToDisplay.find(e => e.id === id);
-      if (emote) {
-        revealedLegend.push({ emote, count: state.emoteCounts?.[id] || 0 });
-        processedIds.add(id);
+  // Helper to group multiple guesses by the same user
+  const groupGuesses = (guesses: any[]) => {
+    const grouped: Record<string, { username: string; emotes: string[] }> = {};
+    for (const g of guesses) {
+      if (!grouped[g.userId]) {
+        grouped[g.userId] = { username: g.username || 'User', emotes: [] };
       }
+      grouped[g.userId].emotes.push(g.emoteId);
     }
-  }
+    return Object.values(grouped);
+  };
 
-  // 2. Friday reveal
-  if (state.fridayReveal && !processedIds.has(state.fridayReveal)) {
-    const emote = emotesToDisplay.find(e => e.id === state.fridayReveal);
-    if (emote) {
-      revealedLegend.push({ emote, count: '?' });
-      processedIds.add(state.fridayReveal);
-    }
-  }
-
-  // 3. Saturday reveal
-  if (state.saturdayReveal && !processedIds.has(state.saturdayReveal)) {
-    const emote = emotesToDisplay.find(e => e.id === state.saturdayReveal);
-    if (emote) {
-      revealedLegend.push({ emote, count: state.emoteCounts?.[state.saturdayReveal] || 0 });
-      processedIds.add(state.saturdayReveal);
-    }
-  }
+  const renderEmote = (id: string) => {
+    const emote = allStaticEmotes.find((e) => e.id === id);
+    if (!emote) return <span className="text-white/50 text-xs">?</span>;
+    return (
+      <img
+        src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
+        alt={emote.name}
+        className="w-8 h-8 object-contain"
+      />
+    );
+  };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-between gap-6 overflow-y-auto custom-scrollbar pb-6">
+    <div className="flex flex-col items-center w-full gap-6">
       
-      {/* Timer & Emote Counts Header */}
-      <div className="flex flex-col items-center gap-3 shrink-0">
-        <div className={`text-xl font-mono px-6 py-2 rounded-full border shadow-lg transition-colors ${
-          state.solved 
-            ? 'text-green-400 bg-green-950/30 border-green-800' 
-            : 'text-cyan-400 bg-cyan-950/30 border-cyan-800'
-        }`}>
-          {state.solved ? '🎉 Puzzle Solved!' : `Next Event: ${timeLeft || 'Loading...'}`}
-        </div>
-
-        {revealedLegend.length > 0 && (
-          <div className="flex flex-col items-center bg-[#181820] px-4 py-2 rounded-xl border border-white/10 animate-in fade-in slide-in-from-top-2">
-            <span className="text-[10px] text-white/50 uppercase tracking-wider font-bold mb-1.5">Revealed Emote Counts</span>
-            <div className="flex flex-wrap justify-center gap-3">
-              {revealedLegend.map((item, i) => (
-                <div key={i} className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
-                  <img 
-                    src={`https://cdn.discordapp.com/emojis/${item.emote.id}.${item.emote.animated ? 'gif' : 'png'}`} 
-                    className="w-5 h-5" 
-                    alt={item.emote.name} 
-                  />
-                  <span className="text-sm font-bold text-white font-mono">{item.count}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      {/* Grid Info */}
+      <div className="text-center text-sm text-white/60">
+        <p>Grid size: <strong className="text-white">{width}×{height}</strong></p>
+        <p>Progress: <strong className="text-white">{revealedCells.size}/{width * height}</strong></p>
       </div>
 
-      {/* Grid */}
+      {/* The Grid */}
       <div 
-        className="grid gap-2 bg-black/40 p-4 rounded-2xl border border-white/5 shrink-0" 
-        style={{ gridTemplateColumns: `repeat(${state.width || 5}, minmax(0, 1fr))` }}
+        className="grid gap-2 bg-[#0a0a14] p-4 rounded-2xl border border-white/10 shadow-2xl"
+        style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}
       >
-        {(state.gridEmotes || []).map((row: any[], r: number) => 
-          (row || []).map((emote: any, c: number) => {
-            const idx = r * state.width + c;
-            const isRevealed = (state.revealedCells || []).includes(idx);
-            const isCurrent = currentCell === idx;
-            const guesses = (state.guessesByCell || {})[idx] || [];
+        {state.grid.map((row: (string | null)[], r: number) =>
+          row.map((id: string | null, c: number) => {
+            const idx = r * width + c;
+            const isRevealed = revealedCells.has(idx);
+            const cellGuesses = guessesByCell[idx] || [];
+            const grouped = groupGuesses(cellGuesses);
 
             return (
               <div 
-                key={idx}
+                key={idx} 
+                className="relative group flex justify-center"
                 onMouseEnter={() => setHoveredCell(idx)}
                 onMouseLeave={() => setHoveredCell(null)}
-                className={`
-                  relative w-12 h-12 md:w-16 md:h-16 rounded-xl flex items-center justify-center text-2xl transition-all
-                  ${isCurrent && !state.solved ? 'bg-indigo-600/30 border-2 border-indigo-400 animate-pulse' : 
-                    isRevealed ? 'bg-white/10 border border-white/20' : 'bg-white/5 border border-white/5'}
-                `}
               >
-                {isRevealed ? (
-                  <button 
-                    onClick={() => openCardModal(emote.name)}
-                    className="w-full h-full flex items-center justify-center hover:scale-110 transition"
-                  >
-                    <img 
-                      src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
-                      className="w-10 h-10 md:w-12 md:h-12 drop-shadow-md"
-                      alt={emote.name}
-                    />
-                  </button>
-                ) : (
-                  <span className="opacity-50 text-white/50">❓</span>
-                )}
+                {/* The Cell Itself */}
+                <div 
+                  className={`
+                    w-12 h-12 flex items-center justify-center rounded-lg border transition-colors
+                    ${isRevealed 
+                      ? 'bg-white/10 border-white/30' 
+                      : 'bg-black/40 border-white/10 hover:border-white/30 cursor-help'
+                    }
+                  `}
+                >
+                  {isRevealed && id ? renderEmote(id) : <span className="text-white/30 text-lg">❓</span>}
+                </div>
 
-                {hoveredCell === idx && !isRevealed && isFocused && (
-                  <div className="absolute bottom-full mb-2 w-56 bg-[#181820] text-xs text-white p-3 rounded-xl border border-white/20 z-50 shadow-2xl pointer-events-none">
-                    <p className="font-bold border-b border-white/10 pb-2 mb-2 text-indigo-300">Guesses for this cell:</p>
-                    {guesses.length === 0 ? <p className="opacity-50 italic">No guesses yet.</p> : (
-                      <ul className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
-                        {guesses.map((g: any, i: number) => (
-                          <li key={i} className="flex items-center justify-between gap-2">
-                            <span className="truncate max-w-[80px]">{g.username}</span>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              {g.emoteId && (
-                                <img 
-                                  src={getEmoteUrl(g.emoteId)} 
-                                  className="w-5 h-5 opacity-90" 
-                                  alt="guess"
+                {/* The Tooltip */}
+                {!isRevealed && grouped.length > 0 && (
+                  <div className="absolute bottom-full pb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity z-50">
+                    <div className="bg-[#181820] border border-white/20 rounded-xl p-3 shadow-2xl w-48 max-h-40 overflow-y-auto custom-scrollbar">
+                      <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-2 sticky top-0 bg-[#181820]">
+                        Guesses
+                      </p>
+                      {grouped.map((user) => (
+                        <div key={user.username} className="flex items-start gap-2 mb-2 last:mb-0">
+                          <span className="text-xs text-white/70 font-semibold truncate max-w-[80px]" title={user.username}>
+                            {user.username}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {user.emotes.map((emoteId, eIdx) => {
+                              const emote = allStaticEmotes.find((e) => e.id === emoteId);
+                              return emote ? (
+                                <img
+                                  key={eIdx}
+                                  src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
+                                  className="w-4 h-4 object-contain"
+                                  alt={emote.name}
                                 />
-                              )}
-                              <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>
-                                {g.isCorrect ? '✓' : '✗'}
-                              </span>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -223,77 +126,20 @@ export default function PuzzleGame({
         )}
       </div>
 
-      {/* Emote Keyboard */}
-      <div className="w-full max-w-2xl bg-[#181820] p-4 rounded-2xl border border-white/10 shrink-0">
-        <p className="text-xs text-center text-white/50 mb-3 uppercase tracking-wider font-bold">
-          Select an Emote ({emotesToDisplay.length})
-        </p>
-        <div className="flex flex-wrap justify-center gap-2 max-h-48 overflow-y-auto custom-scrollbar p-2">
-          {emotesToDisplay.map((emote: any) => {
-            const isIncorrect = currentGuesses.some((g: any) => g.emoteId === emote.id && !g.isCorrect);
-            
-            const totalInGrid = state.emoteCounts?.[emote.id] || 0;
-            let revealedCount = 0;
-            for (const idx of (state.revealedCells || [])) {
-              const r = Math.floor(idx / state.width);
-              const c = idx % state.width;
-              if (state.gridEmotes?.[r]?.[c]?.id === emote.id) {
-                revealedCount++;
-              }
-            }
-            const isUsedUp = totalInGrid > 0 && revealedCount >= totalInGrid;
-
-            return (
-              <button
-                key={emote.id}
-                disabled={isIncorrect || isUsedUp || !isFocused || state.solved}
-                onClick={() => handleGuess(emote.id)}
-                className={`
-                  p-2 rounded-xl border transition-all
-                  ${isIncorrect || isUsedUp ? 'opacity-20 grayscale cursor-not-allowed border-transparent bg-black' : 
-                    'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 active:scale-95 cursor-pointer'}
-                `}
-              >
-                <img 
-                  src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`} 
-                  className="w-8 h-8" 
-                  alt={emote.name}
-                />
-              </button>
-            );
-          })}
-        </div>
+      {/* Status / Rules */}
+      <div className="text-center max-w-sm text-sm text-white/50 space-y-2">
+        {state.solved ? (
+          <p className="text-green-400 font-bold text-lg">🎉 Puzzle Solved!</p>
+        ) : (
+          <>
+            <p>Post a single static emote in the Discord thread to guess the next cell.</p>
+            <p>
+              Each player has <strong className="text-white">4</strong> guesses +<strong className="text-white">1 per day</strong>.
+            </p>
+          </>
+        )}
       </div>
 
-      {/* Card Modal */}
-      {selectedCard && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in" 
-          onClick={() => setSelectedCard(null)}
-        >
-          <div 
-            className="w-full max-w-sm animate-in zoom-in-95" 
-            onClick={e => e.stopPropagation()}
-          >
-            <ProfileCard
-              name={selectedCard.name}
-              title={selectedCard.type}
-              handle={selectedCard.name.toLowerCase().replace(/\s+/g, '-')}
-              status="Online"
-              contactText="Close"
-              avatarUrl={selectedCard.thumbUrl || selectedCard.image}
-              rarity={selectedCard.rarity}
-              showUserInfo={false}
-              enableTilt={true}
-              behindGlowColor="#fff"
-              iconUrl={null}
-              behindGlowEnabled
-              isModal={true}
-              onContactClick={() => setSelectedCard(null)}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
