@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useCollectionFilter } from '@/components/CollectionFilterContext';
 
 export default function PuzzleGame({
   state,
@@ -11,7 +12,47 @@ export default function PuzzleGame({
   allStaticEmotes: any[];
   isFocused: boolean;
 }) {
+  const { userId } = useCollectionFilter();
   const [isGuessing, setIsGuessing] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [guessFeedback, setGuessFeedback] = useState<'correct' | 'incorrect' | null>(null);
+
+  // Handle the countdown timer for the next guess
+  useEffect(() => {
+    if (!state || !userId) return;
+
+    const used = state.guesses[userId] || 0;
+    const daysSinceStart = Math.floor((Date.now() - state.startedAt) / (24 * 60 * 60 * 1000));
+    const totalBudget = 4 + Math.max(0, daysSinceStart);
+    const remaining = totalBudget - used;
+
+    if (remaining > 0) {
+      setTimeLeft('');
+      return; // No timer needed if they have guesses left
+    }
+
+    const nextGuessTime = state.startedAt + (daysSinceStart + 1) * 24 * 60 * 60 * 1000;
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = nextGuessTime - now;
+      
+      if (diff <= 0) {
+        setTimeLeft('00:00:00');
+        return;
+      }
+      
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff / 1000 / 60) % 60);
+      const s = Math.floor((diff / 1000) % 60);
+      
+      setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const int = setInterval(updateTimer, 1000);
+    return () => clearInterval(int);
+  }, [state, userId]);
 
   if (!state) return null;
 
@@ -28,6 +69,12 @@ export default function PuzzleGame({
       .filter((g: any) => !g.isCorrect)
       .map((g: any) => g.emoteId)
   );
+
+  // Calculate user guesses
+  const used = state.guesses[userId || ''] || 0;
+  const daysSinceStart = Math.floor((Date.now() - state.startedAt) / (24 * 60 * 60 * 1000));
+  const totalBudget = 4 + Math.max(0, daysSinceStart);
+  const remaining = totalBudget - used;
 
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
@@ -54,8 +101,11 @@ export default function PuzzleGame({
   };
 
   const handleGuess = async (emoteId: string) => {
-    if (!isFocused || state.solved || isGuessing) return;
+    if (!isFocused || state.solved || isGuessing || remaining <= 0) return;
+    
     setIsGuessing(emoteId);
+    setGuessFeedback(null);
+
     try {
       const res = await fetch('/api/games/guess', {
         method: 'POST',
@@ -63,7 +113,11 @@ export default function PuzzleGame({
         body: JSON.stringify({ emoteId, game: 'puzzle' }),
       });
       const data = await res.json();
-      if (!res.ok) {
+      
+      if (res.ok && data.isCorrect !== undefined) {
+        setGuessFeedback(data.isCorrect ? 'correct' : 'incorrect');
+        setTimeout(() => setGuessFeedback(null), 1500);
+      } else {
         alert(data.error || 'Guess failed');
       }
     } finally {
@@ -74,15 +128,40 @@ export default function PuzzleGame({
   return (
     <div className="flex flex-col items-center w-full gap-6">
       
-      {/* Grid Info */}
-      <div className="text-center text-sm text-white/60">
-        <p>Grid size: <strong className="text-white">{width}×{height}</strong></p>
-        <p>Progress: <strong className="text-white">{revealedCells.size}/{width * height}</strong></p>
+      {/* Guesses Indicator */}
+      <div className="flex items-center justify-center gap-4 bg-[#0a0a14] border border-white/10 rounded-2xl px-6 py-3 shadow-lg">
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider mb-0.5">Your Guesses</p>
+          {remaining > 0 ? (
+            <p className="text-xl font-bold text-indigo-400">
+              {remaining} <span className="text-sm text-white/40 font-normal">left</span>
+            </p>
+          ) : (
+            <p className="text-lg font-mono font-bold text-red-400">
+              {timeLeft || '00:00:00'}
+            </p>
+          )}
+        </div>
+        <div className="w-px h-8 bg-white/10" />
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider mb-0.5">Grid Size</p>
+          <p className="text-xl font-bold text-white">{width}×{height}</p>
+        </div>
+        <div className="w-px h-8 bg-white/10" />
+        <div className="text-center">
+          <p className="text-[10px] font-bold text-white/50 uppercase tracking-wider mb-0.5">Progress</p>
+          <p className="text-xl font-bold text-green-400">{revealedCells.size}/{width * height}</p>
+        </div>
       </div>
 
       {/* The Grid */}
       <div 
-        className="grid gap-2 bg-[#0a0a14] p-4 rounded-2xl border border-white/10 shadow-2xl"
+        className={`
+          grid gap-2 bg-[#0a0a14] p-4 rounded-2xl border transition-all duration-300 shadow-2xl
+          ${guessFeedback === 'correct' ? 'border-green-500 ring-4 ring-green-500/30 shadow-[0_0_40px_rgba(34,197,94,0.4)] scale-[1.02]' : ''}
+          ${guessFeedback === 'incorrect' ? 'border-red-500 ring-4 ring-red-500/30 shadow-[0_0_40px_rgba(239,68,68,0.4)] translate-x-1' : ''}
+          ${!guessFeedback ? 'border-white/10 scale-100 translate-x-0' : ''}
+        `}
         style={{ gridTemplateColumns: `repeat(${width}, minmax(0, 1fr))` }}
       >
         {state.grid.map((row: (string | null)[], r: number) =>
@@ -110,7 +189,7 @@ export default function PuzzleGame({
                   {isRevealed && id ? renderEmote(id) : <span className="text-white/30 text-lg">❓</span>}
                 </div>
 
-                {/* The Tooltip (with pb-2 bridge to keep hover active) */}
+                {/* The Tooltip */}
                 {!isRevealed && grouped.length > 0 && (
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 pb-2 z-50 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="bg-[#181820] border border-white/20 rounded-xl p-3 shadow-2xl w-56 max-h-40 overflow-y-auto custom-scrollbar pointer-events-auto">
@@ -181,16 +260,17 @@ export default function PuzzleGame({
             {allStaticEmotes.map((emote: any) => {
               const isIncorrect = incorrectEmotes.has(emote.id);
               const isSpinning = isGuessing === emote.id;
+              const noGuessesLeft = remaining <= 0;
 
               return (
                 <button
                   key={emote.id}
-                  disabled={isIncorrect || state.solved || !!isGuessing}
+                  disabled={isIncorrect || state.solved || !!isGuessing || noGuessesLeft}
                   onClick={() => handleGuess(emote.id)}
                   title={emote.name}
                   className={`
                     relative w-10 h-10 rounded-lg flex items-center justify-center border transition-all shrink-0
-                    ${isIncorrect 
+                    ${isIncorrect || noGuessesLeft
                       ? 'bg-black/20 border-white/5 opacity-30 grayscale cursor-not-allowed' 
                       : 'bg-white/5 border-white/10 hover:bg-white/20 hover:scale-110 cursor-pointer'
                     }
