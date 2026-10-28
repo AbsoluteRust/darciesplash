@@ -911,3 +911,18 @@
 
 .pc-card-wrapper--rarity-contraband { --rarity-color: #000000; }
 .pc-rarity-badge--contraband { --rarity-color: #000000; }
+
+/* Ensure the Legendary colour reveal matches Splash Art and Wallpaper dimensions */
+.pc-card.is-splash .pc-colour-reveal img,
+.pc-card.is-wallpaper .pc-colour-reveal img {
+  height: 72%;
+  object-fit: cover;
+}
+
+.pc-card.is-splash .pc-colour-reveal img {
+  object-position: center;
+}
+
+.pc-card.is-wallpaper .pc-colour-reveal img {
+  object-position: 50% 27%;
+}

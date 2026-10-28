@@ -495,7 +495,7 @@ const ProfileCardComponent = ({
             </div>
           </div>
 
-          {rarity === 'Legendary' && isEmoteLike && !isModal && (
+          {rarity === 'Legendary' && !isModal && (
             <div className="pc-colour-reveal" aria-hidden="true">
               <img
                 src={optimizedUrl(avatarUrl, 828)}
