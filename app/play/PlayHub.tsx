@@ -2,22 +2,37 @@
 
 import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
+import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import PuzzleGame from './PuzzleGame';
 import DropGame from './DropGame';
 import PackArea from './PackArea';
 
 export default function PlayHub({ signedIn }: { signedIn: boolean }) {
+  const { userId } = useCollectionFilter();
   const [focused, setFocused] = useState<'pack' | 'puzzle' | 'drop'>('pack');
   const [liveState, setLiveState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Group State
+  const [groupLobby, setGroupLobby] = useState<any>(null);
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+  const [startingGroup, setStartingGroup] = useState(false);
 
   useEffect(() => {
     if (!signedIn) return;
     const fetchState = async () => {
       try {
-        const res = await fetch('/api/games/state');
-        if (res.ok) {
-          setLiveState(await res.json());
+        const [stateRes, groupRes] = await Promise.all([
+          fetch('/api/games/state'),
+          fetch('/api/games/group/status')
+        ]);
+        if (stateRes.ok) setLiveState(await stateRes.json());
+        if (groupRes.ok) {
+          const groupData = await groupRes.json();
+          setGroupLobby(groupData);
+          if (groupData.active) {
+            setTimeLeft(Math.max(0, Math.ceil((groupData.endsAt - Date.now()) / 1000)));
+          }
         }
       } catch (err) {
       } finally {
@@ -25,9 +40,43 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
       }
     };
     fetchState();
-    const int = setInterval(fetchState, 5000);
+    const int = setInterval(fetchState, 2000);
     return () => clearInterval(int);
   }, [signedIn]);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!groupLobby?.active) return;
+    const int = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((groupLobby.endsAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+    }, 1000);
+    return () => clearInterval(int);
+  }, [groupLobby]);
+
+  const handleJoinGroup = async () => {
+    if (!userId || startingGroup) return;
+    setStartingGroup(true);
+    try {
+      const res = await fetch('/api/games/group/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGroupLobby(data);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to join group.');
+      }
+    } finally {
+      setStartingGroup(false);
+    }
+  };
+
+  const isInGroup = groupLobby?.participants?.includes(userId);
+  const groupActive = groupLobby?.active && isInGroup;
 
   const panelClass = (id: string) => `
     transition-all duration-500 ease-in-out relative bg-[#0a0a14]/80 border border-white/10 rounded-3xl
@@ -77,12 +126,61 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
 
         {/* Center: Pack Opening */}
         <div className={panelClass('pack')} onClick={() => setFocused('pack')}>
-          <h2 className="text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 mb-6 lg:mb-8 tracking-widest uppercase w-full text-center">
-            Open Packs
-          </h2>
-          
-          <PackArea />
+          <div className="flex flex-col items-center justify-center mb-6 w-full">
+            <div className="flex items-center justify-center gap-4">
+              <h2 className="text-2xl lg:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 tracking-widest uppercase">
+                Open Packs
+              </h2>
+              <button 
+                onClick={(e) => { e.stopPropagation(); if (!groupActive) handleJoinGroup(); }}
+                disabled={groupActive || startingGroup}
+                className={`
+                  text-sm lg:text-lg font-black tracking-widest uppercase transition-all duration-300
+                  ${groupActive
+                    ? 'text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 drop-shadow-[0_0_10px_rgba(234,179,8,0.5)] cursor-default'
+                    : 'text-white/20 hover:text-white/50'
+                  }
+                `}
+              >
+                WITH FRIENDS!
+              </button>
+            </div>
 
+            {/* Group Lobby UI */}
+            {groupActive && (
+              <div className="mt-6 flex flex-col items-center bg-[#181820] border border-indigo-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-fadeIn">
+                <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-1">Group Pack Opening</p>
+                <p className="text-5xl font-black font-mono text-white mb-4">
+                  {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                </p>
+                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                  {groupLobby.participants.map((id: string) => (
+                    <span key={id} className={`px-3 py-1 rounded-full text-xs font-bold ${id === userId ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/70'}`}>
+                      {id === userId ? 'You' : 'Player'}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-center text-sm text-white/60 mb-4">
+                  {groupLobby.participants.length > 1 
+                    ? "Everyones' packs will open simultaneously when the timer ends, with chances at bonus loot!"
+                    : "Waiting for others to join... Click 'WITH FRIENDS!' to invite them!"}
+                </p>
+              </div>
+            )}
+
+            {/* Results Screen */}
+            {groupLobby?.results && isInGroup && !groupLobby.active && (
+              <div className="mt-6 flex flex-col items-center bg-[#181820] border border-green-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+                <p className="text-xl font-bold text-green-400 mb-2">Session Ended!</p>
+                <p className="text-center text-sm text-white mb-4">{groupLobby.results.bonusMessage}</p>
+                <button onClick={() => setGroupLobby(null)} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition">
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
+
+          <PackArea groupActive={groupActive} groupTimeLeft={timeLeft} />
         </div>
 
         {/* Right: Random Drops */}

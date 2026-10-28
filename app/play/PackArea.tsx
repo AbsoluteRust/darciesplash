@@ -10,7 +10,7 @@ type MiniPack = {
   cards: { name: string; rarity: string; collection: string; image?: string }[];
 };
 
-export default function PackArea() {
+export default function PackArea({ groupActive, groupTimeLeft }: { groupActive?: boolean; groupTimeLeft?: number }) {
   const [packs, setPacks] = useState<MiniPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<'regular' | 'minipack'>('regular');
@@ -40,10 +40,23 @@ export default function PackArea() {
     fetchPacks();
   }, []);
 
-  // Handle Hold Timer
+  // Handle Group Hold Automation
+  useEffect(() => {
+    if (groupActive && groupTimeLeft !== undefined) {
+      if (groupTimeLeft <= 2 && groupTimeLeft > 0) {
+        setIsHolding(true);
+      } else {
+        setIsHolding(false);
+      }
+    } else {
+      setIsHolding(false);
+    }
+  }, [groupActive, groupTimeLeft]);
+
+  // Handle Hold Timer (For manual mini-pack opening)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (isHolding && selected === 'minipack') {
+    if (isHolding && !groupActive && selected === 'minipack') {
       interval = setInterval(() => {
         setProgress((p) => {
           if (p >= 1) {
@@ -51,21 +64,31 @@ export default function PackArea() {
             handleOpenMinipack();
             return 0;
           }
-          return p + 0.05; // 50ms * 20 = 2 seconds total
+          return p + 0.05;
+        });
+      }, 50);
+    } else if (groupActive && isHolding) {
+      // For group, just animate the progress bar filling up over 2 seconds
+      interval = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 1) {
+            clearInterval(interval);
+            return 1; // Hold at 100% until server resolves
+          }
+          return p + 0.05;
         });
       }, 50);
     } else {
       setProgress(0);
     }
     return () => clearInterval(interval);
-  }, [isHolding, selected]);
+  }, [isHolding, selected, groupActive]);
 
   const handleOpenMinipack = async () => {
     if (packs.length === 0 || opening) return;
     setIsHolding(false);
     setOpening(true);
 
-    // Always open the oldest pack (first in the list)
     const packId = packs[0]?.id;
     if (!packId) {
       setOpening(false);
@@ -81,9 +104,8 @@ export default function PackArea() {
       const data = await res.json();
       
       if (res.ok && Array.isArray(data.cards)) {
-        // Filter out any null/undefined cards that might have been returned
         setRevealedCards(data.cards.filter(Boolean));
-        setPacks(prev => prev.slice(1)); // Remove opened pack
+        setPacks(prev => prev.slice(1));
       } else if (res.ok) {
         alert('Pack opened, but no cards were returned.');
         setPacks(prev => prev.slice(1));
@@ -100,10 +122,8 @@ export default function PackArea() {
 
   const handleDone = () => {
     setRevealedCards(null);
-    if (packs.length === 0) {
-      setSelected('regular');
-    }
-    fetchPacks(); // Re-verify to update UI if no packs left
+    if (packs.length === 0) setSelected('regular');
+    fetchPacks();
   };
 
   if (loading) return <div className="text-white/50 animate-pulse">Loading...</div>;
@@ -114,44 +134,76 @@ export default function PackArea() {
 
   // If no minipacks, default to the original PlayButton
   if (packs.length === 0) {
-    return <PlayButton />;
+    return (
+      <motion.div
+        animate={groupActive && isHolding ? {
+          x: [0, -3, 3, -3, 3, 0],
+          y: [0, 2, -2, 2, -2, 0],
+          rotate: [0, -1, 1, -1, 1, 0]
+        } : {}}
+        transition={{ repeat: groupActive && isHolding ? Infinity : 0, duration: 0.15 }}
+        className={`relative ${groupActive ? 'pointer-events-none' : ''}`}
+      >
+        <PlayButton />
+        {groupActive && (
+          <div 
+            className="absolute bottom-0 left-0 h-1.5 bg-indigo-500 transition-opacity duration-150"
+            style={{ width: `${progress * 100}%`, opacity: progress > 0 ? 1 : 0 }}
+          />
+        )}
+      </motion.div>
+    );
   }
 
   return (
     <div className="flex flex-col sm:flex-row gap-6 sm:gap-12 w-full justify-center items-center h-full pb-10">
       
       {/* Regular Pack */}
-      <div
-        onClick={() => setSelected('regular')}
+      <motion.div
+        onClick={() => !groupActive && setSelected('regular')}
+        animate={groupActive && isHolding ? {
+          x: [0, -3, 3, -3, 3, 0],
+          y: [0, 2, -2, 2, -2, 0],
+          rotate: [0, -1, 1, -1, 1, 0]
+        } : {}}
+        transition={{ repeat: groupActive && isHolding ? Infinity : 0, duration: 0.15 }}
         className={`
-          transition-all duration-300 flex items-center justify-center cursor-pointer
+          transition-all duration-300 flex items-center justify-center relative
+          ${groupActive ? 'pointer-events-none' : 'cursor-pointer'}
           ${selected === 'regular' ? 'scale-100' : 'scale-90 opacity-30 grayscale pointer-events-none'}
         `}
       >
         <PlayButton />
-      </div>
+        {groupActive && (
+          <div 
+            className="absolute bottom-0 left-0 h-1.5 bg-indigo-500 transition-opacity duration-150"
+            style={{ width: `${progress * 100}%`, opacity: progress > 0 ? 1 : 0 }}
+          />
+        )}
+      </motion.div>
 
       {/* Mini Pack Card */}
       <motion.div
         onPointerDown={(e) => {
           e.preventDefault();
+          if (groupActive) return;
           if (!opening) {
             if (selected !== 'minipack') setSelected('minipack');
             else setIsHolding(true);
           }
         }}
-        onPointerUp={() => setIsHolding(false)}
-        onPointerLeave={() => setIsHolding(false)}
-        onPointerCancel={() => setIsHolding(false)}
+        onPointerUp={() => !groupActive && setIsHolding(false)}
+        onPointerLeave={() => !groupActive && setIsHolding(false)}
+        onPointerCancel={() => !groupActive && setIsHolding(false)}
         animate={
-          isHolding ? {
+          isHolding && selected === 'minipack' && !groupActive ? {
             x: [0, -3, 3, -3, 3, 0],
             y: [0, 2, -2, 2, -2, 0],
             rotate: [0, -1, 1, -1, 1, 0]
           } : {}
         }
         transition={{
-          repeat: isHolding ? Infinity : 0,
+          repeat: isHolding && selected === 'minipack' && !groupActive ? Infinity : 0,
           duration: 0.15
         }}
         className={`
@@ -162,6 +214,7 @@ export default function PackArea() {
             : 'bg-[#0a0a14] border-white/10 scale-90 opacity-30 grayscale cursor-pointer hover:opacity-70 hover:scale-95'
           }
           ${opening ? 'opacity-50 cursor-wait' : ''}
+          ${groupActive ? 'opacity-30 grayscale pointer-events-none' : ''}
         `}
       >
         <span className={`text-5xl mb-4 transition-transform duration-300 ${selected === 'minipack' ? 'scale-110' : 'scale-100'}`}>
@@ -171,16 +224,12 @@ export default function PackArea() {
           Mini Pack
         </span>
         <span className={`text-xs text-center mt-2 ${selected === 'minipack' ? 'text-indigo-300' : 'text-white/30'}`}>
-          {opening ? 'Opening...' : 'Hold to open'}
+          {opening ? 'Opening...' : groupActive ? 'Group active' : 'Hold to open'}
         </span>
 
-        {/* Progress Bar */}
         <div 
           className="absolute bottom-0 left-0 h-1.5 bg-indigo-500 transition-opacity duration-150"
-          style={{ 
-            width: `${progress * 100}%`,
-            opacity: progress > 0 ? 1 : 0 
-          }}
+          style={{ width: `${progress * 100}%`, opacity: progress > 0 ? 1 : 0 }}
         />
       </motion.div>
 
