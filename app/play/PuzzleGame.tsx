@@ -146,6 +146,34 @@ export default function PuzzleGame({
         )}
       </div>
 
+      {/* Revealed Emotes Counts */}
+      {state.revealedCounts && Object.keys(state.revealedCounts).length > 0 && (
+        <div className="w-full max-w-lg p-4 bg-[#0a0a14] border border-white/10 rounded-2xl flex flex-col gap-3">
+          <p className="text-xs font-bold text-white/50 uppercase tracking-wider">Revealed Emotes</p>
+          <div className="flex flex-wrap gap-3">
+            {Object.keys(state.revealedCounts).map((emoteId) => {
+              const emote = allStaticEmotes.find((e) => e.id === emoteId);
+              const count = state.emoteCounts?.[emoteId] || 0;
+              return (
+                <div key={emoteId} className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                  {emote ? (
+                    <img
+                      src={`https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? 'gif' : 'png'}`}
+                      className="w-6 h-6 object-contain"
+                      alt={emote.name}
+                    />
+                  ) : (
+                    <span className="w-6 h-6 flex items-center justify-center text-white/50 text-xs">?</span>
+                  )}
+                  <span className="text-white font-bold">{count}</span>
+                  <span className="text-white/40 text-xs">in grid</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* The Keyboard (All Server Emotes) */}
       {!state.solved && (
         <div className="w-full max-w-2xl mt-2">
