@@ -13,7 +13,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const [liveState, setLiveState] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Group State
   const [groupLobby, setGroupLobby] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startingGroup, setStartingGroup] = useState(false);
@@ -44,7 +43,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     return () => clearInterval(int);
   }, [signedIn]);
 
-  // Timer countdown
   useEffect(() => {
     if (!groupLobby?.active) return;
     const int = setInterval(() => {
@@ -75,7 +73,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     }
   };
 
-  const isInGroup = groupLobby?.participants?.includes(userId);
+  const isInGroup = groupLobby?.participants?.includes(userId) && groupLobby.participants.length > 0;
   const groupActive = groupLobby?.active && isInGroup;
 
   const panelClass = (id: string) => `
@@ -110,7 +108,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 w-full gap-4 overflow-hidden p-4 lg:p-0 min-h-0">
-        {/* Left: Weekly Puzzle */}
         <div className={panelClass('puzzle')} onClick={() => setFocused('puzzle')}>
           <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 lg:mb-6 w-full text-center">Weekly Puzzle</h2>
           {liveState?.puzzle ? (
@@ -124,7 +121,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           )}
         </div>
 
-        {/* Center: Pack Opening */}
         <div className={panelClass('pack')} onClick={() => setFocused('pack')}>
           <div className="flex flex-col items-center justify-center mb-6 w-full">
             <div className="flex items-center justify-center gap-4">
@@ -146,7 +142,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
               </button>
             </div>
 
-            {/* Group Lobby UI */}
             {groupActive && (
               <div className="mt-6 flex flex-col items-center bg-[#181820] border border-indigo-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-fadeIn">
                 <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-1">Group Pack Opening</p>
@@ -168,11 +163,37 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
               </div>
             )}
 
-            {/* Results Screen */}
-            {groupLobby?.results && isInGroup && !groupLobby.active && (
+            {groupLobby?.results && isInGroup && !groupActive && (
               <div className="mt-6 flex flex-col items-center bg-[#181820] border border-green-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(34,197,94,0.15)]">
-                <p className="text-xl font-bold text-green-400 mb-2">Session Ended!</p>
-                <p className="text-center text-sm text-white mb-4">{groupLobby.results.bonusMessage}</p>
+                <p className="text-xl font-bold text-green-400 mb-4">Session Ended!</p>
+                
+                <div className="flex flex-col gap-3 mb-6 w-full">
+                  {groupLobby.results.bonusLoot?.length > 0 ? (
+                    groupLobby.results.bonusLoot.map((loot: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
+                        <span className="text-white/80 font-medium text-sm">{loot.label}</span>
+                        <div className="flex -space-x-2">
+                          {loot.users.map((uid: string) => {
+                            const profile = groupLobby.results.participants.find((p: any) => p.id === uid);
+                            if (!profile) return null;
+                            return (
+                              <img
+                                key={uid}
+                                src={profile.avatarUrl}
+                                alt={profile.name}
+                                title={profile.name}
+                                className="w-8 h-8 rounded-full border-2 border-[#181820] relative hover:z-10 hover:scale-110 transition-transform cursor-help"
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-center text-white/50 text-sm italic">No bonus loot this time.</p>
+                  )}
+                </div>
+
                 <button onClick={() => setGroupLobby(null)} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition">
                   Close
                 </button>
@@ -183,7 +204,6 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           <PackArea groupActive={groupActive} groupTimeLeft={timeLeft} />
         </div>
 
-        {/* Right: Random Drops */}
         <div className={panelClass('drop')} onClick={() => setFocused('drop')}>
           <h2 className="text-xl lg:text-2xl font-bold text-white mb-4 lg:mb-6 w-full text-center">Card Drops</h2>
           {liveState?.drop ? (
