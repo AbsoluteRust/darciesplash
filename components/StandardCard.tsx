@@ -13,6 +13,16 @@ export const COLLECTION_GLOW: Record<string, string> = {
 };
 export const DEFAULT_GLOW = "rgba(125, 190, 255, 0.67)";
 
+const RARITY_COLORS: Record<string, string> = {
+  Common: "#9ca3af",
+  Uncommon: "#22c55e",
+  Rare: "#3b82f6",
+  Epic: "#a855f7",
+  Legendary: "#eab308",
+  Mythic: "#ef4444",
+  Contraband: "#000000",
+};
+
 export default function StandardCard({
   name,
   title,
@@ -48,26 +58,40 @@ export default function StandardCard({
 
   // Use the collection glow if provided, otherwise fall back to the card's glow, otherwise default.
   const finalGlow = glow || COLLECTION_GLOW[collection || ""] || DEFAULT_GLOW;
+  
+  // Get the color for the rarity to use as an external hover glow
+  const rarityColor = finalRarity ? RARITY_COLORS[finalRarity] : null;
 
   return (
-    <ProfileCard
-      name={name || "Unknown Card"}
-      title={title || "Emote"}
-      handle={(name || "unknown").toLowerCase().replace(/\s+/g, "-")}
-      status="Online"
-      contactText="View"
-      avatarUrl={thumbUrl || image || ""}
-      rarity={finalRarity}
-      showUserInfo={false}
-      enableTilt={enableTilt}
-      enableMobileTilt={false}
-      behindGlowColor={finalGlow}
-      iconUrl={null}
-      behindGlowEnabled
-      innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-      isModal={isModal}
-      onContactClick={onClick}
-      copyEmote={copyEmote}
-    />
+    <div className="relative group w-full h-full">
+      {/* External glow that is visible even on opaque Splash Arts */}
+      {rarityColor && (
+        <div 
+          className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-0"
+          style={{ boxShadow: `0 0 35px 4px ${rarityColor}90` }}
+        />
+      )}
+      <div className="relative z-10 w-full h-full">
+        <ProfileCard
+          name={name || "Unknown Card"}
+          title={title || "Emote"}
+          handle={(name || "unknown").toLowerCase().replace(/\s+/g, "-")}
+          status="Online"
+          contactText="View"
+          avatarUrl={thumbUrl || image || ""}
+          rarity={finalRarity}
+          showUserInfo={false}
+          enableTilt={enableTilt}
+          enableMobileTilt={false}
+          behindGlowColor={finalGlow}
+          iconUrl={null}
+          behindGlowEnabled
+          innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+          isModal={isModal}
+          onContactClick={onClick}
+          copyEmote={copyEmote}
+        />
+      </div>
+    </div>
   );
 }
