@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import PlayButton from './PlayButton';
 import MiniPackReveal from './MiniPackReveal';
@@ -66,7 +66,11 @@ export default function PackArea() {
     setOpening(true);
 
     // Always open the oldest pack (first in the list)
-    const packId = packs[0].id;
+    const packId = packs[0]?.id;
+    if (!packId) {
+      setOpening(false);
+      return;
+    }
 
     try {
       const res = await fetch('/api/minipacks/open', {
@@ -76,22 +80,19 @@ export default function PackArea() {
       });
       const data = await res.json();
       
-      if (res.ok) {
-        const cardsRes = await fetch('/api/cards/list');
-        const allCards = cardsRes.ok ? await cardsRes.json() : [];
-        
-        const fullCards = data.cards.map((c: any) => {
-          const meta = allCards.find((ac: any) => ac.name === c.name);
-          return { ...c, image: meta?.image, thumbUrl: meta?.thumbUrl, type: meta?.type };
-        });
-
-        setRevealedCards(fullCards);
+      if (res.ok && Array.isArray(data.cards)) {
+        // Filter out any null/undefined cards that might have been returned
+        setRevealedCards(data.cards.filter(Boolean));
         setPacks(prev => prev.slice(1)); // Remove opened pack
+      } else if (res.ok) {
+        alert('Pack opened, but no cards were returned.');
+        setPacks(prev => prev.slice(1));
       } else {
-        alert(data.error);
+        alert(data.error || 'Failed to open pack');
       }
     } catch (err) {
       console.error(err);
+      alert('A network error occurred while opening the pack.');
     } finally {
       setOpening(false);
     }
