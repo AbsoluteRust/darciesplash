@@ -10,6 +10,7 @@
 
 body {
     @apply bg-black text-white text-sm antialiased font-poppins;
+    color-scheme: dark; /* Tells extensions the site is dark */
 }
 
 body::selection {
@@ -513,19 +514,13 @@ button {
 
 /* ===========================================================
    Firefox Performance Overrides
-   Firefox software-renders backdrop-filter, causing massive
-   frame drops on modals, cards, and the navbar. We force 
-   hardware acceleration and optimize the full-screen overlay
-   without changing the visual appearance.
    =========================================================== */
 @supports (-moz-appearance: none) {
-  /* 1. Stop infinite background animations on cards (if any) */
   .pc-card,
   .pc-shine {
     animation: none !important;
   }
 
-  /* 2. Force GPU Hardware Acceleration on all blurry elements */
   .emote-modal-overlay,
   .related-panel,
   .chroma-panel,
@@ -542,18 +537,12 @@ button {
     backface-visibility: hidden !important;
   }
 
-  /* 3. The full-screen overlay blurs the entire viewport behind it. 
-     This is the #1 reason for the lag. We remove the blur but increase 
-     the background opacity by 10%, making it visually identical to the 
-     human eye while running 100x faster. */
   .emote-modal-overlay {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: rgba(0, 0, 0, 0.75) !important;
   }
 
-  /* 4. Remove box-shadows on blurred panels. Firefox struggles 
-     to composite shadows and blurs at the same time. */
   .related-panel,
   .chroma-panel,
   .chroma-lightbox,
@@ -561,4 +550,43 @@ button {
   .collection-hint {
     box-shadow: none !important;
   }
+}
+
+/* ===========================================================
+   Dark Mode Extension Overrides (Dark Reader, etc.)
+   Forces the text to stay white and backgrounds dark inside
+   cards so extensions don't try to invert them and ruin contrast.
+   =========================================================== */
+.pc-card {
+  color-scheme: dark !important;
+}
+
+/* Force all text inside cards to be white */
+.pc-details h3,
+.pc-details p,
+.pc-handle,
+.pc-status,
+.pc-contact-btn,
+.pc-contact-btn span,
+.pc-user-info,
+.pc-user-info span,
+.emote-info-box,
+.emote-info-box p,
+.collection-section-header h3,
+.collection-section-header p,
+.rename-modal h2,
+.rename-modal label,
+.toolbar-label,
+.toolbar-checkbox,
+.toolbar-hint {
+  color: #ffffff !important;
+  background-color: transparent !important;
+}
+
+/* Keep the specific button backgrounds intact */
+.pc-contact-btn {
+  background-color: rgba(15, 15, 24, 0.65) !important;
+}
+.pc-user-info {
+  background-color: rgba(15, 15, 24, 0.88) !important;
 }
