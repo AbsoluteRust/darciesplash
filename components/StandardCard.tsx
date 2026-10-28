@@ -63,35 +63,30 @@ export default function StandardCard({
   const rarityColor = finalRarity ? RARITY_COLORS[finalRarity] : null;
 
   return (
-    <div className="relative group w-full h-full">
-      {/* External glow that is visible even on opaque Splash Arts */}
-      {rarityColor && (
-        <div 
-          className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-0"
-          style={{ boxShadow: `0 0 35px 4px ${rarityColor}90` }}
-        />
-      )}
-      <div className="relative z-10 w-full h-full">
-        <ProfileCard
-          name={name || "Unknown Card"}
-          title={title || "Emote"}
-          handle={(name || "unknown").toLowerCase().replace(/\s+/g, "-")}
-          status="Online"
-          contactText="View"
-          avatarUrl={thumbUrl || image || ""}
-          rarity={finalRarity}
-          showUserInfo={false}
-          enableTilt={enableTilt}
-          enableMobileTilt={false}
-          behindGlowColor={finalGlow}
-          iconUrl={null}
-          behindGlowEnabled
-          innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
-          isModal={isModal}
-          onContactClick={onClick}
-          copyEmote={copyEmote}
-        />
-      </div>
+    <div 
+      className="relative group w-full h-full"
+      // Pass the color to CSS so it can be applied to the tilting .pc-card element
+      style={{ '--hover-glow': rarityColor ? `${rarityColor}cc` : 'transparent' } as React.CSSProperties}
+    >
+      <ProfileCard
+        name={name || "Unknown Card"}
+        title={title || "Emote"}
+        handle={(name || "unknown").toLowerCase().replace(/\s+/g, "-")}
+        status="Online"
+        contactText="View"
+        avatarUrl={thumbUrl || image || ""}
+        rarity={finalRarity}
+        showUserInfo={false}
+        enableTilt={enableTilt}
+        enableMobileTilt={false}
+        behindGlowColor={finalGlow}
+        iconUrl={null}
+        behindGlowEnabled
+        innerGradient="linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)"
+        isModal={isModal}
+        onContactClick={onClick}
+        copyEmote={copyEmote}
+      />
     </div>
   );
 }

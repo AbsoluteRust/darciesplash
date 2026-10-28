@@ -590,3 +590,14 @@ button {
 .pc-user-info {
   background-color: rgba(15, 15, 24, 0.88) !important;
 }
+
+/* ===========================================================
+   Card Hover Glow (Applies to .pc-card so it tilts natively)
+   =========================================================== */
+.pc-card {
+  transition: box-shadow 0.3s ease !important;
+}
+
+.group:hover .pc-card {
+  box-shadow: 0 0 35px 6px var(--hover-glow) !important;
+}
