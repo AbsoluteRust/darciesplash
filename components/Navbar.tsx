@@ -143,6 +143,10 @@ export default function Navbar() {
                     Play
                 </Link>
 
+                <Link href="/news" onClick={() => setIsOpen(false)} className="hover:text-pink-400 transition-colors">
+                    News
+                </Link>
+
                 <div className="w-12 h-px bg-white/20 my-2" />
 
                 {collections.map((c) => (
