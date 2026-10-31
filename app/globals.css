@@ -245,6 +245,7 @@ button {
   max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 60px 20px;
 }
 
 .full-wallpaper {
