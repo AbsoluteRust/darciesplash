@@ -26,7 +26,7 @@ export type PackCard = {
   link?: string;
 };
 
-export default function PlayButton() {
+export default function PlayButton({ disabled = false }: { disabled?: boolean }) {
   const [progress, setProgress] = useState(0);
   const [charging, setCharging] = useState(false);
   const [status, setStatus] = useState<Status>('idle');
@@ -50,6 +50,7 @@ export default function PlayButton() {
   };
 
   const beginHold = useCallback(() => {
+    if (disabled) return; // <-- Prevents starting if group is active
     if (statusRef.current === 'opening') return;
     if (chargingRef.current) return;
 
@@ -69,7 +70,7 @@ export default function PlayButton() {
       else rafRef.current = null;
     };
     rafRef.current = requestAnimationFrame(tick);
-  }, []);
+  }, [disabled]);
 
   const endHold = useCallback(async () => {
     if (!chargingRef.current) return;
@@ -107,6 +108,7 @@ export default function PlayButton() {
       t instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName);
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (disabled) return; // <-- Blocks spacebar if group is active
       if (e.code !== 'Space') return;
       if (isTextField(e.target)) return;
       e.preventDefault();
@@ -126,12 +128,14 @@ export default function PlayButton() {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
     };
-  }, [beginHold, endHold, reveal]);
+  }, [beginHold, endHold, reveal, disabled]);
 
   const full = progress >= 1;
   const shaking = charging && progress > 0;
 
-  const label = status === 'opening'
+  const label = disabled 
+    ? 'Group session active'
+    : status === 'opening'
     ? 'Opening…'
     : full
     ? 'Release to open!'
@@ -153,7 +157,7 @@ export default function PlayButton() {
           }}
           onPointerCancel={() => { if (chargingRef.current) endHold(); }}
           onContextMenu={(e) => e.preventDefault()}
-          disabled={status === 'opening' || !!reveal}
+          disabled={disabled || status === 'opening' || !!reveal}
           className={[
             'relative select-none touch-none overflow-hidden rounded-3xl',
             'w-64 sm:w-72 md:w-80 aspect-[3/4]', 
@@ -161,7 +165,11 @@ export default function PlayButton() {
             'bg-gradient-to-br from-indigo-600 via-purple-700 to-violet-900',
             'ring-1 ring-white/20',
             shaking ? 'animate-[playShake_0.12s_infinite]' : '',
-            status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 'cursor-pointer hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]',
+            
+            // Updated styling for disabled state
+            disabled ? 'opacity-40 grayscale cursor-not-allowed border border-white/10' : 
+            status === 'opening' || reveal ? 'opacity-70 cursor-wait' : 
+            'cursor-pointer hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(99,102,241,0.4)]',
           ].join(' ')}
         >
           {/* Removed the CSS transition here so it tracks the JS state instantly */}
@@ -180,7 +188,7 @@ export default function PlayButton() {
         </button>
 
         {/* Text moved below the button */}
-        <span className="text-lg font-bold text-white/80 tracking-wide">
+        <span className={`text-lg font-bold tracking-wide ${disabled ? 'text-white/40' : 'text-white/80'}`}>
           {label}
         </span>
 

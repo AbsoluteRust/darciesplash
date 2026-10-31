@@ -68,12 +68,11 @@ export default function PackArea({ groupActive, groupTimeLeft }: { groupActive?:
         });
       }, 50);
     } else if (groupActive && isHolding) {
-      // For group, just animate the progress bar filling up over 2 seconds
       interval = setInterval(() => {
         setProgress((p) => {
           if (p >= 1) {
             clearInterval(interval);
-            return 1; // Hold at 100% until server resolves
+            return 1;
           }
           return p + 0.05;
         });
@@ -144,7 +143,9 @@ export default function PackArea({ groupActive, groupTimeLeft }: { groupActive?:
         transition={{ repeat: groupActive && isHolding ? Infinity : 0, duration: 0.15 }}
         className={`relative ${groupActive ? 'pointer-events-none' : ''}`}
       >
-        <PlayButton />
+        {/* We pass the disabled prop here */}
+        <PlayButton disabled={groupActive} />
+        
         {groupActive && (
           <div 
             className="absolute bottom-0 left-0 h-1.5 bg-indigo-500 transition-opacity duration-150"
@@ -173,7 +174,9 @@ export default function PackArea({ groupActive, groupTimeLeft }: { groupActive?:
           ${selected === 'regular' ? 'scale-100' : 'scale-90 opacity-30 grayscale pointer-events-none'}
         `}
       >
-        <PlayButton />
+        {/* We pass the disabled prop here too */}
+        <PlayButton disabled={groupActive} />
+        
         {groupActive && (
           <div 
             className="absolute bottom-0 left-0 h-1.5 bg-indigo-500 transition-opacity duration-150"
