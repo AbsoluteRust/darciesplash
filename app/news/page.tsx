@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { useSession } from 'next-auth/react';
+import TextDiff from '@/components/TextDiff';
 
 type Revision = {
   title: string;
@@ -49,8 +50,9 @@ export default function NewsPage() {
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('all');
+  
+  const [hoveredDiffId, setHoveredDiffId] = useState<string | null>(null);
 
-  // Admin check via API
   useEffect(() => {
     fetch('/api/me/admin')
       .then(res => res.json())
@@ -58,11 +60,9 @@ export default function NewsPage() {
       .catch(console.error);
   }, []);
 
-  // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<NewsPost | null>(null);
   
-  // Form state
   const [formTitle, setFormTitle] = useState('');
   const [formSection, setFormSection] = useState('website');
   const [formContent, setFormContent] = useState('');
@@ -112,12 +112,33 @@ export default function NewsPage() {
       });
       if (res.ok) {
         setIsModalOpen(false);
-        fetchPosts(); // Refresh list
+        fetchPosts();
       } else {
         alert("Failed to save post.");
       }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this post? This cannot be undone.")) return;
+
+    try {
+      const res = await fetch('/api/news/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (res.ok) {
+        // Remove immediately from UI
+        setPosts(prev => prev.filter(p => p.id !== id));
+      } else {
+        alert("Failed to delete post.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting post.");
     }
   };
 
@@ -128,7 +149,6 @@ export default function NewsPage() {
   return (
     <div className="min-h-screen pt-32 pb-20 px-4 md:px-8 max-w-4xl mx-auto">
       
-      {/* Header & Create Button */}
       <div className="flex flex-col items-center mb-12 relative">
         <h1 className="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 tracking-widest uppercase mb-4">
           News & Updates
@@ -147,7 +167,6 @@ export default function NewsPage() {
         )}
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap justify-center gap-2 mb-12">
         {SECTIONS.map(sec => (
           <button
@@ -166,97 +185,108 @@ export default function NewsPage() {
         ))}
       </div>
 
-      {/* Feed */}
       {loading ? (
         <div className="text-center text-white/50 animate-pulse">Loading feed...</div>
       ) : filteredPosts.length === 0 ? (
         <div className="text-center text-white/50 italic">No updates in this section yet.</div>
       ) : (
         <div className="relative border-l border-white/10 ml-4 md:ml-6 space-y-12 pb-12">
-          {filteredPosts.map((post, i) => (
-            <motion.div 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              key={post.id} 
-              className="relative pl-8 md:pl-12 group"
-            >
-              <div className="absolute -left-[5px] top-2 w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]" />
-              
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-2xl p-6 shadow-xl hover:border-white/20 transition-colors">
+          {filteredPosts.map((post, i) => {
+            const isHoveringDiff = hoveredDiffId === post.id && post.revisions && post.revisions.length > 0;
+            const latestRevision = isHoveringDiff ? post.revisions![post.revisions!.length - 1] : null;
+
+            return (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                key={post.id} 
+                className="relative pl-8 md:pl-12 group"
+              >
+                <div className={`absolute -left-[5px] top-2 w-2.5 h-2.5 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.8)] transition-colors ${isHoveringDiff ? 'bg-yellow-500' : 'bg-indigo-500'}`} />
                 
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <img src={post.author.avatar} alt={post.author.name} className="w-8 h-8 rounded-full border border-white/20" />
-                    <span className="text-white/80 font-bold">{post.author.name}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${SECTION_COLORS[post.section] || 'bg-white/10 text-white/70'}`}>
-                      {post.section}
-                    </span>
-                    <span className="text-white/40 text-xs">
-                      {new Date(post.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                    
-                    {/* Edit History Hover Badge */}
-                    {post.revisions && post.revisions.length > 0 && (
-                      <div className="relative group/edit cursor-help">
-                        <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded-md border border-indigo-500/20">
-                          Edited
-                        </span>
-                        
-                        {/* Hover Tooltip */}
-                        <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-80 bg-[#181820] border border-white/20 rounded-xl p-4 shadow-2xl opacity-0 invisible group-hover/edit:opacity-100 group-hover/edit:visible transition-all z-50 pointer-events-none">
-                          <p className="text-xs font-bold text-white/50 uppercase tracking-wider mb-2 border-b border-white/10 pb-1">Edit History</p>
-                          <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-3">
-                            {post.revisions.map((rev, idx) => (
-                              <div key={idx} className="text-xs text-white/60 border-l-2 border-indigo-500/30 pl-2">
-                                <span className="text-indigo-400 block mb-1">
-                                  {new Date(rev.editedAt).toLocaleString()}
-                                </span>
-                                <p className="line-clamp-3 italic">"{rev.content}"</p>
-                              </div>
-                            ))}
-                          </div>
+                <div className={`bg-[#0a0a14]/80 border rounded-2xl p-6 shadow-xl transition-all duration-300 ${isHoveringDiff ? 'border-yellow-500/50 ring-1 ring-yellow-500/20' : 'border-white/10 hover:border-white/20'}`}>
+                  
+                  <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <img src={post.author.avatar} alt={post.author.name} className="w-8 h-8 rounded-full border border-white/20" />
+                      <span className="text-white/80 font-bold">{post.author.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${SECTION_COLORS[post.section] || 'bg-white/10 text-white/70'}`}>
+                        {post.section}
+                      </span>
+                      <span className="text-white/40 text-xs">
+                        {new Date(post.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      
+                      {post.revisions && post.revisions.length > 0 && (
+                        <div 
+                          onMouseEnter={() => setHoveredDiffId(post.id)}
+                          onMouseLeave={() => setHoveredDiffId(null)}
+                          className="cursor-help"
+                        >
+                          <span className={`text-[10px] font-bold px-2 py-1 rounded-md border transition-colors ${isHoveringDiff ? 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50' : 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20'}`}>
+                            {isHoveringDiff ? 'Viewing History' : 'Edited'}
+                          </span>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Admin Edit Button */}
-                    {isAdmin && (
-                      <button 
-                        onClick={() => openEditModal(post)}
-                        className="text-white/30 hover:text-white transition-colors ml-2"
-                        title="Edit Post"
-                      >
-                        ✏️
-                      </button>
-                    )}
+                      {isAdmin && (
+                        <div className="flex items-center gap-2 ml-2 border-l border-white/10 pl-2">
+                          <button 
+                            onClick={() => openEditModal(post)}
+                            className="text-white/30 hover:text-indigo-400 transition-colors p-1"
+                            title="Edit Post"
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(post.id)}
+                            className="text-white/30 hover:text-red-400 transition-colors p-1"
+                            title="Delete Post"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                <h2 className="text-xl font-bold text-white mb-2">{post.title}</h2>
-                
-                <div className="text-white/70 text-sm leading-relaxed prose prose-invert max-w-none">
-                  <ReactMarkdown
-                    components={{
-                      a: ({ node, ...props }) => (
-                        <a {...props} className="text-indigo-400 hover:text-indigo-300 underline font-semibold transition-colors" target="_blank" rel="noopener noreferrer" />
-                      ),
-                      p: ({ node, ...props }) => <p {...props} className="mb-4 last:mb-0" />,
-                      strong: ({ node, ...props }) => <strong {...props} className="font-bold text-white" />
-                    }}
-                  >
-                    {post.content}
-                  </ReactMarkdown>
+                  {isHoveringDiff && latestRevision ? (
+                    <div className="animate-in fade-in duration-200">
+                      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
+                        <span className="text-xs font-bold text-yellow-400">Comparing changes from</span>
+                        <span className="text-xs text-white/50">{new Date(latestRevision.editedAt).toLocaleString()}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-white/50 mb-3 line-through decoration-red-500/50">{latestRevision.title}</h2>
+                      <TextDiff oldText={latestRevision.content} newText={post.content} />
+                    </div>
+                  ) : (
+                    <div className="animate-in fade-in duration-200">
+                      <h2 className="text-xl font-bold text-white mb-2">{post.title}</h2>
+                      <div className="text-white/70 text-sm leading-relaxed prose prose-invert max-w-none">
+                        <ReactMarkdown
+                          components={{
+                            a: ({ node, ...props }) => (
+                              <a {...props} className="text-indigo-400 hover:text-indigo-300 underline font-semibold transition-colors" target="_blank" rel="noopener noreferrer" />
+                            ),
+                            p: ({ node, ...props }) => <p {...props} className="mb-4 last:mb-0" />,
+                            strong: ({ node, ...props }) => <strong {...props} className="font-bold text-white" />
+                          }}
+                        >
+                          {post.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
-      {/* Create/Edit Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div 
