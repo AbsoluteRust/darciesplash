@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import ReactMarkdown from 'react-markdown';
 import { useSession } from 'next-auth/react';
 import TextDiff from '@/components/TextDiff';
 import {
@@ -25,6 +24,7 @@ type Revision = {
   title: string;
   section: string;
   content: string;
+  imageUrl?: string | null;
   editedAt: number;
 };
 
@@ -33,6 +33,7 @@ type NewsPost = {
   title: string;
   section: string;
   content: string;
+  imageUrl?: string | null;
   timestamp: number;
   editedAt?: number;
   revisions?: Revision[];
@@ -47,6 +48,48 @@ type Section = {
   label: string;
   color: string;
 };
+
+// --- Custom Discord Markdown Parser ---
+function renderDiscordMarkdown(text: string) {
+  if (!text) return { __html: "" };
+
+  let html = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+  // Blockquotes
+  html = html.replace(/^> (.*)$/gm, "<blockquote class=\"border-l-4 border-white/20 pl-3 my-2 text-white/60\">$1</blockquote>");
+  
+  // Headers
+  html = html.replace(/^### (.*)$/gm, "<h3 class=\"text-xl font-bold mt-4 mb-2 text-white\">$1</h3>");
+  html = html.replace(/^## (.*)$/gm, "<h2 class=\"text-2xl font-bold mt-4 mb-2 text-white\">$1</h2>");
+  html = html.replace(/^# (.*)$/gm, "<h1 class=\"text-3xl font-bold mt-4 mb-2 text-white\">$1</h1>");
+  
+  // Subtext
+  html = html.replace(/^-# (.*)$/gm, "<span class=\"text-xs text-white/40 block mt-1\">$1</span>");
+
+  // Bold, Italics, Underline, Strikethrough
+  html = html.replace(/\*\*(.*?)\*\*/g, "<strong class=\"font-bold text-white\">$1</strong>");
+  html = html.replace(/\*(.*?)\*/g, "<em class=\"italic\">$1</em>");
+  html = html.replace(/__(.*?)__/g, "<u class=\"underline\">$1</u>");
+  html = html.replace(/~~(.*?)~~/g, "<del class=\"line-through text-white/40\">$1</del>");
+
+  // Spoilers
+  html = html.replace(/\|\|(.*?)\|\|/g, "<span class=\"bg-white/20 hover:bg-transparent text-transparent hover:text-white transition-colors rounded px-1 cursor-pointer\">$1</span>");
+
+  // Code blocks
+  html = html.replace(/```([\s\S]*?)```/g, "<pre class=\"bg-black/50 p-3 rounded-md overflow-x-auto text-sm my-2\"><code>$1</code></pre>");
+  html = html.replace(/`([^`]+)`/g, "<code class=\"bg-black/50 px-1 py-0.5 rounded text-sm font-mono text-pink-300\">$1</code>");
+
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-indigo-400 hover:text-indigo-300 underline\">$1</a>");
+
+  // Newlines
+  html = html.replace(/\n/g, "<br />");
+
+  return { __html: html };
+}
 
 function SortableSectionRow({
   sec,
@@ -207,6 +250,8 @@ export default function NewsPage() {
   const [formTitle, setFormTitle] = useState('');
   const [formSection, setFormSection] = useState('general');
   const [formContent, setFormContent] = useState('');
+  const [formImageUrl, setFormImageUrl] = useState('');
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const openCreateModal = () => {
@@ -214,6 +259,7 @@ export default function NewsPage() {
     setFormTitle('');
     setFormSection(sections[0]?.id || 'general');
     setFormContent('');
+    setFormImageUrl('');
     setIsPostModalOpen(true);
   };
 
@@ -222,7 +268,26 @@ export default function NewsPage() {
     setFormTitle(post.title);
     setFormSection(post.section);
     setFormContent(post.content);
+    setFormImageUrl(post.imageUrl || '');
     setIsPostModalOpen(true);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImage(true);
+    
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/news/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) setFormImageUrl(data.url);
+      else alert(data.error || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSavePost = async () => {
@@ -231,8 +296,8 @@ export default function NewsPage() {
 
     const url = editingPost ? '/api/news/edit' : '/api/news/create';
     const body = editingPost 
-      ? { id: editingPost.id, title: formTitle, section: formSection, content: formContent }
-      : { title: formTitle, section: formSection, content: formContent };
+      ? { id: editingPost.id, title: formTitle, section: formSection, content: formContent, imageUrl: formImageUrl }
+      : { title: formTitle, section: formSection, content: formContent, imageUrl: formImageUrl };
 
     try {
       const res = await fetch(url, {
@@ -477,11 +542,14 @@ export default function NewsPage() {
                   ) : (
                     <div className="animate-in fade-in duration-200">
                       <h2 className="text-xl font-bold text-white mb-2">{post.title}</h2>
-                      <div className="text-white/70 text-sm leading-relaxed prose prose-invert max-w-none">
-                        <ReactMarkdown components={{ a: ({ node, ...props }) => <a {...props} className="text-indigo-400 hover:text-indigo-300 underline font-semibold transition-colors" target="_blank" rel="noopener noreferrer" />, p: ({ node, ...props }) => <p {...props} className="mb-4 last:mb-0" />, strong: ({ node, ...props }) => <strong {...props} className="font-bold text-white" /> }}>
-                          {post.content}
-                        </ReactMarkdown>
-                      </div>
+                      
+                      {post.imageUrl && (
+                        <div className="mb-4 rounded-xl overflow-hidden border border-white/10 max-h-[400px]">
+                          <img src={post.imageUrl} alt={post.title} className="w-full h-full object-contain bg-black/50" />
+                        </div>
+                      )}
+
+                      <div className="text-white/70 text-sm leading-relaxed" dangerouslySetInnerHTML={renderDiscordMarkdown(post.content)} />
                     </div>
                   )}
                 </div>
@@ -565,8 +633,25 @@ export default function NewsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-1">Content (Markdown supported)</label>
+                <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-1">Content (Discord Markdown supported)</label>
                 <textarea value={formContent} onChange={e => setFormContent(e.target.value)} rows={6} className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 resize-none custom-scrollbar" />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-1">Image (Optional)</label>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="w-full text-sm text-white/50 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500"
+                />
+                {uploadingImage && <p className="text-xs text-indigo-400 mt-1">Uploading...</p>}
+                {formImageUrl && (
+                  <div className="mt-2 relative w-full h-32 rounded-lg overflow-hidden border border-white/10">
+                    <img src={formImageUrl} alt="Upload preview" className="w-full h-full object-cover" />
+                    <button onClick={() => setFormImageUrl('')} className="absolute top-2 right-2 bg-black/50 hover:bg-red-500 p-1 rounded-md transition">✕</button>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-4">

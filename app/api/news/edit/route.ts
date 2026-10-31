@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { id, title, section, content } = await req.json();
+  const { id, title, section, content, imageUrl } = await req.json();
   if (!id || !title || !section || !content) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   try {
@@ -20,12 +20,12 @@ export async function POST(req: Request) {
 
     const oldPost = posts[index];
     
-    // Add old content to revisions before updating
     const revisions = oldPost.revisions || [];
     revisions.push({
       title: oldPost.title,
       section: oldPost.section,
       content: oldPost.content,
+      imageUrl: oldPost.imageUrl || null,
       editedAt: Date.now()
     });
 
@@ -34,8 +34,9 @@ export async function POST(req: Request) {
       title,
       section,
       content,
+      imageUrl: imageUrl || null,
       editedAt: Date.now(),
-      revisions: revisions.slice(-10) // Keep only the last 10 edits
+      revisions: revisions.slice(-10)
     };
 
     await kv.set("news_posts", posts);

@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title, section, content } = await req.json();
+  const { title, section, content, imageUrl } = await req.json();
   if (!title || !section || !content) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
 
   const newPost = {
@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     title,
     section,
     content,
+    imageUrl: imageUrl || null,
     timestamp: Date.now(),
     author: {
       name: session.user.name || "Admin",
