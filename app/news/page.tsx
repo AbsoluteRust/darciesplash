@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import ReactMarkdown from 'react-markdown';
 
 type NewsPost = {
   id: string;
@@ -59,7 +60,6 @@ export default function NewsPage() {
         </p>
       </div>
 
-      {/* Section Filters */}
       <div className="flex flex-wrap justify-center gap-2 mb-12">
         {SECTIONS.map(sec => (
           <button
@@ -78,7 +78,6 @@ export default function NewsPage() {
         ))}
       </div>
 
-      {/* News Feed */}
       {loading ? (
         <div className="text-center text-white/50 animate-pulse">Loading feed...</div>
       ) : filteredPosts.length === 0 ? (
@@ -113,8 +112,25 @@ export default function NewsPage() {
                 </div>
 
                 <h2 className="text-xl font-bold text-white mb-2">{post.title}</h2>
-                <div className="text-white/70 whitespace-pre-wrap text-sm leading-relaxed">
-                  {post.content}
+                
+                {/* MARKDOWN RENDERER */}
+                <div className="text-white/70 text-sm leading-relaxed prose prose-invert max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      a: ({ node, ...props }) => (
+                        <a 
+                          {...props} 
+                          className="text-indigo-400 hover:text-indigo-300 underline font-semibold transition-colors" 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                        />
+                      ),
+                      p: ({ node, ...props }) => <p {...props} className="mb-4 last:mb-0" />,
+                      strong: ({ node, ...props }) => <strong {...props} className="font-bold text-white" />
+                    }}
+                  >
+                    {post.content}
+                  </ReactMarkdown>
                 </div>
               </div>
             </motion.div>
