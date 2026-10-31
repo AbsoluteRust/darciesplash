@@ -30,23 +30,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // 2. Delete the code so it can't be reused
         await kv.del(`auth_session:${credentials.sessionId}`);
 
-        // 3. Fetch user data (avatar, name, roles) to build the session
-        const userId = authSession.userId;
+        // 3. Clean and validate the ID
+        const userId = authSession.userId.trim();
+
+        // Check if it looks like a real Discord ID (17-20 digits)
+        if (!/^\d{17,20}$/.test(userId)) {
+          throw new Error("Invalid Discord User ID format.");
+        }
+
         let name = "Unknown User";
         let image = "https://cdn.discordapp.com/embed/avatars/0.png";
         let roles = { commissioner: false, darsubscribbler: false };
 
         try {
-          // Fetch profile from bot
+          // Fetch profile from bot to verify the user exists
           const botUrl = process.env.PI_BOT_URL || "";
           const res = await fetch(`${botUrl}/api/user/profile?userId=${userId}`, {
             headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` }
           });
-          if (res.ok) {
-            const data = await res.json();
-            name = data.name;
-            image = data.avatarUrl;
+          
+          // Reject the login if the bot cannot find this user
+          if (!res.ok) {
+            throw new Error("User not found.");
           }
+
+          const data = await res.json();
+          name = data.name;
+          image = data.avatarUrl;
 
           // Fetch roles from KV
           const kvRoles = await kv.get(`account_roles:${userId}`);
@@ -58,6 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         } catch (err) {
           console.error("Failed to fetch user details during DM login", err);
+          throw new Error("Invalid Discord User ID. Please check the ID and try again.");
         }
 
         return { id: userId, name, image, roles };
