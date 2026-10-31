@@ -3,7 +3,7 @@
 import "./page.css";
 import { use, useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import Iridescence from "../../../components/Iridescence";
-import ProfileCard from "@/components/ProfileCard";
+import StandardCard from "@/components/StandardCard";
 import LazyMount from "@/components/LazyMount";
 import RelatedCardMini from "@/components/RelatedCardMini";
 import { ITEMS } from "@/sections/AccordionGallery";
@@ -38,7 +38,6 @@ import { buildGroups } from "@/lib/collection-layout-sort";
 import CollectionSectionEditor from "./CollectionSectionEditor";
 import RenameCollectionModal from "./RenameCollectionModal";
 import type { CollectionMeta } from "@/lib/collection-meta";
-import StandardCard from "@/components/StandardCard";
 
 type Card = {
   name: string;
@@ -575,7 +574,8 @@ export default function CollectionClient({
       const currentY = e.touches[0].clientY;
       const delta = touchStartY - currentY;
 
-      if (atTop && delta < 0) {
+      // If pulling down at the top, or up at the bottom, prevent the browser's native pull-to-refresh
+      if ((atTop && delta < 0) || (atBottom && delta > 0)) {
         if (e.cancelable) e.preventDefault();
       }
 
@@ -1057,25 +1057,25 @@ export default function CollectionClient({
     }
 
     return (
-    <StandardCard
-  name={piece.name}
-  title={
-    piece.type === "Emote"
-      ? (() => {
-          const n = findEmoteCount(piece.name, emoteTotals);
-          return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
-        })()
-      : piece.type
-  }
-  image={piece.image}
-  thumbUrl={piece.thumbUrl}
-  rarity={showMine && ownedRarity ? ownedRarity : piece.rarity}
-  glow={piece.glow}
-  isPlay={false}
-  onClick={() => openCard(piece, idx)}
-  enableTilt={!editMode}
-  copyEmote={copyEmote}
-/>
+      <StandardCard
+        name={piece.name}
+        title={
+          piece.type === "Emote"
+            ? (() => {
+                const n = findEmoteCount(piece.name, emoteTotals);
+                return n > 0 ? `Emote • ${n.toLocaleString()}` : "Emote";
+              })()
+            : piece.type
+        }
+        image={piece.image}
+        thumbUrl={piece.thumbUrl}
+        rarity={showMine && ownedRarity ? ownedRarity : piece.rarity}
+        glow={piece.glow}
+        isPlay={false}
+        onClick={() => openCard(piece, idx)}
+        enableTilt={!editMode}
+        copyEmote={copyEmote}
+      />
     );
   };
 
@@ -1098,28 +1098,19 @@ export default function CollectionClient({
             className={`emote-modal emote-layout${modalTransitionClass}`}
             onClick={e => e.stopPropagation()}
           >
-            {activeEmote.type === "Emote" && (
-  <StandardCard
-    key={activeEmote.name}
-    name={activeEmote.name}
-    title="Emote"
-    image={activeEmote.image}
-    rarity={activeEmote.rarity}
-    glow={activeEmote.glow}
-    isPlay={false}
-    isModal={true}
-    onClick={closeModal}
-    enableTilt={false}
-  />
-)}
-
-            {(activeEmote.type === "Mobile Wallpaper" ||
-              activeEmote.type === "Splash Art" ||
-              activeEmote.type === "Sticker") && (
-              <div className="art-layout">
-                <img className="full-wallpaper" src={activeEmote.image} alt={activeEmote.name} />
-              </div>
-            )}
+            <StandardCard
+              key={activeEmote.name}
+              name={activeEmote.name}
+              title={activeEmote.type || 'Emote'}
+              image={activeEmote.image}
+              thumbUrl={activeEmote.thumbUrl}
+              rarity={activeEmote.rarity}
+              glow={activeEmote.glow}
+              isPlay={false}
+              isModal={true}
+              onClick={closeModal}
+              enableTilt={false}
+            />
 
             <div className="emote-info-boxes">
               {activeEmote.description?.trim() && (

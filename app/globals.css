@@ -8,6 +8,11 @@
     --font-poppins: "Poppins", sans-serif;
 }
 
+html, body {
+  overscroll-behavior-y: none; /* changed from contain */
+  overscroll-behavior-x: none; /* Added to prevent horizontal swipe reloads */
+}
+
 body {
     @apply bg-black text-white text-sm antialiased font-poppins;
     color-scheme: dark; /* Tells extensions the site is dark */
