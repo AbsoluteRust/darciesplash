@@ -45,13 +45,18 @@ const SECTION_COLORS: Record<string, string> = {
 
 export default function NewsPage() {
   const { data: session } = useSession();
+  const [isAdmin, setIsAdmin] = useState(false);
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('all');
 
-  // Admin check
-  const adminIds = (process.env.NEXT_PUBLIC_ADMIN_IDS || "").split(",").map(id => id.trim());
-  const isAdmin = !!session?.user?.id && adminIds.includes(session.user.id);
+  // Admin check via API
+  useEffect(() => {
+    fetch('/api/me/admin')
+      .then(res => res.json())
+      .then(data => setIsAdmin(data.isAdmin))
+      .catch(console.error);
+  }, []);
 
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
