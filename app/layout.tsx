@@ -9,7 +9,9 @@ import { PageLoadingProvider } from "@/components/PageLoadingContext";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { cn } from "@/lib/utils";
-import Heartbeat from "@/components/Heartbeat"; // <-- Add this import
+import Heartbeat from "@/components/Heartbeat";
+import { SessionProvider } from "next-auth/react";
+import { auth } from "@/auth";
 
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
@@ -19,26 +21,30 @@ const poppins = Poppins({
     variable: "--font-poppins",
 });
 
-export default function RootLayout({ children, }: Readonly<{
+export default async function RootLayout({ children, }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const session = await auth();
+
     return (
         <html lang="en" className={cn("font-sans", geist.variable)}>
             <head>
                 <link rel="preload" href="/assets/background-splash.svg" as="image" />
             </head>
             <body>
-                <Heartbeat /> {/* <-- Add it here */}
-                <LenisScroll />
-                <PageLoadingProvider>
-                    <RarityModeProvider>
-                        <CollectionFilterProvider>
-                            <Navbar />
-                            <div style={{ minHeight: '100vh' }}>{children}</div>
-                            <Footer />
-                        </CollectionFilterProvider>
-                    </RarityModeProvider>
-                </PageLoadingProvider>
+                <SessionProvider session={session}>
+                    <Heartbeat />
+                    <LenisScroll />
+                    <PageLoadingProvider>
+                        <RarityModeProvider>
+                            <CollectionFilterProvider>
+                                <Navbar />
+                                <div style={{ minHeight: '100vh' }}>{children}</div>
+                                <Footer />
+                            </CollectionFilterProvider>
+                        </RarityModeProvider>
+                    </PageLoadingProvider>
+                </SessionProvider>
                 <SpeedInsights />
                 <Analytics />
             </body>
