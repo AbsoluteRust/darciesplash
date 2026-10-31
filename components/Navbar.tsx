@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import WarpText from "@/components/WarpText";
 import RarityModeToggle from "@/components/RarityModeToggle";
+import { useSession, signOut } from "next-auth/react";
 
 type NavCollection = {
   internalSlug: string;
@@ -27,6 +28,7 @@ export default function Navbar() {
     const [collections, setCollections] = useState<NavCollection[]>(FALLBACK_COLLECTIONS);
     const pathname = usePathname();
     const router = useRouter();
+    const { data: session } = useSession();
 
     useEffect(() => {
         let cancelled = false;
@@ -129,7 +131,7 @@ export default function Navbar() {
                 </button>
             </motion.nav>
 
-            {/* Full-Screen Menu Overlay (Now used for both desktop and mobile) */}
+            {/* Full-Screen Menu Overlay */}
             <div
                 className={`fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center text-lg gap-6 transition-transform duration-400 ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
@@ -165,6 +167,31 @@ export default function Navbar() {
                         <RarityModeToggle />
                     </div>
                 )}
+
+                <div className="w-12 h-px bg-white/20 my-4" />
+
+                {/* AUTH BUTTONS */}
+                <div className="flex flex-col items-center gap-4 mt-2">
+                    {session ? (
+                        <button
+                            onClick={() => {
+                                setIsOpen(false);
+                                signOut({ callbackUrl: '/' });
+                            }}
+                            className="text-red-400 hover:text-red-300 transition-colors text-sm font-bold uppercase tracking-wider"
+                        >
+                            Sign Out
+                        </button>
+                    ) : (
+                        <Link
+                            href="/signin"
+                            onClick={() => setIsOpen(false)}
+                            className="text-indigo-400 hover:text-indigo-300 transition-colors text-sm font-bold uppercase tracking-wider"
+                        >
+                            Sign In
+                        </Link>
+                    )}
+                </div>
 
                 <button
                     onClick={() => setIsOpen(false)}
