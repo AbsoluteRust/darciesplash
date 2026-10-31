@@ -258,7 +258,11 @@ export default function PuzzleGame({
         <div className="w-full max-w-2xl mt-2">
           <div className="max-h-48 overflow-y-auto custom-scrollbar bg-[#0a0a14] p-3 rounded-2xl border border-white/10 shadow-inner flex flex-wrap gap-2 justify-center">
             {allStaticEmotes.map((emote: any) => {
-              const isIncorrect = incorrectEmotes.has(emote.id);
+              const revealedCount = Number(state.revealedCounts?.[emote.id]) || 0;
+              const totalCount = Number(state.emoteCounts?.[emote.id]) || 0;
+              const isMaxRevealed = totalCount > 0 && revealedCount >= totalCount;
+              
+              const isIncorrect = incorrectEmotes.has(emote.id) || isMaxRevealed;
               const isSpinning = isGuessing === emote.id;
               const noGuessesLeft = remaining <= 0;
 
