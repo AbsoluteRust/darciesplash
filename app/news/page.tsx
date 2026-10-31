@@ -5,6 +5,21 @@ import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
 import { useSession } from 'next-auth/react';
 import TextDiff from '@/components/TextDiff';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 type Revision = {
   title: string;
@@ -33,6 +48,99 @@ type Section = {
   color: string;
 };
 
+function SortableSectionRow({
+  sec,
+  editingSectionId,
+  editingSectionName,
+  editingSectionColor,
+  setEditingSectionId,
+  setEditingSectionName,
+  setEditingSectionColor,
+  handleEditSection,
+  handleDeleteSection,
+}: any) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sec.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+    position: 'relative' as const,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      className="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/10"
+    >
+      {editingSectionId === sec.id ? (
+        <div className="flex flex-1 gap-2 items-center">
+          <input 
+            type="color" 
+            value={editingSectionColor} 
+            onChange={e => setEditingSectionColor(e.target.value)}
+            className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+          />
+          <input 
+            type="text" 
+            value={editingSectionName} 
+            onChange={e => setEditingSectionName(e.target.value)}
+            className="flex-1 bg-black/50 border border-white/20 rounded-md px-2 py-1 text-sm text-white"
+            autoFocus
+          />
+          <button onClick={() => handleEditSection(sec.id)} className="text-green-400 font-bold px-2">Save</button>
+          <button onClick={() => setEditingSectionId(null)} className="text-white/50 px-2">Cancel</button>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 flex-1">
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 text-white/30 hover:text-white transition-colors"
+              title="Drag to reorder"
+            >
+              ≡
+            </button>
+            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: sec.color }} />
+            <span className="text-white font-bold">{sec.label}</span>
+          </div>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={() => { 
+                setEditingSectionId(sec.id); 
+                setEditingSectionName(sec.label); 
+                setEditingSectionColor(sec.color); 
+              }} 
+              className="text-white/40 hover:text-indigo-400 px-1" 
+              disabled={sec.id === 'admin-updates'}
+            >
+              ✏️
+            </button>
+            <button 
+              onClick={() => handleDeleteSection(sec.id)} 
+              className="text-white/40 hover:text-red-400 px-1" 
+              disabled={sec.id === 'general' || sec.id === 'admin-updates'}
+            >
+              🗑️
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function NewsPage() {
   const { data: session } = useSession();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -43,6 +151,10 @@ export default function NewsPage() {
   
   const [hoveredDiffId, setHoveredDiffId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   useEffect(() => {
     Promise.all([
@@ -201,6 +313,27 @@ export default function NewsPage() {
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = sections.findIndex(s => s.id === active.id);
+    const newIndex = sections.findIndex(s => s.id === over.id);
+    const newSections = arrayMove(sections, oldIndex, newIndex);
+    
+    setSections(newSections);
+
+    try {
+      await fetch('/api/news/sections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reorder', order: newSections.map(s => s.id) })
+      });
+    } catch (err) {
+      console.error("Failed to save section order", err);
+    }
+  };
+
   const filteredPosts = activeSection === 'all' 
     ? posts 
     : posts.filter(p => p.section === activeSection);
@@ -218,12 +351,6 @@ export default function NewsPage() {
         
         {isAdmin && (
           <div className="absolute right-0 top-0 flex gap-2">
-            <button
-              onClick={() => setIsSectionModalOpen(true)}
-              className="bg-white/10 hover:bg-white/20 text-white text-sm font-bold px-4 py-2 rounded-xl transition"
-            >
-              ⚙️ Sections
-            </button>
             <button
               onClick={openCreateModal}
               className="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold px-4 py-2 rounded-xl transition"
@@ -255,6 +382,16 @@ export default function NewsPage() {
             {sec.label}
           </button>
         ))}
+        
+        {isAdmin && (
+          <button
+            onClick={() => setIsSectionModalOpen(true)}
+            className="px-4 py-2 rounded-full text-sm font-bold transition-all border border-dashed border-white/30 text-white/50 hover:text-white hover:border-white hover:bg-white/5"
+            title="Manage Sections"
+          >
+            ✏️
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -269,10 +406,7 @@ export default function NewsPage() {
             const postColor = getSectionColor(post.section);
 
             return (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
+              <div 
                 key={post.id} 
                 id={post.id}
                 className="relative pl-8 md:pl-12 group scroll-mt-32 transition-all duration-500 rounded-2xl"
@@ -351,7 +485,7 @@ export default function NewsPage() {
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
@@ -381,58 +515,26 @@ export default function NewsPage() {
                 <button onClick={handleCreateSection} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition">Add</button>
               </div>
 
-              <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar">
-                {sections.map(sec => (
-                  <div key={sec.id} className="flex items-center justify-between bg-white/5 p-2 rounded-lg border border-white/10">
-                    {editingSectionId === sec.id ? (
-                      <div className="flex flex-1 gap-2 items-center">
-                        <input 
-                          type="color" 
-                          value={editingSectionColor} 
-                          onChange={e => setEditingSectionColor(e.target.value)}
-                          className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
-                        />
-                        <input 
-                          type="text" 
-                          value={editingSectionName} 
-                          onChange={e => setEditingSectionName(e.target.value)}
-                          className="flex-1 bg-black/50 border border-white/20 rounded-md px-2 py-1 text-sm text-white"
-                          autoFocus
-                        />
-                        <button onClick={() => handleEditSection(sec.id)} className="text-green-400 font-bold px-2">Save</button>
-                        <button onClick={() => setEditingSectionId(null)} className="text-white/50 px-2">Cancel</button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: sec.color }} />
-                          <span className="text-white font-bold">{sec.label}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => { 
-                              setEditingSectionId(sec.id); 
-                              setEditingSectionName(sec.label); 
-                              setEditingSectionColor(sec.color); 
-                            }} 
-                            className="text-white/40 hover:text-indigo-400 px-1" 
-                            disabled={sec.id === 'admin-updates'}
-                          >
-                            ✏️
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteSection(sec.id)} 
-                            className="text-white/40 hover:text-red-400 px-1" 
-                            disabled={sec.id === 'general' || sec.id === 'admin-updates'}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </>
-                    )}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                  <div className="flex flex-col gap-2 max-h-60 overflow-y-auto custom-scrollbar pr-1">
+                    {sections.map(sec => (
+                      <SortableSectionRow 
+                        key={sec.id}
+                        sec={sec}
+                        editingSectionId={editingSectionId}
+                        editingSectionName={editingSectionName}
+                        editingSectionColor={editingSectionColor}
+                        setEditingSectionId={setEditingSectionId}
+                        setEditingSectionName={setEditingSectionName}
+                        setEditingSectionColor={setEditingSectionColor}
+                        handleEditSection={handleEditSection}
+                        handleDeleteSection={handleDeleteSection}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
 
               <div className="flex justify-end mt-4">
                 <button onClick={() => setIsSectionModalOpen(false)} className="px-6 py-2 rounded-xl text-white/60 hover:text-white hover:bg-white/5 transition">Close</button>

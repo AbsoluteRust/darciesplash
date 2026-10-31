@@ -50,7 +50,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { action, id, label, color } = await req.json();
+  const { action, id, label, color, order } = await req.json();
 
   try {
     let sections = (await kv.get("news_sections")) || DEFAULT_SECTIONS;
@@ -79,6 +79,16 @@ export async function POST(req: Request) {
         p.section === id ? { ...p, section: "general" } : p
       );
       await kv.set("news_posts", updatedPosts);
+    }
+    else if (action === "reorder" && Array.isArray(order)) {
+      const sectionMap = new Map(sections.map((s: any) => [s.id, s]));
+      const newSections = order.map((id: string) => sectionMap.get(id)).filter(Boolean);
+      
+      // Add any sections that weren't in the order list (safety fallback)
+      sections.forEach((s: any) => {
+        if (!order.includes(s.id)) newSections.push(s);
+      });
+      sections = newSections;
     }
 
     await kv.set("news_sections", sections);
