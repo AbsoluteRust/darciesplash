@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 
-export const runtime = 'edge';
+// 1. Force Node.js runtime (Edge has a hard 30s limit, Node.js allows longer)
+export const runtime = 'nodejs';
+// 2. Tell Vercel to allow up to 60 seconds for this route to finish
+export const maxDuration = 60;
 
 export async function POST() {
   const session = await auth();
