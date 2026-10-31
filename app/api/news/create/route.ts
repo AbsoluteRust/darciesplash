@@ -25,6 +25,8 @@ export async function POST(req: Request) {
       avatar: session.user.image || "https://cdn.discordapp.com/embed/avatars/0.png"
     },
     revisions: []
+    likes: [], // <-- Add this
+    shares: 0 
   };
 
   try {

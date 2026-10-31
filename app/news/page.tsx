@@ -41,6 +41,8 @@ type NewsPost = {
     name: string;
     avatar: string;
   };
+  likes?: string[];
+  shares?: number;
 };
 
 type Section = {
@@ -49,7 +51,6 @@ type Section = {
   color: string;
 };
 
-// --- Custom Discord Markdown Parser ---
 function renderDiscordMarkdown(text: string) {
   if (!text) return { __html: "" };
 
@@ -58,34 +59,19 @@ function renderDiscordMarkdown(text: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 
-  // Blockquotes
   html = html.replace(/^> (.*)$/gm, "<blockquote class=\"border-l-4 border-white/20 pl-3 my-2 text-white/60\">$1</blockquote>");
-  
-  // Headers
   html = html.replace(/^### (.*)$/gm, "<h3 class=\"text-xl font-bold mt-4 mb-2 text-white\">$1</h3>");
   html = html.replace(/^## (.*)$/gm, "<h2 class=\"text-2xl font-bold mt-4 mb-2 text-white\">$1</h2>");
   html = html.replace(/^# (.*)$/gm, "<h1 class=\"text-3xl font-bold mt-4 mb-2 text-white\">$1</h1>");
-  
-  // Subtext
   html = html.replace(/^-# (.*)$/gm, "<span class=\"text-xs text-white/40 block mt-1\">$1</span>");
-
-  // Bold, Italics, Underline, Strikethrough
   html = html.replace(/\*\*(.*?)\*\*/g, "<strong class=\"font-bold text-white\">$1</strong>");
   html = html.replace(/\*(.*?)\*/g, "<em class=\"italic\">$1</em>");
   html = html.replace(/__(.*?)__/g, "<u class=\"underline\">$1</u>");
   html = html.replace(/~~(.*?)~~/g, "<del class=\"line-through text-white/40\">$1</del>");
-
-  // Spoilers
   html = html.replace(/\|\|(.*?)\|\|/g, "<span class=\"bg-white/20 hover:bg-transparent text-transparent hover:text-white transition-colors rounded px-1 cursor-pointer\">$1</span>");
-
-  // Code blocks
   html = html.replace(/```([\s\S]*?)```/g, "<pre class=\"bg-black/50 p-3 rounded-md overflow-x-auto text-sm my-2\"><code>$1</code></pre>");
   html = html.replace(/`([^`]+)`/g, "<code class=\"bg-black/50 px-1 py-0.5 rounded text-sm font-mono text-pink-300\">$1</code>");
-
-  // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-indigo-400 hover:text-indigo-300 underline\">$1</a>");
-
-  // Newlines
   html = html.replace(/\n/g, "<br />");
 
   return { __html: html };
@@ -227,12 +213,51 @@ export default function NewsPage() {
     }, 100);
   }, [loading, posts]);
 
-  const handleCopyLink = (id: string) => {
+  const handleCopyLink = async (id: string) => {
     const url = `${window.location.origin}/news#${id}`;
-    navigator.clipboard.writeText(url).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
+    await navigator.clipboard.writeText(url);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+
+    // Increment share count
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, shares: (p.shares || 0) + 1 } : p));
+    fetch('/api/news/share', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).catch(console.error);
+  };
+
+  const handleLike = async (id: string) => {
+    if (!session?.user?.id) {
+      alert("You must be signed in to like posts!");
+      return;
+    }
+
+    // Optimistic update
+    setPosts(prev => prev.map(p => {
+      if (p.id !== id) return p;
+      const likes = p.likes || [];
+      const hasLiked = likes.includes(session.user.id);
+      return {
+        ...p,
+        likes: hasLiked ? likes.filter(uid => uid !== session.user.id) : [...likes, session.user.id]
+      };
+    }));
+
+    try {
+      const res = await fetch('/api/news/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (!res.ok) {
+        // Revert on failure
+        setPosts(prev => [...prev]); 
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const getSectionColor = (id: string) => {
@@ -469,6 +494,9 @@ export default function NewsPage() {
             const isHoveringDiff = hoveredDiffId === post.id && post.revisions && post.revisions.length > 0;
             const latestRevision = isHoveringDiff ? post.revisions![post.revisions!.length - 1] : null;
             const postColor = getSectionColor(post.section);
+            const likeCount = (post.likes || []).length;
+            const hasLiked = session?.user?.id && (post.likes || []).includes(session.user.id);
+            const shareCount = post.shares || 0;
 
             return (
               <div 
@@ -517,10 +545,6 @@ export default function NewsPage() {
                         </div>
                       )}
 
-                      <button onClick={() => handleCopyLink(post.id)} className={`text-xs font-bold px-2 py-1 rounded-md border transition-colors ml-1 ${copiedId === post.id ? 'bg-green-500/20 text-green-300 border-green-500/50' : 'text-white/40 border-transparent hover:text-white hover:bg-white/5'}`} title="Copy link">
-                        {copiedId === post.id ? 'Copied!' : '🔗'}
-                      </button>
-
                       {isAdmin && (
                         <div className="flex items-center gap-2 ml-1 border-l border-white/10 pl-2">
                           <button onClick={() => openEditModal(post)} className="text-white/30 hover:text-indigo-400 transition-colors p-1" title="Edit Post">✏️</button>
@@ -549,7 +573,26 @@ export default function NewsPage() {
                         </div>
                       )}
 
-                      <div className="text-white/70 text-sm leading-relaxed" dangerouslySetInnerHTML={renderDiscordMarkdown(post.content)} />
+                      <div className="text-white/70 text-sm leading-relaxed mb-4" dangerouslySetInnerHTML={renderDiscordMarkdown(post.content)} />
+                      
+                      {/* Action Bar */}
+                      <div className="flex items-center gap-4 pt-3 border-t border-white/5">
+                        <button 
+                          onClick={() => handleLike(post.id)}
+                          className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${hasLiked ? 'text-pink-500' : 'text-white/40 hover:text-white'}`}
+                        >
+                          <span className="text-base">{hasLiked ? '❤️' : '🤍'}</span>
+                          {likeCount > 0 ? likeCount : 'Like'}
+                        </button>
+                        
+                        <button 
+                          onClick={() => handleCopyLink(post.id)}
+                          className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${copiedId === post.id ? 'text-green-400' : 'text-white/40 hover:text-white'}`}
+                        >
+                          <span className="text-base">🔗</span>
+                          {copiedId === post.id ? 'Copied!' : (shareCount > 0 ? shareCount : 'Share')}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
