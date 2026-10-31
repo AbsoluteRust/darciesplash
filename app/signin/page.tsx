@@ -1,33 +1,191 @@
-import { signIn } from "@/auth";
-import Link from "next/link";
+'use client';
+
+import { useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 export default function SignInPage() {
+  const router = useRouter();
+  const [method, setMethod] = useState<'oauth' | 'dm'>('oauth');
+  
+  // DM Login State
+  const [userId, setUserId] = useState('');
+  const [sessionId, setSessionId] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<1 | 2>(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
+
+  const handleSendCode = async () => {
+    if (!userId) return setError("Please enter your Discord User ID");
+    setLoading(true);
+    setError(null);
+
+    // Generate a random session ID for this specific login attempt
+    const newSessionId = crypto.randomUUID();
+    setSessionId(newSessionId);
+
+    try {
+      const res = await fetch('/api/auth/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, sessionId: newSessionId }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.error || 'Failed to send code');
+      
+      setStep(2);
+      setCountdown(30);
+      
+      // Start countdown
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setStep(1);
+            setError("Code expired. Please try again.");
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyCode = async () => {
+    if (code.length !== 6) return setError("Please enter the 6-digit code");
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await signIn('discord-dm', {
+        sessionId,
+        code,
+        redirect: false,
+      });
+
+      if (res?.error) {
+        throw new Error(res.error);
+      }
+
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="signin-page">
-      <div className="signin-card">
-        <h1>Sign in</h1>
-        <p>Connect your Discord account to see your card collection on the site.</p>
-        <form
-          action={async () => {
-            "use server";
-            await signIn("discord", { redirectTo: "/" });
-          }}
-        >
-          <button type="submit" className="signin-discord-btn">
-            <DiscordIcon />
-            Continue with Discord
+    <div className="min-h-screen flex items-center justify-center bg-black p-4">
+      <div className="bg-[#0a0a14] border border-white/10 rounded-3xl p-8 max-w-md w-full shadow-2xl">
+        <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-pink-400 text-center mb-8 uppercase tracking-widest">
+          Sign In
+        </h1>
+
+        {/* Method Toggle */}
+        <div className="flex bg-black/50 p-1 rounded-xl mb-8 border border-white/10">
+          <button
+            onClick={() => setMethod('oauth')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${method === 'oauth' ? 'bg-indigo-600 text-white' : 'text-white/50 hover:text-white'}`}
+          >
+            Standard Login
           </button>
-        </form>
-        <Link href="/" className="signin-back">← Back to the site</Link>
+          <button
+            onClick={() => setMethod('dm')}
+            className={`flex-1 py-2 text-sm font-bold rounded-lg transition ${method === 'dm' ? 'bg-indigo-600 text-white' : 'text-white/50 hover:text-white'}`}
+          >
+            Login via Bot DM
+          </button>
+        </div>
+
+        {method === 'oauth' ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-white/60 text-center mb-2">
+              The standard secure OAuth method. Allows the site to read your username, avatar, and server roles.
+            </p>
+            <button
+              onClick={() => signIn('discord', { callbackUrl: '/' })}
+              className="w-full py-3 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-lg"
+            >
+              Continue with Discord
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-white/60 text-center mb-2">
+              For privacy. We will DM you a 6-digit code. We never see your password or OAuth token.
+            </p>
+
+            {error && (
+              <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center">
+                {error}
+              </div>
+            )}
+
+            {step === 1 ? (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-2">Discord User ID</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 164429062238896129"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 transition"
+                  />
+                  <p className="text-[10px] text-white/40 mt-1">Right-click yourself in Discord → Copy User ID</p>
+                </div>
+                <button
+                  onClick={handleSendCode}
+                  disabled={loading || !userId}
+                  className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition disabled:opacity-50"
+                >
+                  {loading ? 'Sending...' : 'DM me a code'}
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase tracking-wider mb-2 flex justify-between">
+                    <span>6-Digit Code</span>
+                    <span className="text-indigo-400 font-mono">{countdown}s</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="000000"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                    className="w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-center tracking-[0.5em] text-2xl font-mono text-white focus:outline-none focus:border-indigo-500 transition"
+                  />
+                </div>
+                <button
+                  onClick={handleVerifyCode}
+                  disabled={loading || code.length !== 6}
+                  className="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition disabled:opacity-50"
+                >
+                  {loading ? 'Verifying...' : 'Verify & Sign In'}
+                </button>
+                <button
+                  onClick={() => setStep(1)}
+                  className="w-full py-2 text-sm text-white/40 hover:text-white transition"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
-  );
-}
-
-function DiscordIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M20.32 4.37A19.79 19.79 0 0 0 15.43 3a.07.07 0 0 0-.07.03c-.21.38-.45.87-.61 1.25a18.27 18.27 0 0 0-5.49 0 12.4 12.4 0 0 0-.62-1.25A.08.08 0 0 0 8.57 3a19.74 19.74 0 0 0-4.89 1.37.07.07 0 0 0-.03.03A20.23 20.23 0 0 0 .1 17.06a.08.08 0 0 0 .03.06 19.9 19.9 0 0 0 6 3.03.08.08 0 0 0 .08-.03 14.2 14.2 0 0 0 1.23-2 .08.08 0 0 0-.04-.11 13.1 13.1 0 0 1-1.87-.89.08.08 0 0 1-.01-.13 10.2 10.2 0 0 0 .37-.29.07.07 0 0 1 .08 0 14.2 14.2 0 0 0 12.05 0 .07.07 0 0 1 .08 0c.12.1.25.2.37.29a.08.08 0 0 1-.01.13c-.6.35-1.22.64-1.87.89a.08.08 0 0 0-.04.11c.36.7.77 1.36 1.23 2a.08.08 0 0 0 .08.03 19.85 19.85 0 0 0 6.01-3.03.08.08 0 0 0 .03-.06 20.16 20.16 0 0 0-3.54-12.66.06.06 0 0 0-.03-.03ZM8.02 14.55c-1.18 0-2.15-1.08-2.15-2.41 0-1.33.95-2.41 2.15-2.41 1.2 0 2.17 1.09 2.15 2.41 0 1.33-.95 2.41-2.15 2.41Zm7.97 0c-1.18 0-2.15-1.08-2.15-2.41 0-1.33.95-2.41 2.15-2.41 1.2 0 2.17 1.09 2.15 2.41 0 1.33-.95 2.41-2.15 2.41Z" />
-    </svg>
   );
 }
