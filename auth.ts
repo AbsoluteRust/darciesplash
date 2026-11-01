@@ -21,19 +21,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.sessionId || !credentials?.code) return null;
 
-        // 1. Check the KV store for the code
         const authSession = await kv.get(`auth_session:${credentials.sessionId}`) as { userId: string, code: string } | null;
         
         if (!authSession) throw new Error("Code expired or invalid session.");
         if (authSession.code !== credentials.code) throw new Error("Incorrect code.");
 
-        // 2. Delete the code so it can't be reused
         await kv.del(`auth_session:${credentials.sessionId}`);
 
-        // 3. Clean and validate the ID
         const userId = authSession.userId.trim();
 
-        // Check if it looks like a real Discord ID (17-20 digits)
         if (!/^\d{17,20}$/.test(userId)) {
           throw new Error("Invalid Discord User ID format.");
         }
@@ -43,22 +39,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         let roles = { commissioner: false, darsubscribbler: false };
 
         try {
-          // Fetch profile from bot to verify the user exists
           const botUrl = process.env.PI_BOT_URL || "";
           const res = await fetch(`${botUrl}/api/user/profile?userId=${userId}`, {
             headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` }
           });
           
-          // Reject the login if the bot cannot find this user
-          if (!res.ok) {
-            throw new Error("User not found.");
-          }
+          if (!res.ok) throw new Error("User not found.");
 
           const data = await res.json();
           name = data.name;
           image = data.avatarUrl;
 
-          // Fetch roles from KV
           const kvRoles = await kv.get(`account_roles:${userId}`);
           if (kvRoles) {
             roles = {
@@ -67,7 +58,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             };
           }
         } catch (err) {
-          console.error("Failed to fetch user details during DM login", err);
           throw new Error("Invalid Discord User ID. Please check the ID and try again.");
         }
 
@@ -77,7 +67,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      // Grant welcome bonus for standard Discord OAuth
       if (account?.provider === "discord" && profile) {
         const userId = String((profile as any).id ?? "");
         if (userId) {
@@ -95,21 +84,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true;
     },
     jwt({ token, account, profile, user }) {
-      // Handle OAuth (Discord)
-      if (account && profile) {
-        token.sub = (profile as any).id ?? token.sub;
-      }
-      // Handle Credentials (DM Login)
-      if (user) {
+      // FIX: Only use 'user' object if it's a DM Login, otherwise use the Discord profile ID
+      if (account?.provider === "discord-dm" && user) {
         token.sub = user.id;
         // @ts-ignore
         token.roles = user.roles;
+      } else if (account?.provider === "discord" && profile) {
+        token.sub = String((profile as any).id ?? token.sub);
       }
       return token;
     },
     session({ session, token }) {
-      if (token.sub) {
-        session.user.id = token.sub;
+      // STRICT VALIDATION: Only accept valid Discord IDs into the session
+      const sub = token.sub ? String(token.sub) : '';
+      if (/^\d{17,20}$/.test(sub)) {
+        session.user.id = sub;
+      } else {
+        // Clear any stale/invalid ID so downstream routes see no user
+        (session.user as any).id = undefined;
       }
       if (token.roles) {
         // @ts-ignore
