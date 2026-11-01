@@ -6,6 +6,7 @@ import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import PuzzleGame from './PuzzleGame';
 import DropGame from './DropGame';
 import PackArea from './PackArea';
+import PackReveal from './PackReveal'; // Import this
 
 export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const { userId } = useCollectionFilter();
@@ -16,6 +17,10 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const [groupLobby, setGroupLobby] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startingGroup, setStartingGroup] = useState(false);
+
+  // For revealing the group pack on the website
+  const [webRevealPack, setWebRevealPack] = useState<any>(null);
+  const [closedRevealShortIds, setClosedRevealShortIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (!signedIn) return;
@@ -29,8 +34,15 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
         if (groupRes.ok) {
           const groupData = await groupRes.json();
           setGroupLobby(groupData);
+          
           if (groupData.active) {
             setTimeLeft(Math.max(0, Math.ceil((groupData.endsAt - Date.now()) / 1000)));
+          } else if (groupData.results && !webRevealPack) {
+            // If the group just ended, check if we have an unviewed pack
+            const myPack = groupData.results.packs?.find((p: any) => p.userId === userId);
+            if (myPack && !closedRevealShortIds.includes(myPack.shortId)) {
+              setWebRevealPack(myPack);
+            }
           }
         }
       } catch (err) {
@@ -41,7 +53,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     fetchState();
     const int = setInterval(fetchState, 2000);
     return () => clearInterval(int);
-  }, [signedIn]);
+  }, [signedIn, userId, webRevealPack, closedRevealShortIds]);
 
   useEffect(() => {
     if (!groupLobby?.active) return;
@@ -73,7 +85,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     }
   };
 
-  const isInGroup = groupLobby?.participants?.includes(userId) && groupLobby.participants.length > 0;
+  const isInGroup = groupLobby?.participants?.some((p: any) => p.id === userId) && groupLobby.participants.length > 0;
   const groupActive = groupLobby?.active && isInGroup;
 
   const panelClass = (id: string) => `
@@ -145,17 +157,26 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
             {groupActive && (
               <div className="mt-6 flex flex-col items-center bg-[#181820] border border-indigo-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(99,102,241,0.15)] animate-fadeIn">
                 <p className="text-sm font-bold text-indigo-400 uppercase tracking-widest mb-1">Group Pack Opening</p>
-                <p className="text-5xl font-black font-mono text-white mb-4">
+                <p className="text-5xl font-black font-mono text-white mb-6">
                   {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
                 </p>
-                <div className="flex flex-wrap justify-center gap-2 mb-4">
-                  {groupLobby.participants.map((id: string) => (
-                    <span key={id} className={`px-3 py-1 rounded-full text-xs font-bold ${id === userId ? 'bg-indigo-500 text-white' : 'bg-white/10 text-white/70'}`}>
-                      {id === userId ? 'You' : 'Player'}
-                    </span>
+                
+                <div className="flex flex-wrap justify-center gap-3 mb-6">
+                  {groupLobby.participants.map((p: any) => (
+                    <div key={p.id} className="relative group/avatar flex items-center justify-center">
+                      <img
+                        src={p.avatar}
+                        alt={p.name}
+                        className={`w-12 h-12 rounded-full border-2 transition-all ${p.id === userId ? 'border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'border-white/20 hover:border-white/50'}`}
+                      />
+                      <span className="absolute -bottom-8 bg-black/90 text-white text-xs px-2.5 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/avatar:opacity-100 transition-opacity pointer-events-none z-10 border border-white/10 shadow-lg">
+                        {p.name} {p.id === userId ? '(You)' : ''}
+                      </span>
+                    </div>
                   ))}
                 </div>
-                <p className="text-center text-sm text-white/60 mb-4">
+
+                <p className="text-center text-sm text-white/60">
                   {groupLobby.participants.length > 1 
                     ? "Everyones' packs will open simultaneously when the timer ends, with chances at bonus loot!"
                     : "Waiting for others to join... Click 'WITH FRIENDS!' to invite them!"}
@@ -217,6 +238,26 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           )}
         </div>
       </div>
+
+      {/* Group Pack Reveal Modal */}
+      {webRevealPack && (
+        <PackReveal
+          cards={webRevealPack.cards}
+          shortId={webRevealPack.shortId}
+          canReroll={false}
+          onClose={() => {
+            setClosedRevealShortIds(prev => [...prev, webRevealPack.shortId]);
+            setWebRevealPack(null);
+            
+            // Trigger the Discord reveal immediately
+            fetch('/api/games/reveal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ shortId: webRevealPack.shortId })
+            }).catch(console.error);
+          }}
+        />
+      )}
     </div>
   );
 }
