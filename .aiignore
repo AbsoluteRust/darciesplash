@@ -1,0 +1,28 @@
+# =================================================================
+# AI BRIDGE IGNORE FILE
+# =================================================================
+# NOTE: Everything in your .gitignore is ALREADY ignored by AI Bridge!
+# Do not copy your .gitignore here.
+#
+# ONLY add files to this list if they are currently tracked by Git,
+# but you want to hide them from the AI to save tokens (e.g. huge
+# JSON test data, generated code) or to protect sensitive secrets.
+# =================================================================
+TestResults/
+*.g.cs
+*.log
+*.tmp
+# Backups and duplicates
+*.bak
+*.css.css
+
+# Duplicate/legacy component copies
+components/Iridescence.*
+app/components/Iridescence.*
+
+# AI instruction files (not code)
+AGENTS.md
+CLAUDE.md
+
+# Redundant configs (keep only one postcss)
+postcss.config.js
