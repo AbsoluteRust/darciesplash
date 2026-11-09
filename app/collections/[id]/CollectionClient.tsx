@@ -12,7 +12,7 @@ import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
 import { useRarityMode } from "@/components/RarityModeContext";
 import { useCollectionFilter } from "@/components/CollectionFilterContext";
-import { canEditCollectionOrder } from "@/lib/collection-owners";
+import { canEditCollectionOrder, type AccountRoles } from "@/lib/collection-owners";
 import {
   DndContext,
   closestCenter,
@@ -243,11 +243,33 @@ export default function CollectionClient({
 
   const myMeta = collectionMeta.find(m => m.internalSlug === id);
 
+  // Fetch fresh roles from the server on mount. Bypasses any caching in
+  // useCollectionFilter, which can go stale when a role is granted after login.
+  const [serverRoles, setServerRoles] = useState<{
+    userId: string | null;
+    darsubscribbler: boolean;
+    commissioner: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me/roles", { cache: "no-store" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && d) setServerRoles(d); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const effectiveUserId = serverRoles?.userId ?? userId;
+  const effectiveRoles: AccountRoles | null = serverRoles
+    ? { darsubscribbler: serverRoles.darsubscribbler, commissioner: serverRoles.commissioner }
+    : roles;
+
   const canEdit = useMemo(
-    () => canEditCollectionOrder(userId, id, roles),
-    [userId, id, roles]
+    () => canEditCollectionOrder(effectiveUserId, id, effectiveRoles),
+    [effectiveUserId, id, effectiveRoles]
   );
-  const canCopyEmotes = roles?.darsubscribbler === true;
+  const canCopyEmotes = effectiveRoles?.darsubscribbler === true;
 
   const publicSlugFor = useCallback(
     (internal: string) => {

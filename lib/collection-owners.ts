@@ -3,6 +3,7 @@ export const COLLECTION_OWNERS: Record<string, string[]> = {
   darcie:    ["665898420447215647"],
   tobi:      ["285239143041073155"],
   madolche:  ["138458918316802058"],
+  lunalux:   ["142200534781132800"],
 };
 
 export type AccountRoles = {
