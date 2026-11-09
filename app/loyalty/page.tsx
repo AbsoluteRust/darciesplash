@@ -1,6 +1,8 @@
 // app/loyalty/page.tsx
 import { auth } from '@/auth';
 import { kv } from '@vercel/kv';
+import { DEFAULT_MILESTONES, type Milestone } from '@/lib/loyalty-milestones';
+import { ADMIN_IDS } from '@/lib/admin';
 import LoyaltyClient from './LoyaltyClient';
 import './page.css';
 
@@ -14,6 +16,11 @@ export const metadata = {
 export default async function LoyaltyPage() {
   const session = await auth();
   const userId = session?.user?.id || null;
+  const isAdmin = !!userId && ADMIN_IDS.has(userId);
+
+  const stored = await kv.get('loyalty_milestones').catch(() => null);
+  const milestones: Milestone[] =
+    Array.isArray(stored) && stored.length > 0 ? (stored as Milestone[]) : DEFAULT_MILESTONES;
 
   let profile: {
     subMonths: number;
@@ -40,11 +47,8 @@ export default async function LoyaltyPage() {
 
     const b = rawBadges || {};
     const r = roles || {};
-    const manualMonths = Number(b.sub_months || 0);
-    const kofiMonths = Number(kofiData?.months || 0);
-
     profile = {
-      subMonths: Math.max(manualMonths, kofiMonths),
+      subMonths: Math.max(Number(b.sub_months || 0), Number(kofiData?.months || 0)),
       referrals: Number(b.referrals || 0),
       gifts: Number(b.gifts || 0),
       isCommissioner: !!r.commissioner,
@@ -59,7 +63,12 @@ export default async function LoyaltyPage() {
           Drag through the stars to explore every milestone you&apos;ve reached — and the ones still ahead.
         </p>
       </div>
-      <LoyaltyClient signedIn={!!userId} profile={profile} />
+      <LoyaltyClient
+        signedIn={!!userId}
+        isAdmin={isAdmin}
+        profile={profile}
+        initialMilestones={milestones}
+      />
     </div>
   );
 }
