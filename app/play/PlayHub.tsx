@@ -17,6 +17,34 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
   const [groupLobby, setGroupLobby] = useState<any>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [startingGroup, setStartingGroup] = useState(false);
+  const [sendingGroupEmote, setSendingGroupEmote] = useState<string | null>(null);
+
+  const groupEmotes = [
+    { collection: 'darcie', label: 'Darcie', fallback: 'darPacks' },
+    { collection: 'tobi', label: 'Tobi', fallback: 'tobiSparkle' },
+    { collection: 'madolche', label: 'Madolche / Magi', fallback: 'magiHappy' },
+    { collection: 'celestial', label: 'Celestial / Lily', fallback: 'lilySip' },
+    { collection: 'lunalux', label: 'LunaLux', fallback: 'luxSit' },
+  ];
+
+  const handleGroupEmote = async (collection: string) => {
+    if (!groupActive || sendingGroupEmote) return;
+    setSendingGroupEmote(collection);
+    try {
+      const res = await fetch('/api/games/group/emote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collection }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGroupLobby((previous: any) => previous ? { ...previous, endsAt: data.endsAt, emoteClicks: data.emoteClicks } : previous);
+        setTimeLeft(Math.max(0, Math.ceil((data.endsAt - Date.now()) / 1000)));
+      }
+    } finally {
+      setSendingGroupEmote(null);
+    }
+  };
   
   // New state to prevent the modal from re-opening
   const [dismissedResult, setDismissedResult] = useState<number | null>(null);
@@ -206,6 +234,30 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
                       </span>
                     </div>
                   ))}
+                </div>
+
+                <div className="mb-6 w-full rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <p className="mb-3 text-center text-xs font-bold uppercase tracking-widest text-white/50">Boost a collection</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {groupEmotes.map((emote: any) => {
+                      const emoji = groupLobby.emotes?.[emote.collection];
+                      const clicks = groupLobby.emoteClicks?.[emote.collection] || 0;
+                      const emojiUrl = emoji?.id ? `https://cdn.discordapp.com/emojis/${emoji.id}.${emoji.animated ? 'gif' : 'png'}?size=64` : null;
+                      return (
+                        <button
+                          key={emote.collection}
+                          type="button"
+                          onClick={(event) => { event.stopPropagation(); handleGroupEmote(emote.collection); }}
+                          disabled={!!sendingGroupEmote}
+                          title={`${emote.label}: ${clicks} boost${clicks === 1 ? '' : 's'}`}
+                          className="flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-2 text-white transition hover:bg-white/10 disabled:opacity-60"
+                        >
+                          {emojiUrl ? <img src={emojiUrl} alt={emote.fallback} className="h-8 w-8 object-contain" /> : <span className="text-xs">:{emote.fallback}:</span>}
+                          <span className="text-[10px] text-white/60">{clicks}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <p className="text-center text-sm text-white/60">
