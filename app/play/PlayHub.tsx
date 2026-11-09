@@ -23,9 +23,24 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
 
   const [webRevealPack, setWebRevealPack] = useState<any>(null);
   const [closedRevealShortIds, setClosedRevealShortIds] = useState<string[]>([]);
+  const [revealHistoryLoaded, setRevealHistoryLoaded] = useState(false);
 
   useEffect(() => {
-    if (!signedIn) return;
+    try {
+      const stored = window.localStorage.getItem('folly:group-reveals');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) setClosedRevealShortIds(parsed.filter((id): id is string => typeof id === 'string'));
+      }
+    } catch {
+      // Ignore unavailable or malformed client storage.
+    } finally {
+      setRevealHistoryLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!signedIn || !revealHistoryLoaded) return;
     const fetchState = async () => {
       try {
         const [stateRes, groupRes] = await Promise.all([
@@ -254,7 +269,17 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           shortId={webRevealPack.shortId}
           canReroll={false}
           onClose={() => {
-            setClosedRevealShortIds(prev => [...prev, webRevealPack.shortId]);
+            setClosedRevealShortIds(prev => {
+              const next = prev.includes(webRevealPack.shortId)
+                ? prev
+                : [...prev, webRevealPack.shortId];
+              try {
+                window.localStorage.setItem('folly:group-reveals', JSON.stringify(next));
+              } catch {
+                // Ignore unavailable client storage; the current session still stays closed.
+              }
+              return next;
+            });
             setWebRevealPack(null);
             
             fetch('/api/games/reveal', {
