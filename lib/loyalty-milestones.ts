@@ -1,37 +1,138 @@
 // lib/loyalty-milestones.ts
 
-export type MilestoneType = 'sub' | 'referral' | 'gift' | 'commissioner';
+export type TierBand = 'intro' | 'early' | 'mid' | 'late' | 'final';
 
-export type Milestone = {
-  id: string;
-  type: MilestoneType;
-  threshold: number;
+export type TierContent = {
   icon: string;
-  label: string;
   title: string;
   description: string;
   reward: string;
 };
 
-export const MILESTONE_TYPES: { id: MilestoneType; label: string; unit: string }[] = [
-  { id: 'sub',          label: 'Subscription',     unit: 'months' },
-  { id: 'referral',     label: 'Referrals',        unit: 'referrals' },
-  { id: 'gift',         label: 'Gifts sent',       unit: 'gifts' },
-  { id: 'commissioner', label: 'Commissioner',     unit: '' },
-];
+export type MergedTier = {
+  tier: number;
+  stardustRequired: number;
+  band: TierBand;
+  icon: string;
+  title: string;
+  description: string;
+  reward: string;
+};
 
-export const DEFAULT_MILESTONES: Milestone[] = [
-  { id: 'sub-1',       type: 'sub',          threshold: 1,  icon: '🌙', label: '1 month',         title: 'First Light',        description: 'Your first month of continuous support.',       reward: 'Darsubscribbler role + profile badge' },
-  { id: 'ref-1',       type: 'referral',     threshold: 1,  icon: '🌠', label: 'First referral',  title: 'Star Finder',        description: 'Brought your first friend to the server.',      reward: 'Access to the referral leaderboard' },
-  { id: 'gift-5',      type: 'gift',         threshold: 5,  icon: '🎁', label: '5 gifts',         title: 'Gift Giver',         description: 'Sent 5 gifts to the community.',                reward: 'Exclusive emote pack' },
-  { id: 'sub-3',       type: 'sub',          threshold: 3,  icon: '✨', label: '3 months',        title: 'Constellation',      description: 'Three months of loyalty.',                      reward: 'Bronze profile accent + exclusive badge colour' },
-  { id: 'ref-5',       type: 'referral',     threshold: 5,  icon: '💫', label: '5 referrals',     title: 'Supernova',          description: 'Five friends joined through you.',              reward: '5,000 bonus points' },
-  { id: 'sub-6',       type: 'sub',          threshold: 6,  icon: '🌟', label: '6 months',        title: 'Nebula',             description: 'Half a year of support.',                       reward: 'Nebula profile theme' },
-  { id: 'gift-10',     type: 'gift',         threshold: 10, icon: '🌌', label: '10 gifts',        title: 'Star Bearer',        description: 'Ten gifts shared with others.',                 reward: 'Custom emote slot for the server' },
-  { id: 'sub-12',      type: 'sub',          threshold: 12, icon: '🪐', label: '1 year',          title: 'Galaxy',             description: 'A full year of continuous support.',            reward: 'Loyalty Card I (bronze) + silver loyalty badge' },
-  { id: 'commission',  type: 'commissioner', threshold: 1,  icon: '🎨', label: 'Commissioner',    title: 'Patron of Art',      description: 'Commissioned a piece from Darcie.',             reward: 'Private commission channel + referral code' },
-  { id: 'ref-15',      type: 'referral',     threshold: 15, icon: '🔭', label: '15 referrals',    title: 'Cosmic Curator',     description: 'Fifteen friends brought in.',                   reward: 'Animated profile decoration' },
-  { id: 'sub-24',      type: 'sub',          threshold: 24, icon: '🌠', label: '2 years',         title: 'Solar System',       description: 'Two years of continuous support.',              reward: 'Loyalty Card II (silver) + gold loyalty badge' },
-  { id: 'sub-36',      type: 'sub',          threshold: 36, icon: '⭐', label: '3 years',         title: 'Stellar Loyalty',    description: 'Three years of continuous support.',            reward: 'Loyalty Card III (gold) + platinum loyalty badge' },
-  { id: 'sub-60',      type: 'sub',          threshold: 60, icon: '🌌', label: '5 years',         title: 'Eternal',            description: 'Five years of continuous support.',             reward: 'Loyalty Card IV (platinum) + name in permanent credits' },
-];
+export type TierOverride = Partial<TierContent>;
+export type TierOverrides = Record<string, TierOverride>;
+
+export const TRACK_START_DATE = "2027-01-01T00:00:00Z";
+
+export const MAJOR_ACTION_VALUE = 6800;
+export const WEEKLY_BONUSES = {
+  pack4: 100,
+  pack8: 300,
+  pack12PlusDrop: 620,
+  pack16PlusDropPlusPuzzle: 660,
+} as const;
+
+export const TOTAL_TIERS = 100;
+export const TOTAL_TRACK_COST = 200_000;
+
+// Per-tier cost (non-decreasing by band).
+// 1–32: 1000 each (32,000)
+// 33–39: 1000 each (7,000)  → cumulative 39,000
+// 40–96: 2500 each (142,500) → cumulative 181,500
+// 97–99: 4000 each (12,000)  → cumulative 193,500
+// 100:   6500                → cumulative 200,000
+export const TIER_COSTS: number[] = (() => {
+  const out: number[] = [];
+  for (let i = 1; i <= TOTAL_TIERS; i++) {
+    if (i <= 39) out.push(1000);
+    else if (i <= 96) out.push(2500);
+    else if (i <= 99) out.push(4000);
+    else out.push(6500);
+  }
+  return out;
+})();
+
+export const CUMULATIVE_COSTS: number[] = (() => {
+  const out: number[] = [];
+  let total = 0;
+  for (const c of TIER_COSTS) { total += c; out.push(total); }
+  return out;
+})();
+
+export function stardustForTier(tier: number): number {
+  if (tier <= 0) return 0;
+  if (tier > TOTAL_TIERS) tier = TOTAL_TIERS;
+  return CUMULATIVE_COSTS[tier - 1];
+}
+
+export function tierForStardust(stardust: number): number {
+  for (let i = CUMULATIVE_COSTS.length - 1; i >= 0; i--) {
+    if (stardust >= CUMULATIVE_COSTS[i]) return i + 1;
+  }
+  return 0;
+}
+
+export function isTrackActive(now = Date.now()): boolean {
+  return now >= new Date(TRACK_START_DATE).getTime();
+}
+
+function bandForTier(tier: number): TierBand {
+  if (tier <= 32) return 'intro';
+  if (tier <= 39) return 'early';
+  if (tier <= 96) return 'mid';
+  if (tier <= 99) return 'late';
+  return 'final';
+}
+
+const NAMED_TIERS: Record<number, TierContent> = {
+  10:  { icon: '🥉', title: 'Bronze Badge',      description: 'Your first proper milestone.',                    reward: 'Bronze loyalty badge' },
+  20:  { icon: '✨', title: 'Shining',           description: 'Twenty tiers of loyalty.',                        reward: 'Custom emote slot' },
+  25:  { icon: '🌿', title: 'Sprout',            description: 'One quarter of the way.',                         reward: 'Extra profile decoration slot' },
+  32:  { icon: '🌱', title: 'First Chapter',     description: 'Complete the intro tier band.',                   reward: 'First major milestone reward' },
+  33:  { icon: '⭐', title: 'Rising Star',       description: 'Past the first milestone.',                       reward: 'Exclusive badge colour' },
+  39:  { icon: '🌙', title: 'Moon Walker',       description: 'End of the early tier band.',                     reward: 'Bronze profile accent' },
+  40:  { icon: '🌠', title: 'Grind Begins',      description: 'Entering the long stretch.',                      reward: 'Star trail effect on profile' },
+  50:  { icon: '💫', title: 'Halfway',           description: 'Halfway through the loyalty journey.',            reward: 'Cosmic profile border' },
+  75:  { icon: '🌟', title: 'Nebula',            description: 'Three quarters of the way.',                      reward: 'Nebula profile theme' },
+  90:  { icon: '🔆', title: 'Almost There',      description: 'Ten tiers from the top of the grind band.',       reward: 'Cosmic aura effect' },
+  96:  { icon: '🪐', title: 'Loyal Constellation', description: 'Completed the hard grind band.',                reward: 'Loyalty Card II (silver) + gold loyalty badge' },
+  97:  { icon: '🔭', title: 'Celestial',         description: 'Entering the highest tier band.',                 reward: 'Exclusive emote pack' },
+  98:  { icon: '✨', title: 'Astral Traveler',   description: 'Nearly to the end of the track.',                 reward: 'Animated profile decoration' },
+  99:  { icon: '🌠', title: 'Star Walker',       description: 'The penultimate tier.',                           reward: 'Loyalty Card III (gold) + platinum loyalty badge' },
+  100: { icon: '🌌', title: 'Cosmic Ascendant',  description: 'The final tier. You have walked among the stars.', reward: 'Loyalty Card IV (platinum) + permanent place in the credits' },
+};
+
+export function getDefaultTier(tier: number): MergedTier {
+  const stardust = stardustForTier(tier);
+  const named = NAMED_TIERS[tier];
+  if (named) {
+    return { tier, stardustRequired: stardust, band: bandForTier(tier), ...named };
+  }
+  return {
+    tier,
+    stardustRequired: stardust,
+    band: bandForTier(tier),
+    icon: '⭐',
+    title: `Tier ${tier}`,
+    description: `Reach ${stardust.toLocaleString()} stardust.`,
+    reward: `Tier ${tier} reward`,
+  };
+}
+
+export function buildTier(tier: number, overrides: TierOverrides): MergedTier {
+  const defaults = getDefaultTier(tier);
+  const o = overrides[String(tier)] || {};
+  return {
+    ...defaults,
+    icon: o.icon || defaults.icon,
+    title: o.title || defaults.title,
+    description: o.description || defaults.description,
+    reward: o.reward || defaults.reward,
+  };
+}
+
+export function buildAllTiers(overrides: TierOverrides): MergedTier[] {
+  const out: MergedTier[] = [];
+  for (let i = 1; i <= TOTAL_TIERS; i++) out.push(buildTier(i, overrides));
+  return out;
+}

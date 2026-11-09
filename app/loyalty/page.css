@@ -1,16 +1,18 @@
 /* app/loyalty/page.css */
 
 .loyalty-page {
-  min-height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
   background: #050510;
   color: #fff;
   position: relative;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 .loyalty-page::before {
   content: '';
-  position: fixed;
+  position: absolute;
   inset: 0;
   background:
     radial-gradient(ellipse 60% 40% at 30% 40%, rgba(139, 92, 246, 0.12), transparent 70%),
@@ -21,67 +23,140 @@
 }
 
 .loyalty-header {
+  flex-shrink: 0;
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 8rem 1.5rem 1rem;
+  padding: 5rem 1.5rem 0.5rem;
 }
 
 .loyalty-title {
-  font-size: clamp(2rem, 5vw, 3rem);
+  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
   font-weight: 900;
   letter-spacing: -0.02em;
   background: linear-gradient(to bottom, #fff, rgba(255, 255, 255, 0.6));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  margin: 0 0 0.75rem;
+  margin: 0 0 0.5rem;
 }
 
 .loyalty-subtitle {
   color: rgba(255, 255, 255, 0.5);
-  font-size: 1rem;
+  font-size: 0.9rem;
   max-width: 34rem;
   margin: 0 auto;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .loyalty-stage {
+  flex: 1;
+  min-height: 0;
   position: relative;
   z-index: 2;
-  margin-top: 3rem;
+  display: flex;
+  flex-direction: column;
+  padding-top: 0.5rem;
+}
+
+/* ---------- banner / progress ---------- */
+
+.loyalty-banner {
+  flex-shrink: 0;
+  margin: 0 1.5rem 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), rgba(236, 72, 153, 0.15));
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.85rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.loyalty-banner__icon { font-size: 1rem; }
+
+.loyalty-progress-bar {
+  flex-shrink: 0;
+  margin: 0 1.5rem 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: rgba(10, 10, 25, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  backdrop-filter: blur(12px);
+}
+
+.loyalty-progress-bar__text {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.loyalty-progress-bar__label {
+  color: rgba(167, 139, 250, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.loyalty-progress-bar__value {
+  color: #fff;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.loyalty-progress-bar__tier {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.75rem;
+}
+
+.loyalty-progress-bar__track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.loyalty-progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.6);
+  transition: width 0.4s ease;
 }
 
 /* ---------- admin bar ---------- */
 
 .loyalty-admin-bar {
-  position: fixed;
-  top: 90px;
-  right: 20px;
-  z-index: 60;
+  flex-shrink: 0;
+  margin: 0 1.5rem 0.5rem;
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
-.loyalty-admin-toggle,
-.loyalty-admin-add {
-  padding: 10px 16px;
-  border-radius: 10px;
+.loyalty-admin-toggle {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
   border: 1px solid rgba(139, 92, 246, 0.4);
   background: rgba(10, 10, 25, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   color: #fff;
   font-family: inherit;
-  font-size: 13px;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.loyalty-admin-toggle:hover,
-.loyalty-admin-add:hover {
+.loyalty-admin-toggle:hover {
   background: rgba(139, 92, 246, 0.25);
   border-color: rgba(167, 139, 250, 0.8);
 }
@@ -92,36 +167,65 @@
   box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 
-.loyalty-admin-add {
-  border-color: rgba(34, 197, 94, 0.4);
+.loyalty-admin-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(10, 10, 25, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-.loyalty-admin-add:hover {
-  background: rgba(34, 197, 94, 0.2);
-  border-color: rgba(34, 197, 94, 0.8);
+.loyalty-admin-preview label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
+
+.loyalty-admin-preview input {
+  width: 90px;
+  padding: 0.25rem 0.4rem;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.loyalty-admin-reset {
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.loyalty-admin-reset:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ---------- viewport ---------- */
 
 .loyalty-viewport {
+  flex: 1;
+  min-height: 0;
   position: relative;
-  height: 600px;
   overflow: hidden;
   cursor: grab;
   outline: none;
   user-select: none;
   -webkit-user-select: none;
-  touch-action: pan-y;
+  touch-action: none;
 }
 
-.loyalty-viewport.is-editing {
-  cursor: crosshair;
-}
-
-.loyalty-viewport:active {
-  cursor: grabbing;
-}
-
+.loyalty-viewport.is-editing { cursor: crosshair; }
+.loyalty-viewport:active { cursor: grabbing; }
 .loyalty-viewport:focus-visible {
   outline: 2px solid rgba(139, 92, 246, 0.6);
   outline-offset: -4px;
@@ -164,25 +268,19 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-family: inherit;
-  transform: translate(-50%, -50%);
-  transition: opacity 0.2s;
 }
 
-.loyalty-node__star-wrap {
+.loyalty-node__wrap {
   position: relative;
-  width: 78px;
-  height: 78px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.loyalty-node:hover .loyalty-node__star-wrap {
-  transform: scale(1.12);
-}
+.loyalty-node:hover .loyalty-node__wrap { transform: scale(1.15); }
 
 .loyalty-star-svg {
   position: absolute;
@@ -199,15 +297,15 @@
 
 @keyframes loyaltyStarPulse {
   0%, 100% { opacity: 0.9; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.06); }
+  50%      { opacity: 1;   transform: scale(1.08); }
 }
 
 .loyalty-node__icon {
   position: relative;
   z-index: 1;
-  font-size: 22px;
+  font-size: 16px;
   line-height: 1;
-  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
 }
 
 .loyalty-node.is-locked .loyalty-node__icon {
@@ -215,23 +313,22 @@
 }
 
 .loyalty-node__label {
-  font-size: 12px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
-  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.75);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
 .loyalty-node.is-locked .loyalty-node__label {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .loyalty-node.is-unlocked .loyalty-node__label {
   color: #fff;
 }
 
-.loyalty-node.is-editable .loyalty-node__star-wrap::after {
+.loyalty-node.is-editable .loyalty-node__wrap::after {
   content: '';
   position: absolute;
   inset: -4px;
@@ -241,20 +338,18 @@
   transition: opacity 0.2s;
 }
 
-.loyalty-node.is-editable:hover .loyalty-node__star-wrap::after {
-  opacity: 1;
-}
+.loyalty-node.is-editable:hover .loyalty-node__wrap::after { opacity: 1; }
 
 .loyalty-node__edit-badge {
   position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 22px;
-  height: 22px;
+  top: -4px;
+  right: -4px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: rgba(139, 92, 246, 0.95);
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -263,18 +358,15 @@
   transition: opacity 0.2s;
 }
 
-.loyalty-node.is-editable:hover .loyalty-node__edit-badge {
-  opacity: 1;
-}
+.loyalty-node.is-editable:hover .loyalty-node__edit-badge { opacity: 1; }
 
 /* ---------- hint ---------- */
 
 .loyalty-hint {
-  position: relative;
-  z-index: 2;
+  flex-shrink: 0;
   text-align: center;
-  margin-top: 2rem;
-  font-size: 0.85rem;
+  padding: 0.5rem 1rem 1rem;
+  font-size: 0.8rem;
   color: rgba(255, 255, 255, 0.35);
   letter-spacing: 0.05em;
 }
@@ -295,10 +387,7 @@
   animation: loyaltyFadeIn 200ms ease-out;
 }
 
-@keyframes loyaltyFadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
+@keyframes loyaltyFadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .loyalty-modal {
   position: relative;
@@ -308,17 +397,13 @@
   border: 1px solid rgba(139, 92, 246, 0.3);
   border-radius: 24px;
   padding: 2rem;
-  box-shadow:
-    0 25px 80px rgba(0, 0, 0, 0.7),
-    0 0 60px rgba(139, 92, 246, 0.2);
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(139, 92, 246, 0.2);
   animation: loyaltySlideUp 300ms cubic-bezier(0.22, 1, 0.36, 1);
   max-height: 90vh;
   overflow-y: auto;
 }
 
-.loyalty-modal--edit {
-  max-width: 540px;
-}
+.loyalty-modal--edit { max-width: 540px; }
 
 @keyframes loyaltySlideUp {
   from { transform: translateY(20px); opacity: 0; }
@@ -357,10 +442,7 @@
   justify-content: center;
 }
 
-.loyalty-modal__star-big .loyalty-star-svg {
-  position: absolute;
-  inset: 0;
-}
+.loyalty-modal__star-big .loyalty-star-svg { position: absolute; inset: 0; }
 
 .loyalty-modal__star-icon {
   position: relative;
@@ -447,6 +529,7 @@
   font-size: 0.85rem;
   margin-bottom: 0.5rem;
   color: rgba(255, 255, 255, 0.7);
+  font-variant-numeric: tabular-nums;
 }
 
 .loyalty-modal__progress-bar {
@@ -468,7 +551,7 @@
 
 .loyalty-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 0.75rem;
   margin-top: 0.5rem;
   text-align: left;
@@ -482,9 +565,8 @@
   color: rgba(255, 255, 255, 0.65);
 }
 
-.loyalty-field--full {
-  grid-column: 1 / -1;
-}
+.loyalty-field--icon { max-width: 100px; }
+.loyalty-field--full { grid-column: 1 / -1; }
 
 .loyalty-field input,
 .loyalty-field select,
@@ -500,17 +582,13 @@
 }
 
 .loyalty-field input:focus,
-.loyalty-field select:focus,
 .loyalty-field textarea:focus {
   outline: none;
   border-color: rgba(139, 92, 246, 0.7);
   box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
 }
 
-.loyalty-field__icon {
-  font-size: 1.25rem;
-  text-align: center;
-}
+.loyalty-field__icon { font-size: 1.25rem; text-align: center; }
 
 .loyalty-form__error {
   margin: 0.75rem 0 0;
@@ -526,10 +604,8 @@
   display: flex;
   gap: 0.5rem;
   margin-top: 1.25rem;
-  align-items: center;
+  justify-content: flex-end;
 }
-
-.loyalty-form__spacer { flex: 1; }
 
 .loyalty-btn {
   padding: 0.55rem 1rem;
@@ -551,26 +627,14 @@
   border-color: rgba(167, 139, 250, 0.7);
 }
 
-.loyalty-btn--primary:hover {
-  background: rgba(139, 92, 246, 0.7);
-}
-
-.loyalty-btn--danger {
-  background: rgba(220, 50, 50, 0.15);
-  border-color: rgba(220, 50, 50, 0.4);
-  color: #ff9999;
-}
-
-.loyalty-btn--danger:hover {
-  background: rgba(220, 50, 50, 0.3);
-  border-color: rgba(220, 50, 50, 0.7);
-}
+.loyalty-btn--primary:hover { background: rgba(139, 92, 246, 0.7); }
 
 @media (max-width: 768px) {
-  .loyalty-node__star-wrap { width: 62px; height: 62px; }
-  .loyalty-node__icon       { font-size: 18px; }
-  .loyalty-node__label      { font-size: 10px; }
-  .loyalty-edge-fade        { width: 100px; }
-  .loyalty-form             { grid-template-columns: 1fr; }
-  .loyalty-modal            { padding: 1.5rem; }
+  .loyalty-header { padding: 4rem 1rem 0.5rem; }
+  .loyalty-title { font-size: 1.5rem; }
+  .loyalty-node__icon { font-size: 14px; }
+  .loyalty-node__label { font-size: 10px; }
+  .loyalty-edge-fade { width: 80px; }
+  .loyalty-modal { padding: 1.5rem; }
+  .loyalty-admin-preview input { width: 70px; }
 }

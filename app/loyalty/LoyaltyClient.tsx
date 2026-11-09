@@ -2,84 +2,99 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MILESTONE_TYPES, type Milestone, type MilestoneType } from '@/lib/loyalty-milestones';
+import {
+  buildAllTiers,
+  TOTAL_TIERS,
+  TOTAL_TRACK_COST,
+  tierForStardust,
+  type MergedTier,
+  type TierOverrides,
+} from '@/lib/loyalty-milestones';
 
-type ProfileData = {
-  subMonths: number;
-  referrals: number;
-  gifts: number;
-  isCommissioner: boolean;
-};
-
-type PositionedMilestone = Milestone & { x: number };
-
-const WORLD_WIDTH = 10000;
-const START_X = 1800;
-const END_X = 8200;
+const WORLD_WIDTH = 16000;
+const START_X = 2400;
+const END_X = 13600;
 const PADDING = 300;
-const SVG_HEIGHT = 600;
-const PATH_POINTS = 200;
 
 /* ---------- wave math ---------- */
 
-function mainStringY(x: number, t: number): number {
-  return SVG_HEIGHT / 2
-    + Math.sin(x / 420 + t * 0.4) * 50
-    + Math.cos(x / 680 + t * 0.3) * 25
-    + Math.sin(x / 300 + t * 0.7) * 12;
+function mainStringY(x: number, t: number, height: number): number {
+  const center = height / 2;
+  const waveAmp = Math.min(50, height * 0.15);
+  return center
+    + Math.sin(x / 420 + t * 0.4) * waveAmp
+    + Math.cos(x / 680 + t * 0.3) * (waveAmp * 0.5)
+    + Math.sin(x / 300 + t * 0.7) * (waveAmp * 0.25);
 }
 
 const DECO_AMPS = [120, 90, 60, 150, 100];
 const DECO_COLORS = ['#818cf8', '#a855f7', '#ec4899', '#22d3ee', '#3b82f6'];
 
-function decoPathY(x: number, idx: number, t: number): number {
-  const amp = DECO_AMPS[idx % DECO_AMPS.length];
+function decoPathY(x: number, idx: number, t: number, height: number): number {
+  const center = height / 2;
+  const scale = Math.min(1, height / 600);
+  const amp = DECO_AMPS[idx % DECO_AMPS.length] * scale;
   const phase = idx * 1.4;
   const speed = 0.15 + idx * 0.05;
-  return SVG_HEIGHT / 2
+  return center
     + Math.sin(x / 500 + phase + t * speed) * amp
     + Math.cos(x / 320 + phase * 0.7 + t * speed * 1.3) * (amp * 0.5)
     + Math.sin(x / 180 + phase * 0.3 + t * speed * 0.8) * (amp * 0.2);
 }
 
 function buildPath(fn: (x: number) => number): string {
-  const step = WORLD_WIDTH / PATH_POINTS;
+  const step = WORLD_WIDTH / 200;
   let d = '';
-  for (let i = 0; i <= PATH_POINTS; i++) {
+  for (let i = 0; i <= 200; i++) {
     const x = i * step;
     d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + fn(x).toFixed(1) + ' ';
   }
   return d;
 }
 
-/* ---------- star visual ---------- */
+/* ---------- star sizing + colors ---------- */
 
-function StarShape({ unlocked }: { unlocked: boolean }) {
-  const strokeColor = unlocked ? 'rgba(167, 139, 250, 0.95)' : 'rgba(110, 110, 140, 0.55)';
-  const fillColor = unlocked ? 'rgba(139, 92, 246, 0.25)' : 'rgba(30, 30, 50, 0.4)';
-  const haloId = unlocked ? 'halo-active' : 'halo-inactive';
+function starSize(tier: number): number {
+  if (tier === 100) return 96;
+  if (tier >= 97) return 84;
+  if (tier === 96 || tier === 90 || tier === 75 || tier === 50 || tier === 40 || tier === 39 || tier === 33 || tier === 32 || tier === 25 || tier === 20 || tier === 10) return 76;
+  if (tier % 10 === 0) return 72;
+  if (tier % 5 === 0) return 60;
+  return 50;
+}
+
+function starPalette(tier: number, unlocked: boolean): { stroke: string; fill: string; glow: string } {
+  if (!unlocked) {
+    return {
+      stroke: 'rgba(120, 130, 160, 0.55)',
+      fill: 'rgba(30, 32, 50, 0.55)',
+      glow: 'rgba(120, 130, 160, 0.15)',
+    };
+  }
+  if (tier === 100) return { stroke: 'rgba(251, 191, 36, 0.95)', fill: 'rgba(251, 191, 36, 0.28)', glow: 'rgba(251, 191, 36, 0.75)' };
+  if (tier >= 97)  return { stroke: 'rgba(244, 114, 182, 0.95)', fill: 'rgba(236, 72, 153, 0.28)', glow: 'rgba(244, 114, 182, 0.65)' };
+  if (tier % 10 === 0) return { stroke: 'rgba(167, 139, 250, 0.95)', fill: 'rgba(139, 92, 246, 0.28)', glow: 'rgba(167, 139, 250, 0.65)' };
+  if (tier % 5 === 0) return { stroke: 'rgba(147, 197, 253, 0.9)', fill: 'rgba(96, 165, 250, 0.22)', glow: 'rgba(147, 197, 253, 0.55)' };
+  return { stroke: 'rgba(196, 181, 253, 0.85)', fill: 'rgba(139, 92, 246, 0.18)', glow: 'rgba(196, 181, 253, 0.5)' };
+}
+
+function StarSVG({ tier, size, unlocked }: { tier: number; size: number; unlocked: boolean }) {
+  const pal = starPalette(tier, unlocked);
+  const haloId = `halo-t${tier}-${unlocked ? 'u' : 'l'}`;
   return (
-    <svg viewBox="0 0 100 100" className="loyalty-star-svg" aria-hidden="true">
+    <svg viewBox="0 0 100 100" width={size} height={size} className="loyalty-star-svg" aria-hidden="true">
       <defs>
-        <radialGradient id="halo-active" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(167, 139, 250, 0.75)" />
-          <stop offset="55%" stopColor="rgba(139, 92, 246, 0.2)" />
-          <stop offset="100%" stopColor="rgba(139, 92, 246, 0)" />
-        </radialGradient>
-        <radialGradient id="halo-inactive" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="rgba(120, 120, 150, 0.2)" />
-          <stop offset="100%" stopColor="rgba(120, 120, 150, 0)" />
+        <radialGradient id={haloId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor={pal.glow} stopOpacity="0.95" />
+          <stop offset="55%" stopColor={pal.glow} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={pal.glow} stopOpacity="0" />
         </radialGradient>
       </defs>
-      <circle
-        cx="50" cy="50" r="48"
-        fill={`url(#${haloId})`}
-        className={unlocked ? 'loyalty-star-halo' : ''}
-      />
+      <circle cx="50" cy="50" r="48" fill={`url(#${haloId})`} className={unlocked ? 'loyalty-star-halo' : ''} />
       <polygon
         points="50,8 62,40 96,40 68,60 79,93 50,74 21,93 32,60 4,40 38,40"
-        fill={fillColor}
-        stroke={strokeColor}
+        fill={pal.fill}
+        stroke={pal.stroke}
         strokeWidth="1.5"
         strokeLinejoin="round"
       />
@@ -87,51 +102,30 @@ function StarShape({ unlocked }: { unlocked: boolean }) {
   );
 }
 
-/* ---------- admin edit modal ---------- */
+/* ---------- edit modal ---------- */
 
-function emptyMilestone(): Milestone {
-  return {
-    id: '',
-    type: 'sub',
-    threshold: 1,
-    icon: '⭐',
-    label: '',
-    title: '',
-    description: '',
-    reward: '',
-  };
-}
-
-function EditMilestoneModal({
-  initial,
-  isNew,
+function EditTierModal({
+  tier,
   onSave,
-  onDelete,
   onClose,
 }: {
-  initial: Milestone | null;
-  isNew: boolean;
-  onSave: (m: Milestone) => void;
-  onDelete: (id: string) => void;
+  tier: MergedTier;
+  onSave: (updated: MergedTier) => void;
   onClose: () => void;
 }) {
-  const [form, setForm] = useState<Milestone>(initial || emptyMilestone());
+  const [form, setForm] = useState({
+    icon: tier.icon,
+    title: tier.title,
+    description: tier.description,
+    reward: tier.reward,
+  });
   const [error, setError] = useState<string | null>(null);
-  const typeMeta = MILESTONE_TYPES.find(t => t.id === form.type);
-
-  function update<K extends keyof Milestone>(key: K, val: Milestone[K]) {
-    setForm(f => ({ ...f, [key]: val }));
-  }
 
   function handleSave() {
-    if (!form.label.trim()) return setError('Label is required');
     if (!form.title.trim()) return setError('Title is required');
-    if (form.threshold < 1) return setError('Threshold must be at least 1');
+    if (!form.reward.trim()) return setError('Reward is required');
     setError(null);
-    onSave({
-      ...form,
-      id: form.id || `ms-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    });
+    onSave({ ...tier, ...form });
   }
 
   return (
@@ -139,49 +133,20 @@ function EditMilestoneModal({
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
-          <div className="loyalty-modal__eyebrow">{isNew ? 'New milestone' : 'Edit milestone'}</div>
-          <h2 className="loyalty-modal__title">{isNew ? 'Add a star' : form.title || 'Edit star'}</h2>
+          <div className="loyalty-modal__eyebrow">
+            Tier {tier.tier} · {tier.stardustRequired.toLocaleString()} stardust
+          </div>
+          <h2 className="loyalty-modal__title">Edit Tier {tier.tier}</h2>
 
           <div className="loyalty-form">
-            <label className="loyalty-field">
-              <span>Type</span>
-              <select value={form.type} onChange={e => update('type', e.target.value as MilestoneType)}>
-                {MILESTONE_TYPES.map(t => (
-                  <option key={t.id} value={t.id}>{t.label}</option>
-                ))}
-              </select>
-            </label>
-
-            <label className="loyalty-field">
-              <span>Threshold {typeMeta?.unit ? `(${typeMeta.unit})` : ''}</span>
-              <input
-                type="number"
-                min={1}
-                value={form.threshold}
-                onChange={e => update('threshold', Math.max(1, Number(e.target.value) || 1))}
-              />
-            </label>
-
-            <label className="loyalty-field">
+            <label className="loyalty-field loyalty-field--icon">
               <span>Icon</span>
               <input
                 type="text"
                 maxLength={4}
                 value={form.icon}
-                onChange={e => update('icon', e.target.value)}
-                placeholder="⭐"
+                onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
                 className="loyalty-field__icon"
-              />
-            </label>
-
-            <label className="loyalty-field loyalty-field--full">
-              <span>Label (shown under the star)</span>
-              <input
-                type="text"
-                maxLength={60}
-                value={form.label}
-                onChange={e => update('label', e.target.value)}
-                placeholder="1 month"
               />
             </label>
 
@@ -191,8 +156,7 @@ function EditMilestoneModal({
                 type="text"
                 maxLength={100}
                 value={form.title}
-                onChange={e => update('title', e.target.value)}
-                placeholder="First Light"
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
               />
             </label>
 
@@ -202,8 +166,7 @@ function EditMilestoneModal({
                 rows={2}
                 maxLength={500}
                 value={form.description}
-                onChange={e => update('description', e.target.value)}
-                placeholder="Your first month of continuous support."
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
               />
             </label>
 
@@ -213,8 +176,7 @@ function EditMilestoneModal({
                 rows={2}
                 maxLength={300}
                 value={form.reward}
-                onChange={e => update('reward', e.target.value)}
-                placeholder="Darsubscribbler role + profile badge"
+                onChange={e => setForm(f => ({ ...f, reward: e.target.value }))}
               />
             </label>
           </div>
@@ -222,22 +184,8 @@ function EditMilestoneModal({
           {error && <p className="loyalty-form__error">{error}</p>}
 
           <div className="loyalty-form__actions">
-            {!isNew && (
-              <button
-                type="button"
-                className="loyalty-btn loyalty-btn--danger"
-                onClick={() => {
-                  if (window.confirm('Delete this milestone?')) onDelete(form.id);
-                }}
-              >
-                Delete
-              </button>
-            )}
-            <div className="loyalty-form__spacer" />
             <button type="button" className="loyalty-btn" onClick={onClose}>Cancel</button>
-            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={handleSave}>
-              {isNew ? 'Add star' : 'Save'}
-            </button>
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={handleSave}>Save</button>
           </div>
         </div>
       </div>
@@ -250,61 +198,109 @@ function EditMilestoneModal({
 export default function LoyaltyClient({
   signedIn,
   isAdmin,
-  profile,
-  initialMilestones,
+  trackActive,
+  currentStardust,
+  currentTier,
+  initialOverrides,
+  initialTiers,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
-  profile: ProfileData | null;
-  initialMilestones: Milestone[];
+  trackActive: boolean;
+  currentStardust: number;
+  currentTier: number;
+  initialOverrides: TierOverrides;
+  initialTiers: MergedTier[];
 }) {
-  const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
-  const [panOffset, setPanOffset] = useState(4000);
-  const [viewportWidth, setViewportWidth] = useState(1200);
-  const [activeMilestone, setActiveMilestone] = useState<PositionedMilestone | null>(null);
+  const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
+  const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
+
+  const [panOffset, setPanOffset] = useState(6000);
+  const [viewportSize, setViewportSize] = useState({ width: 1200, height: 600 });
+  const [activeTier, setActiveTier] = useState<MergedTier | null>(null);
   const [adminMode, setAdminMode] = useState(false);
-  const [editing, setEditing] = useState<{ milestone: Milestone | null; isNew: boolean } | null>(null);
+  const [editing, setEditing] = useState<MergedTier | null>(null);
+  const [previewStardust, setPreviewStardust] = useState<number | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const panOffsetRef = useRef(panOffset);
+  const viewportHeightRef = useRef(600);
   const dragRef = useRef({ dragging: false, startX: 0, startOffset: 0, moved: 0 });
   const frozenRef = useRef(false);
 
   const mainPathRef = useRef<SVGPathElement>(null);
   const decoPathRefs = useRef<(SVGPathElement | null)[]>([]);
-  const nodeRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const nodeRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
 
-  const positionedMilestones = useMemo<PositionedMilestone[]>(() => {
-    const n = milestones.length;
-    return milestones.map((m, i) => {
-      const t = n > 1 ? i / (n - 1) : 0.5;
-      return { ...m, x: START_X + t * (END_X - START_X) };
-    });
-  }, [milestones]);
-
-  const positionedRef = useRef(positionedMilestones);
-  useEffect(() => { positionedRef.current = positionedMilestones; }, [positionedMilestones]);
-  useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+  /* ---------- lock body scroll ---------- */
 
   useEffect(() => {
-    const measure = () => {
-      if (viewportRef.current) setViewportWidth(viewportRef.current.clientWidth);
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyPaddingRight = document.body.style.paddingRight;
+
+    // Compensate for scrollbar disappearance
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.paddingRight = prevBodyPaddingRight;
     };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
   }, []);
+
+  /* ---------- viewport size ---------- */
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setViewportSize({ width: rect.width, height: rect.height });
+      viewportHeightRef.current = rect.height;
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+
+  /* ---------- positioning ---------- */
+
+  const positioned = useMemo(() => {
+    return tiers.map((t, i) => {
+      const ratio = TOTAL_TIERS > 1 ? i / (TOTAL_TIERS - 1) : 0.5;
+      return { ...t, x: START_X + ratio * (END_X - START_X) };
+    });
+  }, [tiers]);
+
+  const positionedRef = useRef(positioned);
+  useEffect(() => { positionedRef.current = positioned; }, [positioned]);
 
   const clampOffset = useCallback((offset: number): number => {
     const minOffset = PADDING;
-    const maxOffset = Math.max(minOffset, WORLD_WIDTH - viewportWidth - PADDING);
+    const maxOffset = Math.max(minOffset, WORLD_WIDTH - viewportSize.width - PADDING);
     return Math.max(minOffset, Math.min(maxOffset, offset));
-  }, [viewportWidth]);
+  }, [viewportSize.width]);
 
   useEffect(() => {
-    if (viewportWidth <= 0) return;
-    setPanOffset(clampOffset(5000 - viewportWidth / 2));
-  }, [viewportWidth, clampOffset]);
+    if (viewportSize.width <= 0) return;
+    const centerX = (START_X + END_X) / 2;
+    setPanOffset(clampOffset(centerX - viewportSize.width / 2));
+  }, [viewportSize.width, clampOffset]);
+
+  /* ---------- effective stardust (preview or real) ---------- */
+
+  const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
+  const effectiveTier = tierForStardust(effectiveStardust);
+  const effectiveTierRef = useRef(effectiveTier);
+  useEffect(() => { effectiveTierRef.current = effectiveTier; }, [effectiveTier]);
 
   /* ---------- animation loop ---------- */
 
@@ -318,25 +314,23 @@ export default function LoyaltyClient({
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      const isFrozen = frozenRef.current || activeMilestone !== null || editing !== null;
+      const isFrozen = frozenRef.current || activeTier !== null || editing !== null;
       if (!isFrozen) mainT += dt;
 
       const decoT = (now - startTime) / 1000;
+      const height = viewportHeightRef.current;
 
-      // Deco paths — always animate
       decoPathRefs.current.forEach((el, i) => {
-        if (el) el.setAttribute('d', buildPath(x => decoPathY(x, i, decoT)));
+        if (el) el.setAttribute('d', buildPath(x => decoPathY(x, i, decoT, height)));
       });
 
-      // Main path — freeze with mainT
       if (mainPathRef.current) {
-        mainPathRef.current.setAttribute('d', buildPath(x => mainStringY(x, mainT)));
+        mainPathRef.current.setAttribute('d', buildPath(x => mainStringY(x, mainT, height)));
       }
 
-      // Nodes — follow main string
       positionedRef.current.forEach(m => {
-        const el = nodeRefs.current.get(m.id);
-        if (el) el.style.top = `${mainStringY(m.x, mainT)}px`;
+        const el = nodeRefs.current.get(m.tier);
+        if (el) el.style.top = `${mainStringY(m.x, mainT, height)}px`;
       });
 
       rafId = requestAnimationFrame(tick);
@@ -347,7 +341,7 @@ export default function LoyaltyClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- pan interaction ---------- */
+  /* ---------- pan ---------- */
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -384,96 +378,95 @@ export default function LoyaltyClient({
   }, [clampOffset]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      setPanOffset(o => clampOffset(o - 200));
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      setPanOffset(o => clampOffset(o + 200));
-    }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setPanOffset(o => clampOffset(o - 200)); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); setPanOffset(o => clampOffset(o + 200)); }
   }, [clampOffset]);
 
-  /* ---------- milestone helpers ---------- */
+  /* ---------- click ---------- */
 
-  const currentValue = useCallback((type: MilestoneType): number => {
-    if (!profile) return 0;
-    switch (type) {
-      case 'sub': return profile.subMonths;
-      case 'referral': return profile.referrals;
-      case 'gift': return profile.gifts;
-      case 'commissioner': return profile.isCommissioner ? 1 : 0;
-    }
-  }, [profile]);
-
-  const isUnlocked = useCallback(
-    (m: Milestone) => currentValue(m.type) >= m.threshold,
-    [currentValue]
-  );
-
-  const handleNodeClick = useCallback((m: PositionedMilestone) => {
+  const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
-    if (adminMode) {
-      setEditing({ milestone: m, isNew: false });
-    } else {
-      setActiveMilestone(m);
-    }
+    if (adminMode) setEditing(t);
+    else setActiveTier(t);
   }, [adminMode]);
 
-  /* ---------- admin save/delete ---------- */
+  /* ---------- admin save ---------- */
 
-  const saveMilestones = useCallback(async (next: Milestone[]) => {
+  const saveOverrides = useCallback(async (next: TierOverrides) => {
     const res = await fetch('/api/loyalty/milestones', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ milestones: next }),
+      body: JSON.stringify({ overrides: next }),
     });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || `HTTP ${res.status}`);
     }
     const data = await res.json();
-    setMilestones(data.milestones);
+    setOverrides(data.overrides);
   }, []);
 
-  const handleEditSave = useCallback(async (m: Milestone) => {
-    const exists = milestones.some(x => x.id === m.id);
-    const next = exists
-      ? milestones.map(x => (x.id === m.id ? m : x))
-      : [...milestones, m];
+  const handleEditSave = useCallback(async (updated: MergedTier) => {
+    const next: TierOverrides = {
+      ...overrides,
+      [String(updated.tier)]: {
+        icon: updated.icon,
+        title: updated.title,
+        description: updated.description,
+        reward: updated.reward,
+      },
+    };
     try {
-      await saveMilestones(next);
+      await saveOverrides(next);
       setEditing(null);
     } catch (err: any) {
       alert('Failed to save: ' + err.message);
     }
-  }, [milestones, saveMilestones]);
+  }, [overrides, saveOverrides]);
 
-  const handleEditDelete = useCallback(async (id: string) => {
-    const next = milestones.filter(x => x.id !== id);
-    try {
-      await saveMilestones(next);
-      setEditing(null);
-    } catch (err: any) {
-      alert('Failed to delete: ' + err.message);
-    }
-  }, [milestones, saveMilestones]);
-
-  /* ---------- ESC handler ---------- */
+  /* ---------- escape ---------- */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (editing) setEditing(null);
-      else if (activeMilestone) setActiveMilestone(null);
+      else if (activeTier) setActiveTier(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeMilestone, editing]);
+  }, [activeTier, editing]);
 
   /* ---------- render ---------- */
 
   return (
     <div className="loyalty-stage">
+      {!trackActive && (
+        <div className="loyalty-banner">
+          <span className="loyalty-banner__icon">🌌</span>
+          <span>Loyalty progression begins <strong>January 1, 2027</strong>. You can explore every tier and its reward now.</span>
+        </div>
+      )}
+
+      {trackActive && signedIn && (
+        <div className="loyalty-progress-bar">
+          <div className="loyalty-progress-bar__text">
+            <span className="loyalty-progress-bar__label">Stardust</span>
+            <span className="loyalty-progress-bar__value">
+              {effectiveStardust.toLocaleString()} / {TOTAL_TRACK_COST.toLocaleString()}
+            </span>
+            <span className="loyalty-progress-bar__tier">
+              Tier {effectiveTier} / {TOTAL_TIERS}
+            </span>
+          </div>
+          <div className="loyalty-progress-bar__track">
+            <div
+              className="loyalty-progress-bar__fill"
+              style={{ width: `${Math.min(100, (effectiveStardust / TOTAL_TRACK_COST) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {isAdmin && (
         <div className="loyalty-admin-bar">
           <button
@@ -481,17 +474,31 @@ export default function LoyaltyClient({
             className={`loyalty-admin-toggle ${adminMode ? 'is-on' : ''}`}
             onClick={() => setAdminMode(v => !v)}
           >
-            {adminMode ? '✕ Exit edit mode' : '⚙️ Edit milestones'}
+            {adminMode ? '✕ Exit edit mode' : '⚙️ Edit tiers'}
           </button>
-          {adminMode && (
+          <div className="loyalty-admin-preview">
+            <label htmlFor="preview-stardust">Preview stardust</label>
+            <input
+              id="preview-stardust"
+              type="number"
+              min={0}
+              max={TOTAL_TRACK_COST}
+              placeholder={trackActive ? String(currentStardust) : '0'}
+              value={previewStardust ?? ''}
+              onChange={e => {
+                const v = e.target.value.trim();
+                setPreviewStardust(v === '' ? null : Math.max(0, Math.min(TOTAL_TRACK_COST, Number(v) || 0)));
+              }}
+            />
             <button
               type="button"
-              className="loyalty-admin-add"
-              onClick={() => setEditing({ milestone: null, isNew: true })}
+              className="loyalty-admin-reset"
+              onClick={() => setPreviewStardust(null)}
+              disabled={previewStardust === null}
             >
-              + Add star
+              Reset
             </button>
-          )}
+          </div>
         </div>
       )}
 
@@ -502,7 +509,7 @@ export default function LoyaltyClient({
         onKeyDown={handleKeyDown}
         tabIndex={0}
         role="region"
-        aria-label="Loyalty milestone journey"
+        aria-label="Loyalty tier track"
       >
         <div className="loyalty-edge-fade loyalty-edge-fade--left" />
         <div className="loyalty-edge-fade loyalty-edge-fade--right" />
@@ -511,8 +518,8 @@ export default function LoyaltyClient({
           <svg
             className="loyalty-svg"
             width={WORLD_WIDTH}
-            height={SVG_HEIGHT}
-            viewBox={`0 0 ${WORLD_WIDTH} ${SVG_HEIGHT}`}
+            height={viewportSize.height}
+            viewBox={`0 0 ${WORLD_WIDTH} ${viewportSize.height}`}
             aria-hidden="true"
           >
             <defs>
@@ -564,28 +571,30 @@ export default function LoyaltyClient({
             />
           </svg>
 
-          {positionedMilestones.map(m => {
-            const unlocked = isUnlocked(m);
+          {positioned.map(m => {
+            const unlocked = m.tier <= effectiveTier;
+            const size = starSize(m.tier);
+            const showLabel = m.tier === 100 || m.tier % 5 === 0;
             return (
               <button
-                key={m.id}
+                key={m.tier}
                 type="button"
                 className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
-                style={{ left: m.x, top: mainStringY(m.x, 0) }}
+                style={{ left: m.x, top: mainStringY(m.x, 0, viewportSize.height), transform: 'translate(-50%, -50%)' }}
                 ref={el => {
-                  if (el) nodeRefs.current.set(m.id, el);
-                  else nodeRefs.current.delete(m.id);
+                  if (el) nodeRefs.current.set(m.tier, el);
+                  else nodeRefs.current.delete(m.tier);
                 }}
                 onPointerEnter={() => { frozenRef.current = true; }}
                 onPointerLeave={() => { frozenRef.current = false; }}
                 onClick={() => handleNodeClick(m)}
-                aria-label={`${m.title}${unlocked ? ' (unlocked)' : ' (locked)'}: ${m.label}`}
+                aria-label={`Tier ${m.tier}: ${m.title}${unlocked ? ' (unlocked)' : ''}`}
               >
-                <span className="loyalty-node__star-wrap">
-                  <StarShape unlocked={unlocked} />
+                <span className="loyalty-node__wrap" style={{ width: size, height: size }}>
+                  <StarSVG tier={m.tier} size={size} unlocked={unlocked} />
                   <span className="loyalty-node__icon">{m.icon}</span>
                 </span>
-                <span className="loyalty-node__label">{m.label}</span>
+                {showLabel && <span className="loyalty-node__label">{m.tier}</span>}
                 {adminMode && <span className="loyalty-node__edit-badge">✎</span>}
               </button>
             );
@@ -594,38 +603,44 @@ export default function LoyaltyClient({
       </div>
 
       <div className="loyalty-hint">
-        {adminMode ? 'Click a star to edit • Use “+ Add star” to create one' : 'Drag, scroll, or use arrow keys to explore'}
+        {adminMode ? 'Click any star to edit its reward' : 'Drag or use arrow keys to pan'}
       </div>
 
-      {activeMilestone && !adminMode && (
-        <div className="loyalty-modal-overlay" onClick={() => setActiveMilestone(null)}>
+      {activeTier && !adminMode && (
+        <div className="loyalty-modal-overlay" onClick={() => setActiveTier(null)}>
           <div className="loyalty-modal" onClick={e => e.stopPropagation()}>
-            <button className="loyalty-modal__close" onClick={() => setActiveMilestone(null)} aria-label="Close">×</button>
+            <button className="loyalty-modal__close" onClick={() => setActiveTier(null)} aria-label="Close">×</button>
             <div className="loyalty-modal__star-big">
-              <StarShape unlocked={isUnlocked(activeMilestone)} />
-              <span className="loyalty-modal__star-icon">{activeMilestone.icon}</span>
+              <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} />
+              <span className="loyalty-modal__star-icon">{activeTier.icon}</span>
             </div>
             <div className="loyalty-modal__body">
-              <div className="loyalty-modal__eyebrow">{activeMilestone.label}</div>
-              <h2 className="loyalty-modal__title">{activeMilestone.title}</h2>
-              <p className="loyalty-modal__description">{activeMilestone.description}</p>
+              <div className="loyalty-modal__eyebrow">
+                Tier {activeTier.tier} · {activeTier.stardustRequired.toLocaleString()} stardust
+              </div>
+              <h2 className="loyalty-modal__title">{activeTier.title}</h2>
+              <p className="loyalty-modal__description">{activeTier.description}</p>
               <div className="loyalty-modal__reward">
                 <div className="loyalty-modal__reward-label">Reward</div>
-                <div className="loyalty-modal__reward-text">{activeMilestone.reward}</div>
+                <div className="loyalty-modal__reward-text">{activeTier.reward}</div>
               </div>
-              {signedIn ? (
-                isUnlocked(activeMilestone) ? (
+              {!trackActive ? (
+                <div className="loyalty-modal__status loyalty-modal__status--signin">
+                  Track opens January 1, 2027
+                </div>
+              ) : signedIn ? (
+                activeTier.tier <= effectiveTier ? (
                   <div className="loyalty-modal__status loyalty-modal__status--unlocked">✓ Unlocked</div>
                 ) : (
                   <div className="loyalty-modal__status loyalty-modal__status--progress">
                     <div className="loyalty-modal__progress-text">
-                      {currentValue(activeMilestone.type)} / {activeMilestone.threshold}
+                      {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
                     </div>
                     <div className="loyalty-modal__progress-bar">
                       <div
                         className="loyalty-modal__progress-fill"
                         style={{
-                          width: `${Math.min(100, (currentValue(activeMilestone.type) / activeMilestone.threshold) * 100)}%`,
+                          width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%`,
                         }}
                       />
                     </div>
@@ -642,11 +657,9 @@ export default function LoyaltyClient({
       )}
 
       {editing && (
-        <EditMilestoneModal
-          initial={editing.milestone}
-          isNew={editing.isNew}
+        <EditTierModal
+          tier={editing}
           onSave={handleEditSave}
-          onDelete={handleEditDelete}
           onClose={() => setEditing(null)}
         />
       )}

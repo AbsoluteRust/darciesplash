@@ -1,8 +1,13 @@
 // app/loyalty/page.tsx
 import { auth } from '@/auth';
 import { kv } from '@vercel/kv';
-import { DEFAULT_MILESTONES, type Milestone } from '@/lib/loyalty-milestones';
 import { ADMIN_IDS } from '@/lib/admin';
+import {
+  buildAllTiers,
+  isTrackActive,
+  tierForStardust,
+  type TierOverrides,
+} from '@/lib/loyalty-milestones';
 import LoyaltyClient from './LoyaltyClient';
 import './page.css';
 
@@ -18,9 +23,14 @@ export default async function LoyaltyPage() {
   const userId = session?.user?.id || null;
   const isAdmin = !!userId && ADMIN_IDS.has(userId);
 
-  const stored = await kv.get('loyalty_milestones').catch(() => null);
-  const milestones: Milestone[] =
-    Array.isArray(stored) && stored.length > 0 ? (stored as Milestone[]) : DEFAULT_MILESTONES;
+  const storedOverrides = await kv.get('loyalty_tiers').catch(() => null);
+  const overrides: TierOverrides =
+    storedOverrides && typeof storedOverrides === 'object'
+      ? (storedOverrides as TierOverrides)
+      : {};
+  const tiers = buildAllTiers(overrides);
+
+  const trackActive = isTrackActive();
 
   let profile: {
     subMonths: number;
@@ -31,7 +41,6 @@ export default async function LoyaltyPage() {
 
   if (userId) {
     const botUrl = (process.env.PI_BOT_URL || '').replace(/\/$/, '');
-
     const [rawBadges, roles, kofiData] = await Promise.all([
       kv.hgetall(`user_badges:${userId}`).catch(() => null),
       kv.get(`account_roles:${userId}`).catch(() => null),
@@ -44,7 +53,6 @@ export default async function LoyaltyPage() {
             .catch(() => ({ months: 0 }))
         : Promise.resolve({ months: 0 }),
     ]);
-
     const b = rawBadges || {};
     const r = roles || {};
     profile = {
@@ -55,19 +63,33 @@ export default async function LoyaltyPage() {
     };
   }
 
+  // Major-action stardust. Weekly bonus stardust is not yet tracked per-user;
+  // when it is (post-2027), add it to `currentStardust` here.
+  let currentStardust = 0;
+  if (trackActive && profile) {
+    currentStardust = profile.subMonths * 6800
+      + profile.referrals * 6800
+      + profile.gifts * 6800
+      + (profile.isCommissioner ? 6800 : 0);
+  }
+  const currentTier = tierForStardust(currentStardust);
+
   return (
     <div className="loyalty-page">
       <div className="loyalty-header">
         <h1 className="loyalty-title">Your Loyalty Journey</h1>
         <p className="loyalty-subtitle">
-          Drag through the stars to explore every milestone you&apos;ve reached — and the ones still ahead.
+          Drag through the stars. Every tier is a step along the path — click any star to inspect its reward.
         </p>
       </div>
       <LoyaltyClient
         signedIn={!!userId}
         isAdmin={isAdmin}
-        profile={profile}
-        initialMilestones={milestones}
+        trackActive={trackActive}
+        currentStardust={currentStardust}
+        currentTier={currentTier}
+        initialOverrides={overrides}
+        initialTiers={tiers}
       />
     </div>
   );

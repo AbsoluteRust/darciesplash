@@ -3,18 +3,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { kv } from "@vercel/kv";
 import { ADMIN_IDS } from "@/lib/admin";
-import { DEFAULT_MILESTONES, type Milestone, type MilestoneType } from "@/lib/loyalty-milestones";
+import type { TierOverrides } from "@/lib/loyalty-milestones";
 
 export const dynamic = 'force-dynamic';
 
-const KEY = "loyalty_milestones";
-const VALID_TYPES: MilestoneType[] = ["sub", "referral", "gift", "commissioner"];
+const KEY = "loyalty_tiers";
 
 export async function GET() {
   const stored = await kv.get(KEY);
-  const milestones =
-    Array.isArray(stored) && stored.length > 0 ? stored : DEFAULT_MILESTONES;
-  return NextResponse.json({ milestones, isDefault: !stored });
+  const overrides: TierOverrides =
+    stored && typeof stored === "object" ? (stored as TierOverrides) : {};
+  return NextResponse.json({ overrides });
 }
 
 export async function POST(req: Request) {
@@ -24,42 +23,30 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => null);
-  const milestones = body?.milestones;
-  if (!Array.isArray(milestones)) {
-    return NextResponse.json({ error: "Missing milestones array" }, { status: 400 });
-  }
-  if (milestones.length > 60) {
-    return NextResponse.json({ error: "Too many milestones (max 60)" }, { status: 400 });
+  const incoming = body?.overrides;
+  if (!incoming || typeof incoming !== "object") {
+    return NextResponse.json({ error: "Missing overrides object" }, { status: 400 });
   }
 
-  const cleaned: Milestone[] = [];
-  for (let i = 0; i < milestones.length; i++) {
-    const m = milestones[i];
-    if (!m || typeof m !== "object") {
-      return NextResponse.json({ error: `Invalid milestone at index ${i}` }, { status: 400 });
-    }
-    const type = String(m.type || "");
-    if (!VALID_TYPES.includes(type as MilestoneType)) {
-      return NextResponse.json({ error: `Invalid type at index ${i}` }, { status: 400 });
-    }
-    const id = String(m.id || `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
-    cleaned.push({
-      id,
-      type: type as MilestoneType,
-      threshold: Math.max(1, Math.floor(Number(m.threshold) || 1)),
-      icon: String(m.icon || "⭐").slice(0, 8),
-      label: String(m.label || "").slice(0, 60),
-      title: String(m.title || "").slice(0, 100),
-      description: String(m.description || "").slice(0, 500),
-      reward: String(m.reward || "").slice(0, 300),
-    });
+  const cleaned: TierOverrides = {};
+  for (const [tierKey, val] of Object.entries(incoming)) {
+    const tier = Number(tierKey);
+    if (!Number.isInteger(tier) || tier < 1 || tier > 100) continue;
+    if (!val || typeof val !== "object") continue;
+    const t = val as TierOverride;
+    const entry: TierOverride = {};
+    if (typeof t.icon === "string" && t.icon.trim()) entry.icon = t.icon.slice(0, 8);
+    if (typeof t.title === "string" && t.title.trim()) entry.title = t.title.slice(0, 100);
+    if (typeof t.description === "string" && t.description.trim()) entry.description = t.description.slice(0, 500);
+    if (typeof t.reward === "string" && t.reward.trim()) entry.reward = t.reward.slice(0, 300);
+    if (Object.keys(entry).length > 0) cleaned[String(tier)] = entry;
   }
 
-  if (cleaned.length === 0) {
+  if (Object.keys(cleaned).length === 0) {
     await kv.del(KEY);
   } else {
     await kv.set(KEY, cleaned);
   }
 
-  return NextResponse.json({ ok: true, milestones: cleaned });
+  return NextResponse.json({ ok: true, overrides: cleaned });
 }
