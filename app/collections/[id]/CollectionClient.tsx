@@ -1228,7 +1228,7 @@ export default function CollectionClient({
       )}
 
       {editMode && editLayout && (
-        <div className="collection-edit-toolbar">
+  <div className="collection-edit-toolbar" style={{ position: "relative", zIndex: 50 }}>
           <div className="toolbar-row">
             <label className="toolbar-label">Layout</label>
             <div className="toolbar-tabs">
