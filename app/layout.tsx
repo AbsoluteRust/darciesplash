@@ -40,7 +40,6 @@ export default async function RootLayout({ children, }: Readonly<{
                             <CollectionFilterProvider>
                                 <Navbar />
                                 <div style={{ minHeight: '100vh' }}>{children}</div>
-                                <Footer />
                             </CollectionFilterProvider>
                         </RarityModeProvider>
                     </PageLoadingProvider>
