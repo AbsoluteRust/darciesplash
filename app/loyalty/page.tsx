@@ -6,6 +6,8 @@ import {
   buildAllTiers,
   isTrackActive,
   tierForStardust,
+  DEFAULT_THEME,
+  type LoyaltyTheme,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
 import LoyaltyClient from './LoyaltyClient';
@@ -23,13 +25,21 @@ export default async function LoyaltyPage() {
   const userId = session?.user?.id || null;
   const isAdmin = !!userId && ADMIN_IDS.has(userId);
 
-  const storedOverrides = await kv.get('loyalty_tiers').catch(() => null);
+  const [storedOverrides, storedTheme] = await Promise.all([
+    kv.get('loyalty_tiers').catch(() => null),
+    kv.get('loyalty_theme').catch(() => null),
+  ]);
+
   const overrides: TierOverrides =
     storedOverrides && typeof storedOverrides === 'object'
       ? (storedOverrides as TierOverrides)
       : {};
-  const tiers = buildAllTiers(overrides);
+  const theme: LoyaltyTheme =
+    storedTheme && typeof storedTheme === 'object'
+      ? { ...DEFAULT_THEME, ...(storedTheme as Partial<LoyaltyTheme>) }
+      : DEFAULT_THEME;
 
+  const tiers = buildAllTiers(overrides);
   const trackActive = isTrackActive();
 
   let profile: {
@@ -63,8 +73,6 @@ export default async function LoyaltyPage() {
     };
   }
 
-  // Major-action stardust. Weekly bonus stardust is not yet tracked per-user;
-  // when it is (post-2027), add it to `currentStardust` here.
   let currentStardust = 0;
   if (trackActive && profile) {
     currentStardust = profile.subMonths * 6800
@@ -75,22 +83,15 @@ export default async function LoyaltyPage() {
   const currentTier = tierForStardust(currentStardust);
 
   return (
-    <div className="loyalty-page">
-      <div className="loyalty-header">
-        <h1 className="loyalty-title">Your Loyalty Journey</h1>
-        <p className="loyalty-subtitle">
-          Drag through the stars. Every tier is a step along the path — click any star to inspect its reward.
-        </p>
-      </div>
-      <LoyaltyClient
-        signedIn={!!userId}
-        isAdmin={isAdmin}
-        trackActive={trackActive}
-        currentStardust={currentStardust}
-        currentTier={currentTier}
-        initialOverrides={overrides}
-        initialTiers={tiers}
-      />
-    </div>
+    <LoyaltyClient
+      signedIn={!!userId}
+      isAdmin={isAdmin}
+      trackActive={trackActive}
+      currentStardust={currentStardust}
+      currentTier={currentTier}
+      initialOverrides={overrides}
+      initialTiers={tiers}
+      initialTheme={theme}
+    />
   );
 }

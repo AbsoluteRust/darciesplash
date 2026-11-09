@@ -4,9 +4,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildAllTiers,
+  DEFAULT_THEME,
+  THEME_GROUPS,
+  themeCssVars,
+  hexToRgba,
   TOTAL_TIERS,
   TOTAL_TRACK_COST,
   tierForStardust,
+  type LoyaltyTheme,
   type MergedTier,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
@@ -15,8 +20,6 @@ const WORLD_WIDTH = 16000;
 const START_X = 2400;
 const END_X = 13600;
 const PADDING = 300;
-
-/* ---------- wave math ---------- */
 
 function mainStringY(x: number, t: number, height: number): number {
   const center = height / 2;
@@ -28,7 +31,6 @@ function mainStringY(x: number, t: number, height: number): number {
 }
 
 const DECO_AMPS = [120, 90, 60, 150, 100];
-const DECO_COLORS = ['#FED1F2', '#E5B8F0', '#C99EE8', '#B08BD5', '#D4A8DC'];
 
 function decoPathY(x: number, idx: number, t: number, height: number): number {
   const center = height / 2;
@@ -52,15 +54,11 @@ function buildPath(fn: (x: number) => number): string {
   return d;
 }
 
-/* ---------- major-tier logic ---------- */
-
 function isMajorTier(tier: number): boolean {
   if (tier === 100) return true;
   if (tier > 0 && tier % 8 === 0) return true;
   return false;
 }
-
-/* ---------- star sizing + colors ---------- */
 
 function starSize(tier: number): number {
   if (tier === 100) return 96;
@@ -70,23 +68,23 @@ function starSize(tier: number): number {
   return 46;
 }
 
-function starPalette(tier: number, unlocked: boolean): { stroke: string; fill: string; glow: string } {
+function starPalette(tier: number, unlocked: boolean, theme: LoyaltyTheme) {
   if (!unlocked) {
     return {
-      stroke: 'rgba(180, 165, 200, 0.45)',
-      fill: 'rgba(45, 36, 70, 0.6)',
-      glow: 'rgba(180, 165, 200, 0.1)',
+      stroke: hexToRgba(theme.starLocked, 0.45),
+      fill: hexToRgba(theme.starLocked, 0.15),
+      glow: hexToRgba(theme.starLocked, 0.1),
     };
   }
-  if (tier === 100)      return { stroke: 'rgba(255, 255, 255, 0.98)',    fill: 'rgba(254, 209, 242, 0.4)',  glow: 'rgba(254, 209, 242, 0.9)' };
-  if (isMajorTier(tier)) return { stroke: 'rgba(254, 209, 242, 0.98)',    fill: 'rgba(254, 209, 242, 0.28)', glow: 'rgba(254, 209, 242, 0.7)' };
-  if (tier % 10 === 0)   return { stroke: 'rgba(254, 209, 242, 0.85)',    fill: 'rgba(254, 209, 242, 0.2)',  glow: 'rgba(254, 209, 242, 0.55)' };
-  if (tier % 5 === 0)    return { stroke: 'rgba(254, 209, 242, 0.7)',     fill: 'rgba(254, 209, 242, 0.14)', glow: 'rgba(254, 209, 242, 0.4)' };
-  return { stroke: 'rgba(254, 209, 242, 0.55)', fill: 'rgba(254, 209, 242, 0.1)', glow: 'rgba(254, 209, 242, 0.25)' };
+  if (tier === 100)      return { stroke: hexToRgba(theme.starFinal, 0.98), fill: hexToRgba(theme.starFinal, 0.4), glow: hexToRgba(theme.starFinal, 0.9) };
+  if (isMajorTier(tier)) return { stroke: hexToRgba(theme.starMajor, 0.98), fill: hexToRgba(theme.starMajor, 0.28), glow: hexToRgba(theme.starMajor, 0.7) };
+  if (tier % 10 === 0)   return { stroke: hexToRgba(theme.starTen, 0.85), fill: hexToRgba(theme.starTen, 0.2), glow: hexToRgba(theme.starTen, 0.55) };
+  if (tier % 5 === 0)    return { stroke: hexToRgba(theme.starFive, 0.7), fill: hexToRgba(theme.starFive, 0.14), glow: hexToRgba(theme.starFive, 0.4) };
+  return { stroke: hexToRgba(theme.starRegular, 0.55), fill: hexToRgba(theme.starRegular, 0.1), glow: hexToRgba(theme.starRegular, 0.25) };
 }
 
-function StarSVG({ tier, size, unlocked }: { tier: number; size: number; unlocked: boolean }) {
-  const pal = starPalette(tier, unlocked);
+function StarSVG({ tier, size, unlocked, theme }: { tier: number; size: number; unlocked: boolean; theme: LoyaltyTheme }) {
+  const pal = starPalette(tier, unlocked, theme);
   const haloId = `halo-t${tier}-${unlocked ? 'u' : 'l'}`;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="loyalty-star-svg" aria-hidden="true">
@@ -109,7 +107,7 @@ function StarSVG({ tier, size, unlocked }: { tier: number; size: number; unlocke
   );
 }
 
-/* ---------- edit modal ---------- */
+/* ---------- edit tier modal ---------- */
 
 function EditTierModal({
   tier,
@@ -200,6 +198,97 @@ function EditTierModal({
   );
 }
 
+/* ---------- edit theme modal ---------- */
+
+function EditThemeModal({
+  theme,
+  onPreview,
+  onSave,
+  onClose,
+}: {
+  theme: LoyaltyTheme;
+  onPreview: (t: LoyaltyTheme) => void;
+  onSave: (t: LoyaltyTheme) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState<LoyaltyTheme>(theme);
+  const [error, setError] = useState<string | null>(null);
+
+  function update<K extends keyof LoyaltyTheme>(key: K, val: string) {
+    const next = { ...draft, [key]: val };
+    setDraft(next);
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) {
+      onPreview(next);
+    }
+  }
+
+  function handleReset() {
+    setDraft(DEFAULT_THEME);
+    onPreview(DEFAULT_THEME);
+  }
+
+  function handleSave() {
+    for (const [k, v] of Object.entries(draft)) {
+      if (!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
+        return setError(`Invalid hex for "${k}"`);
+      }
+    }
+    setError(null);
+    onSave(draft);
+  }
+
+  return (
+    <div className="loyalty-modal-overlay" onClick={onClose}>
+      <div className="loyalty-modal loyalty-modal--theme" onClick={e => e.stopPropagation()}>
+        <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
+        <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
+          <div className="loyalty-modal__eyebrow">Admin · Theme</div>
+          <h2 className="loyalty-modal__title">Edit Page Colours</h2>
+          <p className="loyalty-modal__description" style={{ marginBottom: '1rem' }}>
+            Changes preview live. Save to publish for everyone.
+          </p>
+
+          <div className="loyalty-theme-groups">
+            {THEME_GROUPS.map(group => (
+              <div key={group.name} className="loyalty-theme-group">
+                <div className="loyalty-theme-group__title">{group.name}</div>
+                {group.keys.map(c => (
+                  <label key={c.key} className="loyalty-theme-row">
+                    <span className="loyalty-theme-row__label">{c.label}</span>
+                    <span className="loyalty-theme-row__swatch" style={{ background: draft[c.key] }} />
+                    <input
+                      type="color"
+                      value={draft[c.key]}
+                      onChange={e => update(c.key, e.target.value)}
+                      className="loyalty-theme-row__picker"
+                    />
+                    <input
+                      type="text"
+                      value={draft[c.key]}
+                      onChange={e => update(c.key, e.target.value)}
+                      maxLength={7}
+                      className="loyalty-theme-row__hex"
+                    />
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {error && <p className="loyalty-form__error">{error}</p>}
+
+          <div className="loyalty-form__actions">
+            <button type="button" className="loyalty-btn" onClick={handleReset}>Reset to defaults</button>
+            <div style={{ flex: 1 }} />
+            <button type="button" className="loyalty-btn" onClick={onClose}>Cancel</button>
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={handleSave}>Save</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- main component ---------- */
 
 export default function LoyaltyClient({
@@ -210,6 +299,7 @@ export default function LoyaltyClient({
   currentTier,
   initialOverrides,
   initialTiers,
+  initialTheme,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
@@ -218,9 +308,14 @@ export default function LoyaltyClient({
   currentTier: number;
   initialOverrides: TierOverrides;
   initialTiers: MergedTier[];
+  initialTheme: LoyaltyTheme;
 }) {
   const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
   const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
+
+  const [theme, setTheme] = useState<LoyaltyTheme>(initialTheme);
+  const [themeSnapshot, setThemeSnapshot] = useState<LoyaltyTheme | null>(null);
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const [panOffset, setPanOffset] = useState(6000);
   const [viewportSize, setViewportSize] = useState({ width: 1200, height: 600 });
@@ -238,6 +333,12 @@ export default function LoyaltyClient({
   const mainPathRef = useRef<SVGPathElement>(null);
   const decoPathRefs = useRef<(SVGPathElement | null)[]>([]);
   const nodeRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+
+  const cssVars = useMemo(() => themeCssVars(theme) as React.CSSProperties, [theme]);
+  const decoColors = useMemo(
+    () => [theme.deco1, theme.deco2, theme.deco3, theme.deco4, theme.deco5],
+    [theme]
+  );
 
   /* ---------- lock body scroll ---------- */
 
@@ -259,8 +360,6 @@ export default function LoyaltyClient({
     };
   }, []);
 
-  /* ---------- viewport size ---------- */
-
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
@@ -276,8 +375,6 @@ export default function LoyaltyClient({
   }, []);
 
   useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
-
-  /* ---------- positioning ---------- */
 
   const positioned = useMemo(() => {
     return tiers.map((t, i) => {
@@ -301,12 +398,8 @@ export default function LoyaltyClient({
     setPanOffset(clampOffset(centerX - viewportSize.width / 2));
   }, [viewportSize.width, clampOffset]);
 
-  /* ---------- effective stardust ---------- */
-
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
-  const effectiveTierRef = useRef(effectiveTier);
-  useEffect(() => { effectiveTierRef.current = effectiveTier; }, [effectiveTier]);
 
   /* ---------- animation loop ---------- */
 
@@ -388,15 +481,13 @@ export default function LoyaltyClient({
     else if (e.key === 'ArrowRight') { e.preventDefault(); setPanOffset(o => clampOffset(o + 200)); }
   }, [clampOffset]);
 
-  /* ---------- click ---------- */
-
   const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
     if (adminMode) setEditing(t);
     else setActiveTier(t);
   }, [adminMode]);
 
-  /* ---------- admin save ---------- */
+  /* ---------- admin saves ---------- */
 
   const saveOverrides = useCallback(async (next: TierOverrides) => {
     const res = await fetch('/api/loyalty/milestones', {
@@ -430,186 +521,234 @@ export default function LoyaltyClient({
     }
   }, [overrides, saveOverrides]);
 
+  const handleThemePreview = useCallback((next: LoyaltyTheme) => {
+    setTheme(next);
+  }, []);
+
+  const handleThemeOpen = useCallback(() => {
+    setThemeSnapshot(theme);
+    setThemeOpen(true);
+  }, [theme]);
+
+  const handleThemeCancel = useCallback(() => {
+    if (themeSnapshot) setTheme(themeSnapshot);
+    setThemeSnapshot(null);
+    setThemeOpen(false);
+  }, [themeSnapshot]);
+
+  const handleThemeSave = useCallback(async (next: LoyaltyTheme) => {
+    try {
+      const res = await fetch('/api/loyalty/theme', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ theme: next }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      setTheme(data.theme);
+      setThemeSnapshot(null);
+      setThemeOpen(false);
+    } catch (err: any) {
+      alert('Failed to save theme: ' + err.message);
+    }
+  }, []);
+
   /* ---------- escape ---------- */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (themeOpen) { handleThemeCancel(); return; }
       if (editing) setEditing(null);
       else if (activeTier) setActiveTier(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeTier, editing]);
+  }, [activeTier, editing, themeOpen, handleThemeCancel]);
 
   /* ---------- render ---------- */
 
   return (
-    <div className="loyalty-stage">
-      {!trackActive && (
-        <div className="loyalty-banner">
-          <span className="loyalty-banner__icon">🌌</span>
-          <span>Loyalty progression begins <strong>January 1, 2027</strong>. You can explore every tier and its reward now.</span>
-        </div>
-      )}
-
-      {trackActive && signedIn && (
-        <div className="loyalty-progress-bar">
-          <div className="loyalty-progress-bar__text">
-            <span className="loyalty-progress-bar__label">Stardust</span>
-            <span className="loyalty-progress-bar__value">
-              {effectiveStardust.toLocaleString()} / {TOTAL_TRACK_COST.toLocaleString()}
-            </span>
-            <span className="loyalty-progress-bar__tier">
-              Tier {effectiveTier} / {TOTAL_TIERS}
-            </span>
-          </div>
-          <div className="loyalty-progress-bar__track">
-            <div
-              className="loyalty-progress-bar__fill"
-              style={{ width: `${Math.min(100, (effectiveStardust / TOTAL_TRACK_COST) * 100)}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {isAdmin && (
-        <div className="loyalty-admin-bar">
-          <button
-            type="button"
-            className={`loyalty-admin-toggle ${adminMode ? 'is-on' : ''}`}
-            onClick={() => setAdminMode(v => !v)}
-          >
-            {adminMode ? '✕ Exit edit mode' : '⚙️ Edit tiers'}
-          </button>
-          <div className="loyalty-admin-preview">
-            <label htmlFor="preview-stardust">Preview stardust</label>
-            <input
-              id="preview-stardust"
-              type="number"
-              min={0}
-              max={TOTAL_TRACK_COST}
-              placeholder={trackActive ? String(currentStardust) : '0'}
-              value={previewStardust ?? ''}
-              onChange={e => {
-                const v = e.target.value.trim();
-                setPreviewStardust(v === '' ? null : Math.max(0, Math.min(TOTAL_TRACK_COST, Number(v) || 0)));
-              }}
-            />
-            <button
-              type="button"
-              className="loyalty-admin-reset"
-              onClick={() => setPreviewStardust(null)}
-              disabled={previewStardust === null}
-            >
-              Reset
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div
-        ref={viewportRef}
-        className={`loyalty-viewport ${adminMode ? 'is-editing' : ''}`}
-        onPointerDown={handlePointerDown}
-        onKeyDown={handleKeyDown}
-        tabIndex={0}
-        role="region"
-        aria-label="Loyalty tier track"
-      >
-        <div className="loyalty-edge-fade loyalty-edge-fade--left" />
-        <div className="loyalty-edge-fade loyalty-edge-fade--right" />
-
-        <div className="loyalty-world" style={{ transform: `translateX(${-panOffset}px)` }}>
-          <svg
-            className="loyalty-svg"
-            width={WORLD_WIDTH}
-            height={viewportSize.height}
-            viewBox={`0 0 ${WORLD_WIDTH} ${viewportSize.height}`}
-            aria-hidden="true"
-          >
-            <defs>
-              {DECO_COLORS.map((color, i) => (
-                <linearGradient key={i} id={`deco-grad-${i}`} x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor={color} stopOpacity="0" />
-                  <stop offset="15%" stopColor={color} stopOpacity="0.14" />
-                  <stop offset="50%" stopColor={color} stopOpacity="0.3" />
-                  <stop offset="85%" stopColor={color} stopOpacity="0.14" />
-                  <stop offset="100%" stopColor={color} stopOpacity="0" />
-                </linearGradient>
-              ))}
-              <linearGradient id="main-grad" x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#FED1F2" stopOpacity="0" />
-                <stop offset="10%" stopColor="#FED1F2" stopOpacity="0.35" />
-                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.85" />
-                <stop offset="90%" stopColor="#FED1F2" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#FED1F2" stopOpacity="0" />
-              </linearGradient>
-              <filter id="loyalty-glow">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {DECO_COLORS.map((_, i) => (
-              <path
-                key={i}
-                ref={el => { decoPathRefs.current[i] = el; }}
-                fill="none"
-                stroke={`url(#deco-grad-${i})`}
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
-
-            <path
-              ref={mainPathRef}
-              fill="none"
-              stroke="url(#main-grad)"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#loyalty-glow)"
-            />
-          </svg>
-
-          {positioned.map(m => {
-            const unlocked = m.tier <= effectiveTier;
-            const size = starSize(m.tier);
-            const showLabel = isMajorTier(m.tier);
-            return (
-              <button
-                key={m.tier}
-                type="button"
-                className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
-                style={{ left: m.x, top: mainStringY(m.x, 0, viewportSize.height), transform: 'translate(-50%, -50%)' }}
-                ref={el => {
-                  if (el) nodeRefs.current.set(m.tier, el);
-                  else nodeRefs.current.delete(m.tier);
-                }}
-                onPointerEnter={() => { frozenRef.current = true; }}
-                onPointerLeave={() => { frozenRef.current = false; }}
-                onClick={() => handleNodeClick(m)}
-                aria-label={`Tier ${m.tier}: ${m.title}${unlocked ? ' (unlocked)' : ''}`}
-              >
-                <span className="loyalty-node__wrap" style={{ width: size, height: size }}>
-                  <StarSVG tier={m.tier} size={size} unlocked={unlocked} />
-                  <span className="loyalty-node__icon">{m.icon}</span>
-                </span>
-                {showLabel && <span className="loyalty-node__label">{m.tier}</span>}
-                {adminMode && <span className="loyalty-node__edit-badge">✎</span>}
-              </button>
-            );
-          })}
-        </div>
+    <div className="loyalty-page" style={cssVars}>
+      <div className="loyalty-header">
+        <h1 className="loyalty-title">Your Loyalty Journey</h1>
+        <p className="loyalty-subtitle">
+          Drag through the stars. Every tier is a step along the path — click any star to inspect its reward.
+        </p>
       </div>
 
-      <div className="loyalty-hint">
-        {adminMode ? 'Click any star to edit its reward' : 'Drag or use arrow keys to pan'}
+      <div className="loyalty-stage">
+        {!trackActive && (
+          <div className="loyalty-banner">
+            <span className="loyalty-banner__icon">🌌</span>
+            <span>Loyalty progression begins <strong>January 1, 2027</strong>. You can explore every tier and its reward now.</span>
+          </div>
+        )}
+
+        {trackActive && signedIn && (
+          <div className="loyalty-progress-bar">
+            <div className="loyalty-progress-bar__text">
+              <span className="loyalty-progress-bar__label">Stardust</span>
+              <span className="loyalty-progress-bar__value">
+                {effectiveStardust.toLocaleString()} / {TOTAL_TRACK_COST.toLocaleString()}
+              </span>
+              <span className="loyalty-progress-bar__tier">
+                Tier {effectiveTier} / {TOTAL_TIERS}
+              </span>
+            </div>
+            <div className="loyalty-progress-bar__track">
+              <div
+                className="loyalty-progress-bar__fill"
+                style={{ width: `${Math.min(100, (effectiveStardust / TOTAL_TRACK_COST) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="loyalty-admin-bar">
+            <button type="button" className="loyalty-admin-toggle" onClick={handleThemeOpen}>
+              🎨 Edit theme
+            </button>
+            <button
+              type="button"
+              className={`loyalty-admin-toggle ${adminMode ? 'is-on' : ''}`}
+              onClick={() => setAdminMode(v => !v)}
+            >
+              {adminMode ? '✕ Exit edit mode' : '⚙️ Edit tiers'}
+            </button>
+            <div className="loyalty-admin-preview">
+              <label htmlFor="preview-stardust">Preview stardust</label>
+              <input
+                id="preview-stardust"
+                type="number"
+                min={0}
+                max={TOTAL_TRACK_COST}
+                placeholder={trackActive ? String(currentStardust) : '0'}
+                value={previewStardust ?? ''}
+                onChange={e => {
+                  const v = e.target.value.trim();
+                  setPreviewStardust(v === '' ? null : Math.max(0, Math.min(TOTAL_TRACK_COST, Number(v) || 0)));
+                }}
+              />
+              <button
+                type="button"
+                className="loyalty-admin-reset"
+                onClick={() => setPreviewStardust(null)}
+                disabled={previewStardust === null}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div
+          ref={viewportRef}
+          className={`loyalty-viewport ${adminMode ? 'is-editing' : ''}`}
+          onPointerDown={handlePointerDown}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="region"
+          aria-label="Loyalty tier track"
+        >
+          <div className="loyalty-edge-fade loyalty-edge-fade--left" />
+          <div className="loyalty-edge-fade loyalty-edge-fade--right" />
+
+          <div className="loyalty-world" style={{ transform: `translateX(${-panOffset}px)` }}>
+            <svg
+              className="loyalty-svg"
+              width={WORLD_WIDTH}
+              height={viewportSize.height}
+              viewBox={`0 0 ${WORLD_WIDTH} ${viewportSize.height}`}
+              aria-hidden="true"
+            >
+              <defs>
+                {decoColors.map((color, i) => (
+                  <linearGradient key={i} id={`deco-grad-${i}`} x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor={color} stopOpacity="0" />
+                    <stop offset="15%" stopColor={color} stopOpacity="0.14" />
+                    <stop offset="50%" stopColor={color} stopOpacity="0.3" />
+                    <stop offset="85%" stopColor={color} stopOpacity="0.14" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0" />
+                  </linearGradient>
+                ))}
+                <linearGradient id="main-grad" x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor={theme.accent} stopOpacity="0" />
+                  <stop offset="10%" stopColor={theme.accent} stopOpacity="0.35" />
+                  <stop offset="50%" stopColor={theme.stringMid} stopOpacity="0.85" />
+                  <stop offset="90%" stopColor={theme.accent} stopOpacity="0.35" />
+                  <stop offset="100%" stopColor={theme.accent} stopOpacity="0" />
+                </linearGradient>
+                <filter id="loyalty-glow">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {decoColors.map((_, i) => (
+                <path
+                  key={i}
+                  ref={el => { decoPathRefs.current[i] = el; }}
+                  fill="none"
+                  stroke={`url(#deco-grad-${i})`}
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+
+              <path
+                ref={mainPathRef}
+                fill="none"
+                stroke="url(#main-grad)"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#loyalty-glow)"
+              />
+            </svg>
+
+            {positioned.map(m => {
+              const unlocked = m.tier <= effectiveTier;
+              const size = starSize(m.tier);
+              const showLabel = isMajorTier(m.tier);
+              return (
+                <button
+                  key={m.tier}
+                  type="button"
+                  className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
+                  style={{ left: m.x, top: mainStringY(m.x, 0, viewportSize.height), transform: 'translate(-50%, -50%)' }}
+                  ref={el => {
+                    if (el) nodeRefs.current.set(m.tier, el);
+                    else nodeRefs.current.delete(m.tier);
+                  }}
+                  onPointerEnter={() => { frozenRef.current = true; }}
+                  onPointerLeave={() => { frozenRef.current = false; }}
+                  onClick={() => handleNodeClick(m)}
+                  aria-label={`Tier ${m.tier}: ${m.title}${unlocked ? ' (unlocked)' : ''}`}
+                >
+                  <span className="loyalty-node__wrap" style={{ width: size, height: size }}>
+                    <StarSVG tier={m.tier} size={size} unlocked={unlocked} theme={theme} />
+                    <span className="loyalty-node__icon">{m.icon}</span>
+                  </span>
+                  {showLabel && <span className="loyalty-node__label">{m.tier}</span>}
+                  {adminMode && <span className="loyalty-node__edit-badge">✎</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="loyalty-hint">
+          {adminMode ? 'Click any star to edit its reward' : 'Drag or use arrow keys to pan'}
+        </div>
       </div>
 
       {activeTier && !adminMode && (
@@ -617,7 +756,7 @@ export default function LoyaltyClient({
           <div className="loyalty-modal" onClick={e => e.stopPropagation()}>
             <button className="loyalty-modal__close" onClick={() => setActiveTier(null)} aria-label="Close">×</button>
             <div className="loyalty-modal__star-big">
-              <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} />
+              <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} theme={theme} />
               <span className="loyalty-modal__star-icon">{activeTier.icon}</span>
             </div>
             <div className="loyalty-modal__body">
@@ -667,6 +806,15 @@ export default function LoyaltyClient({
           tier={editing}
           onSave={handleEditSave}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {themeOpen && (
+        <EditThemeModal
+          theme={theme}
+          onPreview={handleThemePreview}
+          onSave={handleThemeSave}
+          onClose={handleThemeCancel}
         />
       )}
     </div>

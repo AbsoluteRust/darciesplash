@@ -35,12 +35,6 @@ export const WEEKLY_BONUSES = {
 export const TOTAL_TIERS = 100;
 export const TOTAL_TRACK_COST = 200_000;
 
-// Per-tier cost (non-decreasing by band).
-// 1–32: 1000 each (32,000)
-// 33–39: 1000 each (7,000)  → cumulative 39,000
-// 40–96: 2500 each (142,500) → cumulative 181,500
-// 97–99: 4000 each (12,000)  → cumulative 193,500
-// 100:   6500                → cumulative 200,000
 export const TIER_COSTS: number[] = (() => {
   const out: number[] = [];
   for (let i = 1; i <= TOTAL_TIERS; i++) {
@@ -135,4 +129,153 @@ export function buildAllTiers(overrides: TierOverrides): MergedTier[] {
   const out: MergedTier[] = [];
   for (let i = 1; i <= TOTAL_TIERS; i++) out.push(buildTier(i, overrides));
   return out;
+}
+
+/* ---------- theme ---------- */
+
+export type LoyaltyTheme = {
+  // base
+  background: string;
+  backgroundLight: string;
+  // accent (used everywhere for emphasis / borders / buttons / stars)
+  accent: string;
+  accentText: string;
+  // text
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  // star tier colours (each is a base hex; stroke = full colour, fill = ~28% opacity)
+  starLocked: string;
+  starRegular: string;
+  starFive: string;
+  starTen: string;
+  starMajor: string;
+  starFinal: string;
+  // background strings
+  deco1: string;
+  deco2: string;
+  deco3: string;
+  deco4: string;
+  deco5: string;
+  stringMid: string;
+};
+
+export const DEFAULT_THEME: LoyaltyTheme = {
+  background: '#1B152F',
+  backgroundLight: '#241B3E',
+  accent: '#FED1F2',
+  accentText: '#1B152F',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#FED1F2',
+  textMuted: '#A899B8',
+  starLocked: '#B4A5C8',
+  starRegular: '#FED1F2',
+  starFive: '#FED1F2',
+  starTen: '#FED1F2',
+  starMajor: '#FED1F2',
+  starFinal: '#FFFFFF',
+  deco1: '#FED1F2',
+  deco2: '#E5B8F0',
+  deco3: '#C99EE8',
+  deco4: '#B08BD5',
+  deco5: '#D4A8DC',
+  stringMid: '#FFFFFF',
+};
+
+export const THEME_GROUPS: { name: string; keys: { key: keyof LoyaltyTheme; label: string }[] }[] = [
+  {
+    name: 'Base',
+    keys: [
+      { key: 'background',      label: 'Background' },
+      { key: 'backgroundLight', label: 'Background (lighter)' },
+    ],
+  },
+  {
+    name: 'Accent',
+    keys: [
+      { key: 'accent',     label: 'Accent' },
+      { key: 'accentText', label: 'Text on accent' },
+    ],
+  },
+  {
+    name: 'Text',
+    keys: [
+      { key: 'textPrimary',   label: 'Primary text' },
+      { key: 'textSecondary', label: 'Secondary text' },
+      { key: 'textMuted',     label: 'Muted text' },
+    ],
+  },
+  {
+    name: 'Stars',
+    keys: [
+      { key: 'starLocked',  label: 'Locked' },
+      { key: 'starRegular', label: 'Regular (unlocked)' },
+      { key: 'starFive',    label: '5-multiples' },
+      { key: 'starTen',     label: '10-multiples' },
+      { key: 'starMajor',   label: 'Major (every 8th)' },
+      { key: 'starFinal',   label: 'Tier 100' },
+    ],
+  },
+  {
+    name: 'Background strings',
+    keys: [
+      { key: 'deco1', label: 'String 1' },
+      { key: 'deco2', label: 'String 2' },
+      { key: 'deco3', label: 'String 3' },
+      { key: 'deco4', label: 'String 4' },
+      { key: 'deco5', label: 'String 5' },
+      { key: 'stringMid', label: 'Main string (middle)' },
+    ],
+  },
+];
+
+export function hexToRgba(hex: string, alpha: number): string {
+  const h = String(hex || '').replace('#', '').trim();
+  if (!h) return `rgba(255, 255, 255, ${alpha})`;
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  if (full.length !== 6) return `rgba(255, 255, 255, ${alpha})`;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if ([r, g, b].some(n => Number.isNaN(n))) return `rgba(255, 255, 255, ${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function themeCssVars(theme: LoyaltyTheme): Record<string, string> {
+  return {
+    '--lt-bg': theme.background,
+    '--lt-bg-light': theme.backgroundLight,
+    '--lt-accent': theme.accent,
+    '--lt-accent-text': theme.accentText,
+    '--lt-text-primary': theme.textPrimary,
+    '--lt-text-secondary': theme.textSecondary,
+    '--lt-text-muted': theme.textMuted,
+    '--lt-accent-03': hexToRgba(theme.accent, 0.03),
+    '--lt-accent-05': hexToRgba(theme.accent, 0.05),
+    '--lt-accent-06': hexToRgba(theme.accent, 0.06),
+    '--lt-accent-08': hexToRgba(theme.accent, 0.08),
+    '--lt-accent-10': hexToRgba(theme.accent, 0.1),
+    '--lt-accent-12': hexToRgba(theme.accent, 0.12),
+    '--lt-accent-14': hexToRgba(theme.accent, 0.14),
+    '--lt-accent-15': hexToRgba(theme.accent, 0.15),
+    '--lt-accent-18': hexToRgba(theme.accent, 0.18),
+    '--lt-accent-20': hexToRgba(theme.accent, 0.2),
+    '--lt-accent-22': hexToRgba(theme.accent, 0.22),
+    '--lt-accent-25': hexToRgba(theme.accent, 0.25),
+    '--lt-accent-30': hexToRgba(theme.accent, 0.3),
+    '--lt-accent-35': hexToRgba(theme.accent, 0.35),
+    '--lt-accent-40': hexToRgba(theme.accent, 0.4),
+    '--lt-accent-45': hexToRgba(theme.accent, 0.45),
+    '--lt-accent-50': hexToRgba(theme.accent, 0.5),
+    '--lt-accent-55': hexToRgba(theme.accent, 0.55),
+    '--lt-accent-60': hexToRgba(theme.accent, 0.6),
+    '--lt-accent-70': hexToRgba(theme.accent, 0.7),
+    '--lt-accent-85': hexToRgba(theme.accent, 0.85),
+    '--lt-accent-90': hexToRgba(theme.accent, 0.9),
+    '--lt-accent-95': hexToRgba(theme.accent, 0.95),
+    '--lt-bg-80': hexToRgba(theme.background, 0.8),
+    '--lt-bg-90': hexToRgba(theme.background, 0.9),
+    '--lt-bg-light-50': hexToRgba(theme.backgroundLight, 0.5),
+    '--lt-bg-light-90': hexToRgba(theme.backgroundLight, 0.9),
+  };
 }
