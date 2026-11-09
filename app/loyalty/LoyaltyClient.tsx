@@ -868,7 +868,7 @@ export default function LoyaltyClient({
         {!trackActive && (
           <div className="loyalty-banner">
             <span className="loyalty-banner__icon">🌌</span>
-            <span>Loyalty progression begins <strong>January 1, 2027</strong>. You can explore every tier and its reward now.</span>
+            <span>Loyalty progression begins <strong>January 1, 2027</strong>. The rewards and tiers you see here are a work in progress, you aren't meant to see this yet, so please don't share it either.</span>
           </div>
         )}
 
