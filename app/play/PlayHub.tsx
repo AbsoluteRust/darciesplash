@@ -188,11 +188,19 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
                 <div className="flex flex-wrap justify-center gap-3 mb-6">
                   {groupLobby.participants.map((p: any) => (
                     <div key={p.id} className="relative group/avatar flex items-center justify-center">
-                      <img
-                        src={p.avatar}
-                        alt={p.name}
-                        className={`w-12 h-12 rounded-full border-2 transition-all ${p.id === userId ? 'border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'border-white/20 hover:border-white/50'}`}
-                      />
+                      <a
+                        href={`/profiles/${p.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`View ${p.name}'s profile`}
+                        className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#181820]"
+                      >
+                        <img
+                          src={p.avatar}
+                          alt={p.name}
+                          className={`w-12 h-12 rounded-full border-2 transition-all ${p.id === userId ? 'border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.6)]' : 'border-white/20 hover:border-white/50'}`}
+                        />
+                      </a>
                       <span className="absolute -bottom-8 bg-black/90 text-white text-xs px-2.5 py-1 rounded-md whitespace-nowrap opacity-0 group-hover/avatar:opacity-100 transition-opacity pointer-events-none z-10 border border-white/10 shadow-lg">
                         {p.name} {p.id === userId ? '(You)' : ''}
                       </span>
