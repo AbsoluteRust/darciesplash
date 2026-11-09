@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { kv } from "@vercel/kv";
 import { ADMIN_IDS } from "@/lib/admin";
-import type { TierOverrides } from "@/lib/loyalty-milestones";
+import type { TierOverride, TierOverrides } from "@/lib/loyalty-milestones";
 
 export const dynamic = 'force-dynamic';
 
 const KEY = "loyalty_tiers";
+
+// Longest valid emote markup we accept:
+//   <a:32CharEmoteName:1234567890123456789012345>  =  3 + 32 + 1 + 25 + 1 = 62 chars
+// Round up for safety margin. Emoji are 1–4 chars typical, up to ~11 for ZWJ sequences.
+const MAX_ICON_LENGTH = 80;
 
 export async function GET() {
   const stored = await kv.get(KEY);
@@ -35,10 +40,20 @@ export async function POST(req: Request) {
     if (!val || typeof val !== "object") continue;
     const t = val as TierOverride;
     const entry: TierOverride = {};
-    if (typeof t.icon === "string" && t.icon.trim()) entry.icon = t.icon.slice(0, 8);
-    if (typeof t.title === "string" && t.title.trim()) entry.title = t.title.slice(0, 100);
-    if (typeof t.description === "string" && t.description.trim()) entry.description = t.description.slice(0, 500);
-    if (typeof t.reward === "string" && t.reward.trim()) entry.reward = t.reward.slice(0, 300);
+
+    if (typeof t.icon === "string" && t.icon.trim()) {
+      entry.icon = t.icon.trim().slice(0, MAX_ICON_LENGTH);
+    }
+    if (typeof t.title === "string" && t.title.trim()) {
+      entry.title = t.title.slice(0, 100);
+    }
+    if (typeof t.description === "string" && t.description.trim()) {
+      entry.description = t.description.slice(0, 500);
+    }
+    if (typeof t.reward === "string" && t.reward.trim()) {
+      entry.reward = t.reward.slice(0, 300);
+    }
+
     if (Object.keys(entry).length > 0) cleaned[String(tier)] = entry;
   }
 
