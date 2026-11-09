@@ -4,10 +4,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildAllTiers,
+  buildEmoteMarkup,
   DEFAULT_THEME,
   THEME_GROUPS,
   themeCssVars,
   hexToRgba,
+  parseTierIcon,
   TOTAL_TIERS,
   TOTAL_TRACK_COST,
   tierForStardust,
@@ -107,30 +109,224 @@ function StarSVG({ tier, size, unlocked, theme }: { tier: number; size: number; 
   );
 }
 
+/* ---------- tier icon (emoji OR emote) ---------- */
+
+function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
+  const parsed = useMemo(() => parseTierIcon(icon), [icon]);
+  if (parsed.type === 'emote') {
+    const ext = parsed.animated ? 'gif' : 'webp';
+    const url = `https://cdn.discordapp.com/emojis/${parsed.id}.${ext}?size=96`;
+    const size = Math.round(starSize * 0.55);
+    return (
+      <img
+        src={url}
+        alt={parsed.name}
+        className="loyalty-tier-icon-emote"
+        style={{ width: size, height: size }}
+        draggable={false}
+      />
+    );
+  }
+  if (parsed.type === 'emoji') {
+    const size = Math.round(starSize * 0.32);
+    return (
+      <span
+        className="loyalty-tier-icon-emoji"
+        style={{ fontSize: `${size}px` }}
+      >
+        {parsed.value}
+      </span>
+    );
+  }
+  return null;
+}
+
+/* ---------- emote picker ---------- */
+
+type EmoteInfo = {
+  id: string;
+  name: string;
+  animated: boolean;
+  guildName: string;
+  collections: string[];
+  ignored: boolean;
+};
+
+type CollectionInfo = { id: string; label: string };
+
+type EmoteData = {
+  emotes: EmoteInfo[];
+  collections: CollectionInfo[];
+};
+
+function EmotePicker({
+  emotes,
+  collections,
+  selectedId,
+  loading,
+  onSelect,
+  onClear,
+}: {
+  emotes: EmoteInfo[];
+  collections: CollectionInfo[];
+  selectedId: string | null;
+  loading: boolean;
+  onSelect: (e: EmoteInfo) => void;
+  onClear: () => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [showIgnored, setShowIgnored] = useState(false);
+  const [collectionFilter, setCollectionFilter] = useState<string>('all');
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return emotes.filter(e => {
+      if (!showIgnored && e.ignored) return false;
+      if (collectionFilter !== 'all') {
+        if (collectionFilter === 'unassigned') {
+          if (e.collections.length > 0) return false;
+        } else {
+          if (!e.collections.includes(collectionFilter)) return false;
+        }
+      }
+      if (q && !e.name.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [emotes, search, showIgnored, collectionFilter]);
+
+  return (
+    <div className="loyalty-emote-picker">
+      <div className="loyalty-emote-picker__toolbar">
+        <input
+          type="text"
+          placeholder="Search emotes…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="loyalty-emote-picker__search"
+        />
+        <select
+          value={collectionFilter}
+          onChange={e => setCollectionFilter(e.target.value)}
+          className="loyalty-emote-picker__filter"
+        >
+          <option value="all">All collections</option>
+          <option value="unassigned">Unassigned</option>
+          {collections.map(c => (
+            <option key={c.id} value={c.id}>{c.label}</option>
+          ))}
+        </select>
+        <label className="loyalty-emote-picker__toggle">
+          <input
+            type="checkbox"
+            checked={showIgnored}
+            onChange={e => setShowIgnored(e.target.checked)}
+          />
+          Ignored
+        </label>
+        {selectedId && (
+          <button type="button" className="loyalty-emote-picker__clear" onClick={onClear}>
+            Clear
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="loyalty-emote-picker__empty">Loading emotes…</div>
+      ) : filtered.length === 0 ? (
+        <div className="loyalty-emote-picker__empty">No emotes match</div>
+      ) : (
+        <div className="loyalty-emote-picker__grid">
+          {filtered.map(e => {
+            const ext = e.animated ? 'gif' : 'webp';
+            const url = `https://cdn.discordapp.com/emojis/${e.id}.${ext}?size=48`;
+            const isSelected = selectedId === e.id;
+            return (
+              <button
+                key={e.id}
+                type="button"
+                className={`loyalty-emote-picker__item${isSelected ? ' is-selected' : ''}${e.ignored ? ' is-ignored' : ''}`}
+                onClick={() => onSelect(e)}
+                title={`:${e.name}:${e.guildName ? ` · ${e.guildName}` : ''}${e.collections.length ? ` · ${e.collections.join(', ')}` : ''}`}
+              >
+                <img src={url} alt={e.name} draggable={false} />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="loyalty-emote-picker__status">
+        {filtered.length} emote{filtered.length === 1 ? '' : 's'}
+        {selectedId && ' · 1 selected'}
+      </div>
+    </div>
+  );
+}
+
 /* ---------- edit tier modal ---------- */
 
 function EditTierModal({
   tier,
+  emoteData,
+  loadingEmotes,
+  onRequestEmotes,
   onSave,
   onClose,
 }: {
   tier: MergedTier;
+  emoteData: EmoteData | null;
+  loadingEmotes: boolean;
+  onRequestEmotes: () => void;
   onSave: (updated: MergedTier) => void;
   onClose: () => void;
 }) {
+  const initial = useMemo(() => parseTierIcon(tier.icon), [tier.icon]);
+
+  const [iconMode, setIconMode] = useState<'emoji' | 'emote'>(
+    initial.type === 'emote' ? 'emote' : 'emoji'
+  );
+  const [emojiValue, setEmojiValue] = useState(
+    initial.type === 'emoji' ? initial.value : '⭐'
+  );
+  const [emoteValue, setEmoteValue] = useState(
+    initial.type === 'emote'
+      ? buildEmoteMarkup(initial.id, initial.name, initial.animated)
+      : ''
+  );
+
   const [form, setForm] = useState({
-    icon: tier.icon,
     title: tier.title,
     description: tier.description,
     reward: tier.reward,
   });
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (iconMode === 'emote') onRequestEmotes();
+  }, [iconMode, onRequestEmotes]);
+
+  const selectedEmoteId = useMemo(() => {
+    const p = parseTierIcon(emoteValue);
+    return p.type === 'emote' ? p.id : null;
+  }, [emoteValue]);
+
+  const previewIcon = iconMode === 'emoji' ? emojiValue : emoteValue;
+
+  function handleEmoteSelect(e: EmoteInfo) {
+    setEmoteValue(buildEmoteMarkup(e.id, e.name, e.animated));
+  }
+
+  function handleEmoteClear() {
+    setEmoteValue('');
+  }
+
   function handleSave() {
     if (!form.title.trim()) return setError('Title is required');
     if (!form.reward.trim()) return setError('Reward is required');
+    const icon = iconMode === 'emoji' ? emojiValue.trim() : emoteValue.trim();
+    if (!icon) return setError('Icon is required');
     setError(null);
-    onSave({ ...tier, ...form });
+    onSave({ ...tier, ...form, icon });
   }
 
   return (
@@ -144,16 +340,51 @@ function EditTierModal({
           <h2 className="loyalty-modal__title">Edit Tier {tier.tier}</h2>
 
           <div className="loyalty-form">
-            <label className="loyalty-field loyalty-field--icon">
-              <span>Icon</span>
-              <input
-                type="text"
-                maxLength={4}
-                value={form.icon}
-                onChange={e => setForm(f => ({ ...f, icon: e.target.value }))}
-                className="loyalty-field__icon"
-              />
-            </label>
+            {/* ICON */}
+            <div className="loyalty-icon-section">
+              <div className="loyalty-icon-section__header">
+                <span>Icon</span>
+                <div className="loyalty-icon-section__preview">
+                  {previewIcon ? <TierIcon icon={previewIcon} starSize={56} /> : null}
+                </div>
+                <div className="loyalty-icon-section__tabs">
+                  <button
+                    type="button"
+                    className={`loyalty-icon-tab${iconMode === 'emoji' ? ' is-active' : ''}`}
+                    onClick={() => setIconMode('emoji')}
+                  >
+                    Emoji
+                  </button>
+                  <button
+                    type="button"
+                    className={`loyalty-icon-tab${iconMode === 'emote' ? ' is-active' : ''}`}
+                    onClick={() => setIconMode('emote')}
+                  >
+                    Emote
+                  </button>
+                </div>
+              </div>
+
+              {iconMode === 'emoji' ? (
+                <input
+                  type="text"
+                  maxLength={4}
+                  value={emojiValue}
+                  onChange={e => setEmojiValue(e.target.value)}
+                  className="loyalty-field__icon loyalty-icon-section__input"
+                  placeholder="⭐"
+                />
+              ) : (
+                <EmotePicker
+                  emotes={emoteData?.emotes || []}
+                  collections={emoteData?.collections || []}
+                  selectedId={selectedEmoteId}
+                  loading={loadingEmotes}
+                  onSelect={handleEmoteSelect}
+                  onClear={handleEmoteClear}
+                />
+              )}
+            </div>
 
             <label className="loyalty-field loyalty-field--full">
               <span>Title</span>
@@ -317,6 +548,10 @@ export default function LoyaltyClient({
   const [themeSnapshot, setThemeSnapshot] = useState<LoyaltyTheme | null>(null);
   const [themeOpen, setThemeOpen] = useState(false);
 
+  const [emoteData, setEmoteData] = useState<EmoteData | null>(null);
+  const [loadingEmotes, setLoadingEmotes] = useState(false);
+  const emotePromiseRef = useRef<Promise<EmoteData> | null>(null);
+
   const [panOffset, setPanOffset] = useState(6000);
   const [viewportSize, setViewportSize] = useState({ width: 1200, height: 600 });
   const [activeTier, setActiveTier] = useState<MergedTier | null>(null);
@@ -401,6 +636,50 @@ export default function LoyaltyClient({
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
 
+  /* ---------- emote loading ---------- */
+
+  const loadEmotes = useCallback((): Promise<EmoteData> => {
+    if (emoteData) return Promise.resolve(emoteData);
+    if (emotePromiseRef.current) return emotePromiseRef.current;
+
+    setLoadingEmotes(true);
+    const promise = fetch('/api/admin/emotes', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: any) => {
+        const emotes: EmoteInfo[] = (data.emotes || []).map((e: any) => ({
+          id: String(e.id),
+          name: String(e.name),
+          animated: !!e.animated,
+          guildName: String(e.guildName || ''),
+          collections: Array.isArray(e.assignment?.collections) ? e.assignment.collections.map(String) : [],
+          ignored: !!e.assignment?.ignored,
+        }));
+        const collections: CollectionInfo[] = (data.collections || []).map((c: any) => ({
+          id: String(c.id),
+          label: String(c.label || c.id),
+        }));
+        const result = { emotes, collections };
+        setEmoteData(result);
+        return result;
+      })
+      .catch(() => {
+        const result = { emotes: [] as EmoteInfo[], collections: [] as CollectionInfo[] };
+        setEmoteData(result);
+        return result;
+      })
+      .finally(() => {
+        setLoadingEmotes(false);
+        emotePromiseRef.current = null;
+      });
+
+    emotePromiseRef.current = promise;
+    return promise;
+  }, [emoteData]);
+
+  const requestEmotes = useCallback(() => {
+    loadEmotes().catch(() => {});
+  }, [loadEmotes]);
+
   /* ---------- animation loop ---------- */
 
   useEffect(() => {
@@ -483,9 +762,14 @@ export default function LoyaltyClient({
 
   const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
-    if (adminMode) setEditing(t);
-    else setActiveTier(t);
-  }, [adminMode]);
+    if (adminMode) {
+      setEditing(t);
+      // Prime the emote list so the picker has it ready
+      loadEmotes().catch(() => {});
+    } else {
+      setActiveTier(t);
+    }
+  }, [adminMode, loadEmotes]);
 
   /* ---------- admin saves ---------- */
 
@@ -736,7 +1020,7 @@ export default function LoyaltyClient({
                 >
                   <span className="loyalty-node__wrap" style={{ width: size, height: size }}>
                     <StarSVG tier={m.tier} size={size} unlocked={unlocked} theme={theme} />
-                    <span className="loyalty-node__icon">{m.icon}</span>
+                    <TierIcon icon={m.icon} starSize={size} />
                   </span>
                   {showLabel && <span className="loyalty-node__label">{m.tier}</span>}
                   {adminMode && <span className="loyalty-node__edit-badge">✎</span>}
@@ -747,7 +1031,7 @@ export default function LoyaltyClient({
         </div>
 
         <div className="loyalty-hint">
-          {adminMode ? 'Click any star to edit its reward' : 'Drag or use arrow keys to pan'}
+          {adminMode ? 'Click any star to edit its reward or icon' : 'Drag or use arrow keys to pan'}
         </div>
       </div>
 
@@ -757,7 +1041,7 @@ export default function LoyaltyClient({
             <button className="loyalty-modal__close" onClick={() => setActiveTier(null)} aria-label="Close">×</button>
             <div className="loyalty-modal__star-big">
               <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} theme={theme} />
-              <span className="loyalty-modal__star-icon">{activeTier.icon}</span>
+              <TierIcon icon={activeTier.icon} starSize={120} />
             </div>
             <div className="loyalty-modal__body">
               <div className="loyalty-modal__eyebrow">
@@ -804,6 +1088,9 @@ export default function LoyaltyClient({
       {editing && (
         <EditTierModal
           tier={editing}
+          emoteData={emoteData}
+          loadingEmotes={loadingEmotes}
+          onRequestEmotes={requestEmotes}
           onSave={handleEditSave}
           onClose={() => setEditing(null)}
         />

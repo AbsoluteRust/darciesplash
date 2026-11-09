@@ -131,27 +131,43 @@ export function buildAllTiers(overrides: TierOverrides): MergedTier[] {
   return out;
 }
 
+/* ---------- icon parsing ---------- */
+
+export type ParsedTierIcon =
+  | { type: 'emoji'; value: string }
+  | { type: 'emote'; id: string; animated: boolean; name: string }
+  | { type: 'empty' };
+
+export function parseTierIcon(icon: string | undefined | null): ParsedTierIcon {
+  if (!icon || !icon.trim()) return { type: 'empty' };
+  const m = String(icon).trim().match(/^<(a?):([\w~]+):(\d{15,25})>$/);
+  if (m) {
+    return { type: 'emote', id: m[3], animated: m[1] === 'a', name: m[2] };
+  }
+  return { type: 'emoji', value: String(icon) };
+}
+
+export function buildEmoteMarkup(id: string, name: string, animated: boolean): string {
+  const safeName = String(name || 'emote').replace(/[^\w~]/g, '_');
+  return animated ? `<a:${safeName}:${id}>` : `<:${safeName}:${id}>`;
+}
+
 /* ---------- theme ---------- */
 
 export type LoyaltyTheme = {
-  // base
   background: string;
   backgroundLight: string;
-  // accent (used everywhere for emphasis / borders / buttons / stars)
   accent: string;
   accentText: string;
-  // text
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
-  // star tier colours (each is a base hex; stroke = full colour, fill = ~28% opacity)
   starLocked: string;
   starRegular: string;
   starFive: string;
   starTen: string;
   starMajor: string;
   starFinal: string;
-  // background strings
   deco1: string;
   deco2: string;
   deco3: string;
@@ -183,50 +199,35 @@ export const DEFAULT_THEME: LoyaltyTheme = {
 };
 
 export const THEME_GROUPS: { name: string; keys: { key: keyof LoyaltyTheme; label: string }[] }[] = [
-  {
-    name: 'Base',
-    keys: [
-      { key: 'background',      label: 'Background' },
-      { key: 'backgroundLight', label: 'Background (lighter)' },
-    ],
-  },
-  {
-    name: 'Accent',
-    keys: [
-      { key: 'accent',     label: 'Accent' },
-      { key: 'accentText', label: 'Text on accent' },
-    ],
-  },
-  {
-    name: 'Text',
-    keys: [
-      { key: 'textPrimary',   label: 'Primary text' },
-      { key: 'textSecondary', label: 'Secondary text' },
-      { key: 'textMuted',     label: 'Muted text' },
-    ],
-  },
-  {
-    name: 'Stars',
-    keys: [
-      { key: 'starLocked',  label: 'Locked' },
-      { key: 'starRegular', label: 'Regular (unlocked)' },
-      { key: 'starFive',    label: '5-multiples' },
-      { key: 'starTen',     label: '10-multiples' },
-      { key: 'starMajor',   label: 'Major (every 8th)' },
-      { key: 'starFinal',   label: 'Tier 100' },
-    ],
-  },
-  {
-    name: 'Background strings',
-    keys: [
-      { key: 'deco1', label: 'String 1' },
-      { key: 'deco2', label: 'String 2' },
-      { key: 'deco3', label: 'String 3' },
-      { key: 'deco4', label: 'String 4' },
-      { key: 'deco5', label: 'String 5' },
-      { key: 'stringMid', label: 'Main string (middle)' },
-    ],
-  },
+  { name: 'Base', keys: [
+    { key: 'background',      label: 'Background' },
+    { key: 'backgroundLight', label: 'Background (lighter)' },
+  ]},
+  { name: 'Accent', keys: [
+    { key: 'accent',     label: 'Accent' },
+    { key: 'accentText', label: 'Text on accent' },
+  ]},
+  { name: 'Text', keys: [
+    { key: 'textPrimary',   label: 'Primary text' },
+    { key: 'textSecondary', label: 'Secondary text' },
+    { key: 'textMuted',     label: 'Muted text' },
+  ]},
+  { name: 'Stars', keys: [
+    { key: 'starLocked',  label: 'Locked' },
+    { key: 'starRegular', label: 'Regular (unlocked)' },
+    { key: 'starFive',    label: '5-multiples' },
+    { key: 'starTen',     label: '10-multiples' },
+    { key: 'starMajor',   label: 'Major (every 8th)' },
+    { key: 'starFinal',   label: 'Tier 100' },
+  ]},
+  { name: 'Background strings', keys: [
+    { key: 'deco1', label: 'String 1' },
+    { key: 'deco2', label: 'String 2' },
+    { key: 'deco3', label: 'String 3' },
+    { key: 'deco4', label: 'String 4' },
+    { key: 'deco5', label: 'String 5' },
+    { key: 'stringMid', label: 'Main string (middle)' },
+  ]},
 ];
 
 export function hexToRgba(hex: string, alpha: number): string {
