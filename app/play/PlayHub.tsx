@@ -130,6 +130,22 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     }
   };
 
+  const handleLeaveGroup = async () => {
+    if (!userId) return;
+    try {
+      const res = await fetch('/api/games/group/leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setGroupLobby(data.lobby || { active: false, participants: [], results: null, endsAt: 0, emotes: {}, emoteClicks: {} });
+      }
+    } catch (err) {
+      console.error('[leave] failed:', err);
+    }
+  };
+
   const isInGroup = groupLobby?.participants?.some((p: any) => p.id === userId) && groupLobby.participants.length > 0;
   const groupActive = groupLobby?.active && isInGroup;
 
@@ -265,6 +281,13 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
                     ? "Everyones' packs will open simultaneously when the timer ends, with chances at bonus loot!"
                     : "Waiting for others to join... Click 'WITH FRIENDS!' to invite them!"}
                 </p>
+
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleLeaveGroup(); }}
+                  className="mt-4 text-xs text-white/40 hover:text-white/80 underline transition-colors"
+                >
+                  Leave lobby
+                </button>
               </div>
             )}
 
