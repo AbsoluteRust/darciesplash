@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useSession } from 'next-auth/react';
 import TextDiff from '@/components/TextDiff';
+import { useEmoteLookup, type EmoteLookup } from '@/lib/emoteLookup';
 import {
   DndContext,
   closestCenter,
@@ -51,10 +52,44 @@ type Section = {
   color: string;
 };
 
-function renderDiscordMarkdown(text: string) {
+const EMOTE_IMG_CLASS =
+  "inline-block h-[1.3em] w-auto align-middle mx-0.5";
+
+function renderDiscordMarkdown(text: string, lookup: EmoteLookup = {}) {
   if (!text) return { __html: "" };
 
-  let html = text
+  // Extract emote markup BEFORE escaping so < > survive, and so :name:
+  // shortcodes can be resolved via the admin-managed lookup. Placeholders
+  // use \x00 (null byte) which cannot collide with real text.
+  const emoteTokens: string[] = [];
+  let working = text.replace(
+    /<(a?):(\w+):(\d+)>|:(\w+):/g,
+    (full, animated, discordName, discordId, shortcodeName) => {
+      let id: string | null = null;
+      let isAnimated = false;
+      let name = '';
+
+      if (discordId) {
+        id = discordId;
+        isAnimated = !!animated;
+        name = discordName;
+      } else {
+        const found = lookup[shortcodeName];
+        if (!found) return full; // unknown :name: — leave as literal text
+        id = found.id;
+        isAnimated = found.animated;
+        name = shortcodeName;
+      }
+
+      const ext = isAnimated ? 'gif' : 'webp';
+      const img = `<img src="https://cdn.discordapp.com/emojis/${id}.${ext}" alt=":${name}:" class="${EMOTE_IMG_CLASS}" loading="lazy" />`;
+      const idx = emoteTokens.length;
+      emoteTokens.push(img);
+      return `\x00EMOTE${idx}\x00`;
+    },
+  );
+
+  let html = working
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
@@ -73,6 +108,9 @@ function renderDiscordMarkdown(text: string) {
   html = html.replace(/`([^`]+)`/g, "<code class=\"bg-black/50 px-1 py-0.5 rounded text-sm font-mono text-pink-300\">$1</code>");
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, "<a href=\"$2\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-indigo-400 hover:text-indigo-300 underline\">$1</a>");
   html = html.replace(/\n/g, "<br />");
+
+  // Restore emote <img> tags that were swapped for placeholders above.
+  html = html.replace(/\x00EMOTE(\d+)\x00/g, (_m, i) => emoteTokens[Number(i)] ?? '');
 
   return { __html: html };
 }
@@ -172,6 +210,7 @@ function SortableSectionRow({
 
 export default function NewsPage() {
   const { data: session } = useSession();
+  const emoteLookup = useEmoteLookup();
   const [isAdmin, setIsAdmin] = useState(false);
   const [posts, setPosts] = useState<NewsPost[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -573,7 +612,7 @@ export default function NewsPage() {
                         </div>
                       )}
 
-                      <div className="text-white/70 text-sm leading-relaxed mb-4" dangerouslySetInnerHTML={renderDiscordMarkdown(post.content)} />
+                      <div className="text-white/70 text-sm leading-relaxed mb-4" dangerouslySetInnerHTML={renderDiscordMarkdown(post.content, emoteLookup)} />
                       
                       {/* Action Bar */}
                       <div className="flex items-center gap-4 pt-3 border-t border-white/5">
