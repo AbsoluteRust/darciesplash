@@ -28,7 +28,7 @@ function mainStringY(x: number, t: number, height: number): number {
 }
 
 const DECO_AMPS = [120, 90, 60, 150, 100];
-const DECO_COLORS = ['#818cf8', '#a855f7', '#ec4899', '#22d3ee', '#3b82f6'];
+const DECO_COLORS = ['#FED1F2', '#E5B8F0', '#C99EE8', '#B08BD5', '#D4A8DC'];
 
 function decoPathY(x: number, idx: number, t: number, height: number): number {
   const center = height / 2;
@@ -54,11 +54,9 @@ function buildPath(fn: (x: number) => number): string {
 
 /* ---------- major-tier logic ---------- */
 
-// Every 8th tier is a major milestone (8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96),
-// plus tier 100 as the final capstone.
 function isMajorTier(tier: number): boolean {
   if (tier === 100) return true;
-  if (tier > 0 && tier < 96 && tier % 8 === 0) return true;
+  if (tier > 0 && tier % 8 === 0) return true;
   return false;
 }
 
@@ -75,16 +73,16 @@ function starSize(tier: number): number {
 function starPalette(tier: number, unlocked: boolean): { stroke: string; fill: string; glow: string } {
   if (!unlocked) {
     return {
-      stroke: 'rgba(120, 130, 160, 0.55)',
-      fill: 'rgba(30, 32, 50, 0.55)',
-      glow: 'rgba(120, 130, 160, 0.15)',
+      stroke: 'rgba(180, 165, 200, 0.45)',
+      fill: 'rgba(45, 36, 70, 0.6)',
+      glow: 'rgba(180, 165, 200, 0.1)',
     };
   }
-  if (tier === 100)    return { stroke: 'rgba(251, 191, 36, 0.95)',  fill: 'rgba(251, 191, 36, 0.28)',  glow: 'rgba(251, 191, 36, 0.75)' };
-  if (isMajorTier(tier)) return { stroke: 'rgba(167, 139, 250, 0.95)', fill: 'rgba(139, 92, 246, 0.28)', glow: 'rgba(167, 139, 250, 0.65)' };
-  if (tier % 10 === 0) return { stroke: 'rgba(147, 197, 253, 0.9)',  fill: 'rgba(96, 165, 250, 0.22)',  glow: 'rgba(147, 197, 253, 0.55)' };
-  if (tier % 5 === 0)  return { stroke: 'rgba(196, 181, 253, 0.85)', fill: 'rgba(139, 92, 246, 0.18)',  glow: 'rgba(196, 181, 253, 0.5)' };
-  return { stroke: 'rgba(196, 181, 253, 0.75)', fill: 'rgba(139, 92, 246, 0.15)', glow: 'rgba(196, 181, 253, 0.4)' };
+  if (tier === 100)      return { stroke: 'rgba(255, 255, 255, 0.98)',    fill: 'rgba(254, 209, 242, 0.4)',  glow: 'rgba(254, 209, 242, 0.9)' };
+  if (isMajorTier(tier)) return { stroke: 'rgba(254, 209, 242, 0.98)',    fill: 'rgba(254, 209, 242, 0.28)', glow: 'rgba(254, 209, 242, 0.7)' };
+  if (tier % 10 === 0)   return { stroke: 'rgba(254, 209, 242, 0.85)',    fill: 'rgba(254, 209, 242, 0.2)',  glow: 'rgba(254, 209, 242, 0.55)' };
+  if (tier % 5 === 0)    return { stroke: 'rgba(254, 209, 242, 0.7)',     fill: 'rgba(254, 209, 242, 0.14)', glow: 'rgba(254, 209, 242, 0.4)' };
+  return { stroke: 'rgba(254, 209, 242, 0.55)', fill: 'rgba(254, 209, 242, 0.1)', glow: 'rgba(254, 209, 242, 0.25)' };
 }
 
 function StarSVG({ tier, size, unlocked }: { tier: number; size: number; unlocked: boolean }) {
@@ -303,7 +301,7 @@ export default function LoyaltyClient({
     setPanOffset(clampOffset(centerX - viewportSize.width / 2));
   }, [viewportSize.width, clampOffset]);
 
-  /* ---------- effective stardust (preview or real) ---------- */
+  /* ---------- effective stardust ---------- */
 
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
@@ -533,19 +531,19 @@ export default function LoyaltyClient({
             <defs>
               {DECO_COLORS.map((color, i) => (
                 <linearGradient key={i} id={`deco-grad-${i}`} x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor="transparent" />
-                  <stop offset="15%" stopColor={color} stopOpacity="0.12" />
-                  <stop offset="50%" stopColor={color} stopOpacity="0.28" />
-                  <stop offset="85%" stopColor={color} stopOpacity="0.12" />
-                  <stop offset="100%" stopColor="transparent" />
+                  <stop offset="0%" stopColor={color} stopOpacity="0" />
+                  <stop offset="15%" stopColor={color} stopOpacity="0.14" />
+                  <stop offset="50%" stopColor={color} stopOpacity="0.3" />
+                  <stop offset="85%" stopColor={color} stopOpacity="0.14" />
+                  <stop offset="100%" stopColor={color} stopOpacity="0" />
                 </linearGradient>
               ))}
               <linearGradient id="main-grad" x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="transparent" />
-                <stop offset="10%" stopColor="#8b5cf6" stopOpacity="0.35" />
-                <stop offset="50%" stopColor="#c4b5fd" stopOpacity="1" />
-                <stop offset="90%" stopColor="#8b5cf6" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="transparent" />
+                <stop offset="0%" stopColor="#FED1F2" stopOpacity="0" />
+                <stop offset="10%" stopColor="#FED1F2" stopOpacity="0.35" />
+                <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.85" />
+                <stop offset="90%" stopColor="#FED1F2" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="#FED1F2" stopOpacity="0" />
               </linearGradient>
               <filter id="loyalty-glow">
                 <feGaussianBlur stdDeviation="3" result="blur" />
