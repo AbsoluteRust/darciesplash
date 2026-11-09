@@ -1124,6 +1124,7 @@ export default function CollectionClient({
               key={activeEmote.name}
               name={activeEmote.name}
               title={activeEmote.type || 'Emote'}
+              type={activeEmote.type}   
               image={activeEmote.image}
               thumbUrl={activeEmote.thumbUrl}
               rarity={activeEmote.rarity}

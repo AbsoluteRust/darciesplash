@@ -522,6 +522,12 @@ html.entering-prev .collections-page {
   }
 }
 
+@media (min-width: 900px) {
+  .emote-modal .full-wallpaper {
+    max-height: 85vh;
+  }
+}
+
 .related-panel__label {
   font-size: 10px;
   letter-spacing: 0.18em;

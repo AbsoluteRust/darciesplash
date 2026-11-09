@@ -26,6 +26,7 @@ const RARITY_COLORS: Record<string, string> = {
 export default function StandardCard({
   name,
   title,
+  type,
   image,
   thumbUrl,
   rarity,
@@ -39,6 +40,7 @@ export default function StandardCard({
 }: {
   name: string;
   title?: string;
+  type?: string;
   image?: string;
   thumbUrl?: string;
   rarity?: string;
@@ -61,6 +63,27 @@ export default function StandardCard({
   
   // Get the color for the rarity to use as an external hover glow
   const rarityColor = finalRarity ? RARITY_COLORS[finalRarity] : null;
+
+  // Detect card type. Prefer the explicit `type` prop; fall back to `title`
+  // (which is the type string in the modal, and "Emote..." or the type in the grid).
+  const effectiveType = type || title || "Emote";
+  const isEmote = effectiveType.startsWith("Emote");
+
+  // In the modal, non-emotes (splash art, mobile wallpaper, sticker) render as
+  // a raw full-resolution <img> at natural aspect ratio, bypassing ProfileCard's
+  // emote-shaped framing so the whole image shows uncropped. Emotes keep using
+  // ProfileCard so their card framing is unchanged.
+  if (isModal && !isEmote && image) {
+    return (
+      <img
+        src={image}
+        alt={name || "Card"}
+        className="full-wallpaper"
+        onClick={onClick}
+        style={{ cursor: "zoom-out" }}
+      />
+    );
+  }
 
   return (
     <div 
