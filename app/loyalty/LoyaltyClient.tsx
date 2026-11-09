@@ -52,15 +52,24 @@ function buildPath(fn: (x: number) => number): string {
   return d;
 }
 
+/* ---------- major-tier logic ---------- */
+
+// Every 8th tier is a major milestone (8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96),
+// plus tier 100 as the final capstone.
+function isMajorTier(tier: number): boolean {
+  if (tier === 100) return true;
+  if (tier > 0 && tier < 96 && tier % 8 === 0) return true;
+  return false;
+}
+
 /* ---------- star sizing + colors ---------- */
 
 function starSize(tier: number): number {
   if (tier === 100) return 96;
-  if (tier >= 97) return 84;
-  if (tier === 96 || tier === 90 || tier === 75 || tier === 50 || tier === 40 || tier === 39 || tier === 33 || tier === 32 || tier === 25 || tier === 20 || tier === 10) return 76;
-  if (tier % 10 === 0) return 72;
-  if (tier % 5 === 0) return 60;
-  return 50;
+  if (isMajorTier(tier)) return 78;
+  if (tier % 10 === 0) return 68;
+  if (tier % 5 === 0) return 58;
+  return 46;
 }
 
 function starPalette(tier: number, unlocked: boolean): { stroke: string; fill: string; glow: string } {
@@ -71,11 +80,11 @@ function starPalette(tier: number, unlocked: boolean): { stroke: string; fill: s
       glow: 'rgba(120, 130, 160, 0.15)',
     };
   }
-  if (tier === 100) return { stroke: 'rgba(251, 191, 36, 0.95)', fill: 'rgba(251, 191, 36, 0.28)', glow: 'rgba(251, 191, 36, 0.75)' };
-  if (tier >= 97)  return { stroke: 'rgba(244, 114, 182, 0.95)', fill: 'rgba(236, 72, 153, 0.28)', glow: 'rgba(244, 114, 182, 0.65)' };
-  if (tier % 10 === 0) return { stroke: 'rgba(167, 139, 250, 0.95)', fill: 'rgba(139, 92, 246, 0.28)', glow: 'rgba(167, 139, 250, 0.65)' };
-  if (tier % 5 === 0) return { stroke: 'rgba(147, 197, 253, 0.9)', fill: 'rgba(96, 165, 250, 0.22)', glow: 'rgba(147, 197, 253, 0.55)' };
-  return { stroke: 'rgba(196, 181, 253, 0.85)', fill: 'rgba(139, 92, 246, 0.18)', glow: 'rgba(196, 181, 253, 0.5)' };
+  if (tier === 100)    return { stroke: 'rgba(251, 191, 36, 0.95)',  fill: 'rgba(251, 191, 36, 0.28)',  glow: 'rgba(251, 191, 36, 0.75)' };
+  if (isMajorTier(tier)) return { stroke: 'rgba(167, 139, 250, 0.95)', fill: 'rgba(139, 92, 246, 0.28)', glow: 'rgba(167, 139, 250, 0.65)' };
+  if (tier % 10 === 0) return { stroke: 'rgba(147, 197, 253, 0.9)',  fill: 'rgba(96, 165, 250, 0.22)',  glow: 'rgba(147, 197, 253, 0.55)' };
+  if (tier % 5 === 0)  return { stroke: 'rgba(196, 181, 253, 0.85)', fill: 'rgba(139, 92, 246, 0.18)',  glow: 'rgba(196, 181, 253, 0.5)' };
+  return { stroke: 'rgba(196, 181, 253, 0.75)', fill: 'rgba(139, 92, 246, 0.15)', glow: 'rgba(196, 181, 253, 0.4)' };
 }
 
 function StarSVG({ tier, size, unlocked }: { tier: number; size: number; unlocked: boolean }) {
@@ -239,7 +248,6 @@ export default function LoyaltyClient({
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyPaddingRight = document.body.style.paddingRight;
 
-    // Compensate for scrollbar disappearance
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
 
@@ -574,7 +582,7 @@ export default function LoyaltyClient({
           {positioned.map(m => {
             const unlocked = m.tier <= effectiveTier;
             const size = starSize(m.tier);
-            const showLabel = m.tier === 100 || m.tier % 5 === 0;
+            const showLabel = isMajorTier(m.tier);
             return (
               <button
                 key={m.tier}
