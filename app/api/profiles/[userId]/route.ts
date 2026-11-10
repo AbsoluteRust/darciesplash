@@ -133,44 +133,35 @@ export async function GET(
     badgeOverrides = (await kv.get('custom_badges')) || {};
   } catch (err) {}
 
-  // 12. Achievements (Collection Badges)
+  // 12. Achievements (delegated to the bot's computeAchievementsDetailed)
   let achievements: any[] = [];
-  let featuredBadgeId: string | null = null;
-  
   try {
-    const { COLLECTION_OWNERS } = require('@/lib/collection-owners');
-    const collectionKeys = Object.keys(COLLECTION_OWNERS); // ['celestial', 'darcie', 'tobi', 'madolche']
-    
-    const cardsRes = await fetch(`${botUrl}/api/cards/list`, { cache: "no-store" });
-    if (cardsRes.ok) {
-      const allCards = await cardsRes.json();
-      const ownedCardNames = new Set(Object.keys(inventory).map(k => k.split('|')[0].toLowerCase()));
-      
-      const rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'];
-      
-      // Scan EVERY collection for EVERY rarity
-      for (const coll of collectionKeys) {
-        for (const rarity of rarities) {
-          const tierCards = allCards.filter((c: any) => c.collection === coll && c.rarity === rarity && !c.contraband);
-          if (tierCards.length === 0) continue;
-          
-          const hasAll = tierCards.every((c: any) => ownedCardNames.has(c.name.toLowerCase()));
-          const collName = coll.charAt(0).toUpperCase() + coll.slice(1);
-          
-          achievements.push({
-            id: `${coll}_${rarity.toLowerCase()}_collector`,
-            label: `${rarity} ${collName} Collector`,
-            rarity,
-            collection: coll,
-            unlocked: hasAll
-          });
-        }
-      }
+    const res = await fetch(
+      `${botUrl}/api/user/achievements?userId=${encodeURIComponent(userId)}`,
+      { headers: botHeaders, cache: "no-store" }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      achievements = (data.achievements || []).map((a: any) => ({
+        id: a.label,
+        label: a.label,
+        rarity: a.tier,
+        emoji: a.emoji,
+        unlocked: !!a.unlocked,
+      }));
+    } else {
+      console.error('[profile] achievements fetch failed:', res.status);
     }
-    
+  } catch (err) {
+    console.error('[profile] achievements fetch threw:', err);
+  }
+
+  // 13. Featured achievement id
+  let featuredBadgeId: string | null = null;
+  try {
     featuredBadgeId = (await kv.get(`user_featured_badge:${userId}`)) as string | null;
   } catch (err) {
-    console.error("Failed to calculate achievements:", err);
+    console.error('[profile] featured-badge read failed:', err);
   }
 
   return NextResponse.json({
