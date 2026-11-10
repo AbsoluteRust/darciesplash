@@ -45,6 +45,12 @@ body::-webkit-scrollbar {
   height: 100vh;
   z-index: -1;
   pointer-events: none;
+  /* iOS Safari: force onto a stable compositor layer that survives scroll
+     without showing black in the newly-visible region. Visual-identical. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
 }
 
 .remix-modal-stack {
@@ -71,12 +77,22 @@ body::-webkit-scrollbar {
 
 
 .madolche-bg {
-  position: absolute;
+  /* Was position: absolute with height: 100% — that made the WebGL canvas
+     page-tall (thousands of px), which exceeds iOS Safari's tile budget
+     and causes the "black bottom" during scroll. Fixed + 100vh keeps the
+     canvas viewport-sized. The shader is animated and continuous, so it
+     looks identical whether fixed or absolute. */
+  position: fixed;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
   z-index: 0;
+  /* iOS Safari: force onto a stable compositor layer. Visual-identical. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
 }
 
 .madolche-bg > * {
@@ -391,6 +407,22 @@ html.entering-prev .collections-page {
 @keyframes lazyMountFadeIn {
   from { opacity: 0; transform: translateY(60px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* On touch devices, animate opacity only. The transform portion promotes
+   every mounting card to a compositor layer during scroll, which competes
+   with the Silk/Iridescence shaders for GPU tiles and causes the
+   "black bottom + progressive card paint" bug on iOS Safari. Fade-only
+   still reads as cards appearing. */
+@media (hover: none) and (pointer: coarse) {
+  .lazy-mount--visible {
+    animation: lazyMountFadeInTouch 320ms ease-out both;
+  }
+}
+
+@keyframes lazyMountFadeInTouch {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 /* ---- Bigger slide for cross-collection transitions inside the modal ---- */
@@ -1278,4 +1310,39 @@ html.entering-prev .collections-page {
   gap: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================
+   Performance containment
+   ============================================================ */
+
+/* Sections are independent layout units. `contain: layout` alone — we
+   deliberately do NOT use `contain: style` because iOS Safari interprets
+   it as a signal to repaint the contained subtree sub-element-by-element,
+   which causes the progressive "back → badge → border → art" pop-in
+   during scroll on iPhone. `contain: layout` gives the same sibling
+   isolation win without that repaint penalty. */
+.collection-section {
+  contain: layout;
+}
+
+.card-grid {
+  contain: layout;
+}
+
+/* The modal overlay, panels, and lightbox are self-contained compositing
+   units. `contain: paint` makes each an independent paint context — this
+   matters because they all have `backdrop-filter` and the browser doesn't
+   have to reconcile them against the rest of the page. */
+.emote-modal-overlay {
+  contain: paint;
+}
+
+.related-panel,
+.chroma-panel {
+  contain: paint;
+}
+
+.chroma-lightbox {
+  contain: paint;
 }
