@@ -76,12 +76,30 @@ type CardData = {
 
 const DEFAULT_HIGHLIGHT = '#6366f1';
 const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1); // Jan 1 2027 00:00:00 UTC
+// Mirrors MAJOR_ACTION_STARDUST in lib/stardust.js (awardMajorActionStardust)
+const MAJOR_ACTION_STARDUST = 6800;
+const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 
 const STARDUST_TIERS = [
   { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
   { num: 2, reqPacks: 8,  reqDrops: 0, reqPuzzles: 0, reward: 300, desc: 'Open 8 packs' },
   { num: 3, reqPacks: 12, reqDrops: 1, reqPuzzles: 0, reward: 620, desc: 'Open 12 packs + catch 1 drop' },
   { num: 4, reqPacks: 16, reqDrops: 1, reqPuzzles: 1, reward: 660, desc: 'Open 16 packs + catch 1 drop + solve 1 puzzle' },
+];
+
+type MajorAction = {
+  id: string;
+  label: string;
+  icon: string;
+  href?: string;
+  hrefLabel?: string;
+};
+
+const MAJOR_ACTIONS: MajorAction[] = [
+  { id: 'referral',     label: 'Referral',     icon: '🍌' },
+  { id: 'subscription', label: 'Subscription', icon: '💖', href: KOFI_TIERS_URL, hrefLabel: 'Subscribe on Ko-fi' },
+  { id: 'gift',         label: 'Gift',         icon: '🎁' },
+  { id: 'commission',   label: 'Commission',   icon: '✨' },
 ];
 
 function formatSubTime(months: number) {
@@ -388,21 +406,14 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
                 {/* ─── WEEKLY STARDUST ─── */}
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
-                  <div className="flex justify-between items-end mb-4">
-                    <div>
-                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Stardust</p>
-                      {stardustActive ? (
-                        <p className="text-2xl font-black text-white">
-                          This week: <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">+{weekEarned.toLocaleString()}</span>
-                          <span className="text-sm font-normal text-white/50 ml-2">✨ · resets Monday 00:00 UTC</span>
-                        </p>
-                      ) : (
-                        <p className="text-sm text-white/50">Earn stardust each week by hitting higher tiers of packs, drops, and puzzle solves.</p>
-                      )}
-                    </div>
+                  <div className="mb-4">
+                    <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Stardust</p>
+                    <p className="text-sm text-white/50">
+                      Earn stardust each week through tiered pack activity, or instantly through repeatable major actions.
+                    </p>
                   </div>
 
-                  {/* Countdown to feature start */}
+                  {/* Countdown to feature start (spans both columns) */}
                   {!stardustActive && (
                     <div className="mb-4 p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
@@ -413,81 +424,156 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         {formatCountdown(featureStartsAt - now)}
                       </div>
                       <p className="text-xs text-white/50 mt-1">
-                        Starting January 1, 2027 (UTC), open packs, catch drops, and solve puzzles each week to climb the tiers below.
+                        Starting January 1, 2027 (UTC), stardust becomes earnable through both methods below.
                       </p>
                     </div>
                   )}
 
-                  {/* Tier list */}
-                  <div className="flex flex-col gap-3 mt-4">
-                    {STARDUST_TIERS.map((t) => {
-                      const reached = stardustActive && currentStardustTier >= t.num;
-                      const isNext = stardustActive && currentStardustTier === t.num - 1;
-                      const reqParts: string[] = [];
-                      if (t.reqPacks > 0) {
-                        reqParts.push(isNext ? `${weekPacks} / ${t.reqPacks} packs` : `${t.reqPacks} packs`);
-                      }
-                      if (t.reqDrops > 0) {
-                        reqParts.push(isNext ? `${weekDrops} / ${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}` : `${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}`);
-                      }
-                      if (t.reqPuzzles > 0) {
-                        reqParts.push(isNext ? `${weekPuzzles} / ${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}` : `${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}`);
-                      }
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* ─── LEFT HALF: Weekly Pack Tiers ─── */}
+                    <div>
+                      <div className="mb-3">
+                        <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Pack Tiers</p>
+                        {stardustActive ? (
+                          <p className="text-lg font-black text-white">
+                            This week: <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">+{weekEarned.toLocaleString()}</span>
+                            <span className="text-xs font-normal text-white/50 ml-2">✨ · resets Monday 00:00 UTC</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-white/40">One-time per week — climb through tiers of activity.</p>
+                        )}
+                      </div>
 
-                      const ratios: number[] = [Math.min(weekPacks / t.reqPacks, 1)];
-                      if (t.reqDrops > 0) ratios.push(Math.min(weekDrops / t.reqDrops, 1));
-                      if (t.reqPuzzles > 0) ratios.push(Math.min(weekPuzzles / t.reqPuzzles, 1));
-                      const progressPct = Math.min(...ratios) * 100;
+                      <div className="flex flex-col gap-3">
+                        {STARDUST_TIERS.map((t) => {
+                          const reached = stardustActive && currentStardustTier >= t.num;
+                          const isNext = stardustActive && currentStardustTier === t.num - 1;
+                          const reqParts: string[] = [];
+                          if (t.reqPacks > 0) {
+                            reqParts.push(isNext ? `${weekPacks} / ${t.reqPacks} packs` : `${t.reqPacks} packs`);
+                          }
+                          if (t.reqDrops > 0) {
+                            reqParts.push(isNext ? `${weekDrops} / ${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}` : `${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}`);
+                          }
+                          if (t.reqPuzzles > 0) {
+                            reqParts.push(isNext ? `${weekPuzzles} / ${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}` : `${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}`);
+                          }
 
-                      if (reached) {
-                        return (
-                          <div key={t.num} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">✓</div>
-                              <div className="flex flex-col">
-                                <span className="text-sm font-bold text-green-400">Tier {t.num}</span>
-                                <span className="text-xs text-green-400/70">{t.desc}</span>
+                          const ratios: number[] = [Math.min(weekPacks / t.reqPacks, 1)];
+                          if (t.reqDrops > 0) ratios.push(Math.min(weekDrops / t.reqDrops, 1));
+                          if (t.reqPuzzles > 0) ratios.push(Math.min(weekPuzzles / t.reqPuzzles, 1));
+                          const progressPct = Math.min(...ratios) * 100;
+
+                          if (reached) {
+                            return (
+                              <div key={t.num} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">✓</div>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-green-400">Tier {t.num}</span>
+                                    <span className="text-xs text-green-400/70">{t.desc}</span>
+                                  </div>
+                                </div>
+                                <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()} ✨</span>
                               </div>
-                            </div>
-                            <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()} ✨</span>
-                          </div>
-                        );
-                      }
+                            );
+                          }
 
-                      if (isNext) {
-                        return (
-                          <div key={t.num} className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{t.num}</div>
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-bold text-indigo-400">Tier {t.num}</span>
-                                  <span className="text-xs text-white/50">{reqParts.join(' · ')}</span>
+                          if (isNext) {
+                            return (
+                              <div key={t.num} className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{t.num}</div>
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-bold text-indigo-400">Tier {t.num}</span>
+                                      <span className="text-xs text-white/50">{reqParts.join(' · ')}</span>
+                                    </div>
+                                  </div>
+                                  <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()} ✨</span>
+                                </div>
+                                <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                                  <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
                                 </div>
                               </div>
-                              <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()} ✨</span>
-                            </div>
-                            <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                              <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      }
+                            );
+                          }
 
-                      // locked
-                      return (
-                        <div key={t.num} className="relative flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl opacity-60">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/40 text-sm">🔒</div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-bold text-white/60">Tier {t.num}</span>
-                              <span className="text-xs text-white/40">{t.desc}</span>
+                          return (
+                            <div key={t.num} className="relative flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl opacity-60">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/40 text-sm">🔒</div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-white/60">Tier {t.num}</span>
+                                  <span className="text-xs text-white/40">{t.desc}</span>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()} ✨</span>
                             </div>
-                          </div>
-                          <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()} ✨</span>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* ─── RIGHT HALF: Major Actions ─── */}
+                    <div>
+                      <div className="mb-3">
+                        <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Major Actions</p>
+                        <p className="text-lg font-black text-white">
+                          +{MAJOR_ACTION_STARDUST.toLocaleString()} <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">✨</span>
+                          <span className="text-xs font-normal text-white/50 ml-2">per action · no weekly cap</span>
+                        </p>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        {MAJOR_ACTIONS.map((action) => {
+                          const baseClass = 'relative flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/25 rounded-xl';
+                          const inner = (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-base">
+                                  {action.icon}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-white">{action.label}</span>
+                                  <span className="text-xs text-white/40">
+                                    Infinitely repeatable
+                                    {action.href && (
+                                      <>
+                                        {' · '}
+                                        <span className="text-indigo-400 group-hover:text-indigo-300 underline underline-offset-2">
+                                          {action.hrefLabel} →
+                                        </span>
+                                      </>
+                                    )}
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-purple-400">+{MAJOR_ACTION_STARDUST.toLocaleString()} ✨</span>
+                            </>
+                          );
+
+                          if (action.href) {
+                            return (
+                              <a
+                                key={action.id}
+                                href={action.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`${baseClass} group hover:border-purple-500/50 hover:bg-purple-500/15 transition`}
+                              >
+                                {inner}
+                              </a>
+                            );
+                          }
+                          return (
+                            <div key={action.id} className={baseClass}>
+                              {inner}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
