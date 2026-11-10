@@ -11,12 +11,14 @@ export async function GET(
   const { userId: rawUserId } = await params;
   const userId = String(rawUserId);
 
+  const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
+  const botHeaders = { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` };
+
   // 1. Fetch name & avatar from the Bot
   let userInfo = { name: "Unknown User", avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png" };
   try {
-    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
     const res = await fetch(`${botUrl}/api/user/profile?userId=${userId}`, {
-      headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
+      headers: botHeaders,
       cache: "no-store",
     });
     if (res.ok) userInfo = await res.json();
@@ -37,13 +39,9 @@ export async function GET(
 
   let kofiSubMonths = 0;
   try {
-    const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
     const res = await fetch(
       `${botUrl}/api/kofi/subscription?discordId=${encodeURIComponent(userId)}`,
-      {
-        headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
-        cache: "no-store",
-      }
+      { headers: botHeaders, cache: "no-store" }
     );
     if (res.ok) {
       const data = await res.json();
@@ -69,26 +67,40 @@ export async function GET(
     love: guildEmotes["lilyLove"]?.id || null,
   };
 
-  // 4. Check Online Status
+  // 4. Online Status
   const heartbeats = (await kv.hgetall("user_heartbeats")) || {};
   const lastPing = Number(heartbeats[userId] || 0);
   const isOnline = Date.now() - lastPing < 120000;
 
-  // 5. Fetch custom color
+  // 5. Custom Color
   const userColors = (await kv.hgetall("user_profile_colors")) || {};
   const customColor = userColors[userId] || null;
 
   // 6. Fetch Inventory
   const inventory = (await kv.hgetall(`user_cards:${userId}`)) || {};
 
-  // 7. Fetch Points / Stardust Stats
-  const collectorPoints = Number(await kv.hget('user_collector_points', userId)) || 0;
+  // 7. Fetch Points
+  // Pack Points (spendable via /b)
   const packPoints = Number(await kv.hget('user_scores', userId)) || 0;
 
-  // Stardust logic (starts in 2027)
+  // Collector Points (from /leaderboard)
+  let collectorPoints = 0;
+  try {
+    const scoreRes = await fetch(`${botUrl}/api/user/collection-score?userId=${userId}`, {
+      headers: botHeaders,
+      cache: "no-store",
+    });
+    if (scoreRes.ok) {
+      const scoreData = await scoreRes.json();
+      collectorPoints = Number(scoreData.score) || 0;
+    }
+  } catch (err) {
+    console.error("Failed to fetch collection score:", err);
+  }
+
+  // Stardust (starts in 2027)
   let stardust = 0;
   const currentYear = new Date().getFullYear();
-  
   if (currentYear >= 2027) {
     stardust += (badges.subMonths * 6800);
     stardust += (badges.referrals * 6800);
@@ -98,7 +110,7 @@ export async function GET(
     stardust += weeklyBonuses;
   }
 
-  // 8. Fetch Streak Sources (from lib/streaks.js data)
+  // 8. Streak Sources (from lib/streaks.js)
   let streakSources: string[] = [];
   try {
     const streakData = (await kv.hgetall(`user_streaks:${userId}`)) || {};
@@ -107,28 +119,18 @@ export async function GET(
     if (streakData.monthly_last) streakSources.push("Monthly Streak");
 
     const now = Date.now();
-    
-    // Check active weekly pack bonuses
     const weeklyExpiries = (await kv.hgetall(`user_bonus_weekly:${userId}`)) || {};
     let activeWeekly = 0;
-    for (const expiry of Object.values(weeklyExpiries)) {
-      if (Number(expiry) > now) activeWeekly++;
-    }
+    for (const expiry of Object.values(weeklyExpiries)) if (Number(expiry) > now) activeWeekly++;
     if (activeWeekly > 0) streakSources.push(`${activeWeekly}x Weekly Pack Bonus`);
 
-    // Check active monthly pack bonuses
     const monthlyExpiries = (await kv.hgetall(`user_bonus_monthly:${userId}`)) || {};
     let activeMonthly = 0;
-    for (const expiry of Object.values(monthlyExpiries)) {
-      if (Number(expiry) > now) activeMonthly++;
-    }
+    for (const expiry of Object.values(monthlyExpiries)) if (Number(expiry) > now) activeMonthly++;
     if (activeMonthly > 0) streakSources.push(`${activeMonthly}x Monthly Pack Bonus`);
-    
-  } catch (err) {
-    console.error("[profiles API] Failed to parse streaks:", err);
-  }
+  } catch (err) {}
 
-  // 9. Fetch Favorites
+  // 9. Favorites
   const favKey = `user_favorites:${userId}`;
   let favorites: string[] = [];
   try {
@@ -137,9 +139,7 @@ export async function GET(
       if (Array.isArray(rawFavs)) favorites = rawFavs;
       else if (typeof rawFavs === 'string') favorites = JSON.parse(rawFavs);
     }
-  } catch (err) {
-    console.error("[profiles API] Failed to parse favorites:", err);
-  }
+  } catch (err) {}
 
   return NextResponse.json({
     id: userId,
