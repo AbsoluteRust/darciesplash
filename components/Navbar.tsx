@@ -173,15 +173,24 @@ export default function Navbar() {
                 {/* AUTH BUTTONS */}
                 <div className="flex flex-col items-center gap-4 mt-2">
                     {session ? (
-                        <button
-                            onClick={() => {
-                                setIsOpen(false);
-                                signOut({ callbackUrl: '/' });
-                            }}
-                            className="text-red-400 hover:text-red-300 transition-colors text-sm font-bold uppercase tracking-wider"
-                        >
-                            Sign Out
-                        </button>
+                        <>
+                            <Link
+                                href={`/profiles/${session.user.id}`}
+                                onClick={() => setIsOpen(false)}
+                                className="text-white/80 hover:text-pink-400 transition-colors text-sm font-bold uppercase tracking-wider"
+                            >
+                                Profile
+                            </Link>
+                            <button
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    signOut({ callbackUrl: '/' });
+                                }}
+                                className="text-red-400 hover:text-red-300 transition-colors text-sm font-bold uppercase tracking-wider"
+                            >
+                                Sign Out
+                            </button>
+                        </>
                     ) : (
                         <Link
                             href="/signin"
