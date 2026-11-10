@@ -165,16 +165,15 @@ export default function ProfileClient({ userId }: { userId: string }) {
       });
       
       if (!res.ok) {
-        const text = await res.text();
-        console.error("Save failed:", text);
-        throw new Error(`Server returned ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
       await fetchProfile();
       setIsEditingFavorites(false);
     } catch (err: any) {
       console.error("Failed to save favorites:", err);
-      alert("Failed to save your showcase. Please try again.");
+      alert(`Failed to save showcase: ${err.message}`);
     } finally {
       setIsSavingFavorites(false);
     }

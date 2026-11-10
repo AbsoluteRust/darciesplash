@@ -4,25 +4,37 @@ import { auth } from '@/auth';
 import { kv } from '@vercel/kv';
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { cardNames } = await req.json();
-  
-  if (!Array.isArray(cardNames)) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-  }
-  if (cardNames.length > 8) {
-    return NextResponse.json({ error: 'You can only showcase up to 8 cards' }, { status: 400 });
-  }
-
   try {
+    // 1. Verify user is logged in
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized: No active session found' }, { status: 401 });
+    }
+
+    // 2. Parse the request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const { cardNames } = body;
+    
+    if (!Array.isArray(cardNames)) {
+      return NextResponse.json({ error: 'cardNames must be an array' }, { status: 400 });
+    }
+    
+    if (cardNames.length > 8) {
+      return NextResponse.json({ error: 'You can only showcase up to 8 cards' }, { status: 400 });
+    }
+
+    // 3. Save to Vercel KV
     await kv.set(`user_favorites:${session.user.id}`, JSON.stringify(cardNames));
+    
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error('Failed to save favorites:', err);
-    return NextResponse.json({ error: 'Database error' }, { status: 500 });
+  } catch (err: any) {
+    console.error('[favorites API] Error:', err);
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
