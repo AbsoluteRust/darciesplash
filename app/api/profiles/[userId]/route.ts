@@ -102,7 +102,7 @@ export async function GET(
     emotes,
     customColor,
     inventory,
-    favorites, // <-- Added
+    favorites,
     stats: {
       stardust,
       collectorPoints,

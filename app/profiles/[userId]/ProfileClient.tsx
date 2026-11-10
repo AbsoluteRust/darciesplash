@@ -157,11 +157,13 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const handleSaveFavorites = async () => {
     setIsSavingFavorites(true);
+    const newFavs = Array.from(tempFavorites);
+    
     try {
       const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardNames: Array.from(tempFavorites) }),
+        body: JSON.stringify({ cardNames: newFavs }),
       });
       
       if (!res.ok) {
@@ -169,8 +171,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
-      await fetchProfile();
+      // Instantly update the UI so the cards appear without waiting
+      setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
       setIsEditingFavorites(false);
+
+      // Quietly fetch the profile in the background to ensure sync
+      await fetchProfile();
     } catch (err: any) {
       console.error("Failed to save favorites:", err);
       alert(`Failed to save showcase: ${err.message}`);

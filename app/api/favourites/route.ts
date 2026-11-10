@@ -27,6 +27,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You can only showcase up to 8 cards' }, { status: 400 });
     }
 
+    // Save to database
     await kv.set(`user_favorites:${session.user.id}`, JSON.stringify(cardNames));
     
     return NextResponse.json({ ok: true });
