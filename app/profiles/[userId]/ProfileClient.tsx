@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileCard from '@/components/ProfileCard';
-import { COLLECTION_OWNERS } from '@/lib/collection-owners';
 
 type StreakSource = {
   id: string;
@@ -24,7 +23,9 @@ type ProfileData = {
   isOnline: boolean;
   customColor: string | null;
   favorites?: string[];
-  badgeOverrides?: Record<string, { name?: string; iconUrl?: string }>;
+  badgeOverrides?: Record<string, any>;
+  achievements?: any[];
+  featuredBadgeId?: string | null;
   badges: {
     gifts: number;
     referrals: number;
@@ -61,27 +62,6 @@ type CardData = {
   contraband?: boolean;
 };
 
-type BadgeMilestone = {
-  type: 'sub' | 'referral' | 'gift';
-  threshold: number;
-  label: string;
-};
-
-const BADGE_MILESTONES: BadgeMilestone[] = [
-  { type: 'sub', threshold: 1, label: '1 Month' },
-  { type: 'sub', threshold: 3, label: '3 Months' },
-  { type: 'sub', threshold: 6, label: '6 Months' },
-  { type: 'sub', threshold: 12, label: '1 Year' },
-  { type: 'sub', threshold: 24, label: '2 Years' },
-  { type: 'sub', threshold: 36, label: '3 Years' },
-  { type: 'sub', threshold: 60, label: '5 Years' },
-  { type: 'referral', threshold: 1, label: 'First Referral' },
-  { type: 'referral', threshold: 5, label: '5 Referrals' },
-  { type: 'referral', threshold: 15, label: '15 Referrals' },
-  { type: 'gift', threshold: 5, label: '5 Gifts' },
-  { type: 'gift', threshold: 10, label: '10 Gifts' },
-];
-
 function formatSubTime(months: number) {
   if (months < 12) return `${months} Month${months === 1 ? '' : 's'}`;
   const years = Math.floor(months / 12);
@@ -90,107 +70,59 @@ function formatSubTime(months: number) {
   return `${years} Year${years === 1 ? '' : 's'}, ${rem} Month${rem === 1 ? '' : 's'}`;
 }
 
-function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): BadgeMilestone | null {
-  const milestones = BADGE_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
-  return milestones.find(m => m.threshold > currentValue) || null;
-}
-
-// Updated to be crash-proof if iconUrl is not a string
 function CustomBadgeIcon({ 
   badgeKey, 
+  progress,
   defaultEmoteId, 
   defaultFallback, 
   overrides, 
   className = "w-8 h-8" 
 }: { 
   badgeKey: string, 
+  progress?: number,
   defaultEmoteId: string | null | undefined, 
   defaultFallback: string, 
-  overrides: Record<string, { name?: string; iconUrl?: string }> | undefined | null,
+  overrides: Record<string, any> | undefined | null,
   className?: string
 }) {
   const custom = overrides?.[badgeKey];
-  const iconUrl = typeof custom?.iconUrl === 'string' ? custom.iconUrl : null;
+  
+  let iconUrl = null;
+  if (custom?.tiers && progress !== undefined) {
+    const thresholds = [1, 3, 6, 12, 24, 36, 60]; 
+    let activeTierIdx = -1;
+    for (let i = 0; i < thresholds.length; i++) {
+      if (progress >= thresholds[i] && custom.tiers[i]?.iconUrl) {
+        activeTierIdx = i;
+      }
+    }
+    if (activeTierIdx !== -1) {
+      iconUrl = custom.tiers[activeTierIdx].iconUrl;
+    }
+  }
+
+  if (!iconUrl && typeof custom?.iconUrl === 'string') {
+    iconUrl = custom.iconUrl;
+  }
 
   if (iconUrl) {
-    if (iconUrl.startsWith('http')) {
-      return <img src={iconUrl} alt="badge" className={`${className} object-contain`} />;
-    }
-    // Handle Discord Emote format <:name:id> or <a:name:id>
+    if (iconUrl.startsWith('http')) return <img src={iconUrl} alt="badge" className={`${className} object-contain`} />;
     const match = iconUrl.match(/<(a?):(\w+):(\d+)>/);
-    if (match) {
-      const ext = match[1] === 'a' ? 'gif' : 'png';
-      return <img src={`https://cdn.discordapp.com/emojis/${match[3]}.${ext}`} alt="badge" className={`${className} object-contain`} />;
-    }
-    // Handle standard Emoji
+    if (match) return <img src={`https://cdn.discordapp.com/emojis/${match[3]}.${match[1] === 'a' ? 'gif' : 'png'}`} alt="badge" className={`${className} object-contain`} />;
     return <span className={`${className} flex items-center justify-center text-xl`}>{iconUrl}</span>;
   }
 
-  // Fallback to KV Emote ID
-  if (defaultEmoteId) {
-    return <img src={`https://cdn.discordapp.com/emojis/${defaultEmoteId}.png`} alt="badge" className={`${className} object-contain`} />;
-  }
-
-  // Fallback to standard emoji
+  if (defaultEmoteId) return <img src={`https://cdn.discordapp.com/emojis/${defaultEmoteId}.png`} alt="badge" className={`${className} object-contain`} />;
   return <span className={`${className} flex items-center justify-center text-xl`}>{defaultFallback}</span>;
-}
-
-function StreakTooltip({ source, now, isOwnProfile }: { source: StreakSource, now: number, isOwnProfile: boolean }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
-  const handleMouseEnter = () => { clearTimeout(timeoutRef.current); setIsOpen(true); };
-  const handleMouseLeave = () => { timeoutRef.current = setTimeout(() => setIsOpen(false), 200); };
-  const timeLeft = source.nextClaimAt ? Math.max(0, source.nextClaimAt - now) : 0;
-  const hours = Math.floor(timeLeft / (1000 * 60 * 60));
-  const mins = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-  const secs = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-  return (
-    <div className="relative flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl cursor-help hover:bg-white/[0.06] transition-colors" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-bold text-white/90">{source.label}</span>
-        {source.current !== null && source.max !== null && <span className="text-xs text-white/40">({source.current}/{source.max})</span>}
-      </div>
-      <span className={`text-sm font-black ${source.points > 0 ? 'text-green-400' : 'text-indigo-400'}`}>
-        {source.points > 0 ? `+${source.points.toLocaleString()} pp` : '+ Score'}
-      </span>
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} className="absolute bottom-full left-0 mb-2 w-72 p-4 bg-[#12121a] border border-white/10 rounded-xl shadow-2xl z-50 pointer-events-auto">
-            <p className="text-xs text-white/70 leading-relaxed mb-3">{source.description}</p>
-            {source.nextClaimAt && timeLeft > 0 && (
-              <div className="flex items-center gap-2 text-[10px] font-mono text-indigo-400 bg-indigo-500/10 p-2 rounded-lg mb-3">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                Next claim in: {hours}h {mins}m {secs}s
-              </div>
-            )}
-            {source.servers && (
-              <div className="mt-3">
-                <p className="text-[10px] font-bold text-white/40 uppercase mb-2">Community Servers</p>
-                <div className="flex flex-wrap gap-2">
-                  {source.servers.map(srv => (
-                    <a key={srv.id} href={srv.inviteUrl} target="_blank" rel="noreferrer" className={`relative group flex items-center gap-2 p-1.5 rounded-lg border transition-all ${srv.joined ? 'bg-green-500/10 border-green-500/30 hover:bg-green-500/20' : 'bg-white/5 border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10'}`}>
-                      <img src={srv.icon} alt={srv.name} className="w-6 h-6 rounded-full" />
-                      <span className="text-xs font-medium text-white/80">{srv.name}</span>
-                      {srv.joined ? <span className="text-[10px] text-green-400 font-bold ml-1">✓</span> : isOwnProfile && <span className="text-[10px] text-indigo-400 font-bold ml-1">Join</span>}
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
 }
 
 export default function ProfileClient({ userId }: { userId: string }) {
   const [data, setData] = useState<ProfileData | null>(null);
   const [allCards, setAllCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'commissions' | 'points' | 'badges'>('commissions');
+  const [activeTab, setActiveTab] = useState<'commissions' | 'points' | 'badges' | 'achievements'>('commissions');
   const [now, setNow] = useState(Date.now());
+  const [showLocked, setShowLocked] = useState(false);
   
   const { userId: currentUserId, roles } = useCollectionFilter();
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
@@ -203,7 +135,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
-  const userCollection = Object.entries(COLLECTION_OWNERS).find(([_, owners]) => owners.includes(userId))?.[0];
 
   useEffect(() => { const int = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(int); }, []);
 
@@ -228,34 +159,52 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const handleSaveFavorites = async () => { setIsSavingFavorites(true); const newFavs = Array.from(tempFavorites); try { const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardNames: newFavs }) }); if (!res.ok) throw new Error(`HTTP error ${res.status}`); setData(prev => prev ? { ...prev, favorites: newFavs } : prev); setIsEditingFavorites(false); } catch (err: any) { alert(`Failed to save showcase: ${err.message}`); } finally { setIsSavingFavorites(false); } };
   const toggleFavorite = (cardName: string) => { setTempFavorites(prev => { const next = new Set(prev); if (next.has(cardName)) next.delete(cardName); else { if (next.size >= 8) { alert("You can only select up to 8 cards."); return prev; } next.add(cardName); } return next; }); };
 
+  const handleSetFeaturedBadge = async (badgeId: string | null) => {
+    try {
+      const res = await fetch('/api/profiles/featured-badge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ badgeId }),
+      });
+      if (res.ok) {
+        setData(prev => prev ? { ...prev, featuredBadgeId: badgeId } : prev);
+      } else {
+        alert('Failed to feature badge.');
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
-
-  const availableCards: CardData[] = [];
-  if (data.inventory && userCollection) {
-    const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
-    for (const card of allCards) {
-      if (ownedCardNames.has(card.name.toLowerCase()) && !card.contraband && card.collection === userCollection) availableCards.push(card);
-    }
-  }
-  const displayedCards = availableCards.filter(c => data.favorites?.includes(c.name));
 
   const payoutSources = data.stats?.streakBreakdown?.filter(s => ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id)) || [];
   const streakScore = data.stats?.streakScore || 0;
   const tierCount = Math.floor(streakScore / 1000);
   const currentProgress = streakScore % 1000;
 
-  const getBadgeName = (key: string, fallback: string) => data.badgeOverrides?.[key]?.name || fallback;
+  // --- BADGE LOGIC ---
+  const earnedBadges = [];
+  const lockedBadges = [];
 
-  // Determine which badges to show in the header
-  const activeBadges = [];
-  if ((data.badges?.subMonths || 0) > 0) activeBadges.push({ key: 'heart', defaultEmote: data.emotes?.heart, fallback: '💖', title: `Subscribed: ${formatSubTime(data.badges.subMonths)}` });
-  if (data.badges?.isCommissioner) activeBadges.push({ key: 'sparkle', defaultEmote: data.emotes?.sparkle, fallback: '✨', title: 'Commissioner' });
-  if ((data.badges?.gifts || 0) > 0) activeBadges.push({ key: 'gift', defaultEmote: data.emotes?.gift, fallback: '🎁', title: `${data.badges.gifts} Gifts Sent` });
-  if ((data.badges?.referrals || 0) > 0) activeBadges.push({ key: 'banana', defaultEmote: data.emotes?.banana, fallback: '🍌', title: `${data.badges.referrals} Referrals` });
+  if ((data.badges?.subMonths || 0) > 0) earnedBadges.push({ key: 'heart', progress: data.badges.subMonths, title: `Subscribed: ${formatSubTime(data.badges.subMonths)}`, label: 'Subscriber', defaultEmote: data.emotes?.heart, fallback: '💖' });
+  else lockedBadges.push({ key: 'heart', title: 'Subscribe to unlock', label: 'Subscriber', defaultEmote: data.emotes?.heart, fallback: '💖' });
+
+  if (data.badges?.isCommissioner) earnedBadges.push({ key: 'sparkle', progress: 1, title: 'Commissioner', label: 'Commissioner', defaultEmote: data.emotes?.sparkle, fallback: '✨' });
+  else lockedBadges.push({ key: 'sparkle', title: 'Commission art to unlock', label: 'Commissioner', defaultEmote: data.emotes?.sparkle, fallback: '✨' });
+
+  if ((data.badges?.gifts || 0) > 0) earnedBadges.push({ key: 'gift', progress: data.badges.gifts, title: `${data.badges.gifts} Gifts Sent`, label: 'Gifter', defaultEmote: data.emotes?.gift, fallback: '🎁' });
+  else lockedBadges.push({ key: 'gift', title: 'Send a gift to unlock', label: 'Gifter', defaultEmote: data.emotes?.gift, fallback: '🎁' });
+
+  if ((data.badges?.referrals || 0) > 0) earnedBadges.push({ key: 'banana', progress: data.badges.referrals, title: `${data.badges.referrals} Referrals`, label: 'Referrals', defaultEmote: data.emotes?.banana, fallback: '🍌' });
+  else lockedBadges.push({ key: 'banana', title: 'Refer a friend to unlock', label: 'Referrals', defaultEmote: data.emotes?.banana, fallback: '🍌' });
+
   (data.badges?.loyalty || []).forEach(year => {
-    activeBadges.push({ key: 'love', defaultEmote: data.emotes?.love, fallback: '💜', title: `${year} Loyalty Card` });
+    earnedBadges.push({ key: 'love', progress: 1, title: `${year} Loyalty Card`, label: 'Loyalty', defaultEmote: data.emotes?.love, fallback: '💜' });
   });
+  
+  const featuredAchievement = data.achievements?.find(a => a.id === data.featuredBadgeId);
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -295,17 +244,28 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
             
             <div className="flex flex-wrap gap-4 items-center">
-              {activeBadges.length === 0 ? (
-                <span className="text-white/30 text-sm italic">No badges unlocked yet.</span>
-              ) : (
-                activeBadges.map((badge, i) => (
-                  <div key={i} className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform">
-                    <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10 md:w-12 md:h-12 drop-shadow-lg" />
-                    <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                      {badge.title}
-                    </span>
+              {earnedBadges.map((badge, i) => (
+                <div key={`earned-${i}`} className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform">
+                  <CustomBadgeIcon badgeKey={badge.key} progress={badge.progress} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10 md:w-12 md:h-12 drop-shadow-lg" />
+                  <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
+                    {badge.title}
+                  </span>
+                </div>
+              ))}
+              
+              {featuredAchievement && (
+                <div className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform ml-2 border-l border-white/10 pl-4">
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/50 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                    <span className="text-xl md:text-2xl">🏆</span>
                   </div>
-                ))
+                  <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
+                    {featuredAchievement.label}
+                  </span>
+                </div>
+              )}
+
+              {earnedBadges.length === 0 && !featuredAchievement && (
+                <span className="text-white/30 text-sm italic">No badges unlocked yet.</span>
               )}
             </div>
           </div>
@@ -315,7 +275,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
       {/* ─── TABS NAVIGATION ─── */}
       <div className="flex justify-center w-full">
         <div className="flex bg-[#0a0a14]/80 border border-white/10 rounded-full p-1 backdrop-blur-xl">
-          {(['commissions', 'points', 'badges'] as const).map(tab => (
+          {(['commissions', 'points', 'badges', 'achievements'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-full text-sm font-bold capitalize transition-all ${activeTab === tab ? 'bg-indigo-600 text-white shadow-lg' : 'text-white/50 hover:text-white hover:bg-white/5'}`}>{tab}</button>
           ))}
         </div>
@@ -332,11 +292,11 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <h2 className="text-xl font-bold text-white">Showcase</h2>
                 {canEdit && <button onClick={() => { setTempFavorites(new Set(data.favorites || [])); setIsEditingFavorites(true); }} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-bold transition">Edit Showcase</button>}
               </div>
-              {displayedCards.length === 0 ? (
+              {(!data.favorites || data.favorites.length === 0) ? (
                 <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">{canEdit ? "You haven't showcased any commissions yet." : "No commissions showcased."}</div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                  {displayedCards.map((card) => (
+                  {allCards.filter(c => data.favorites?.includes(c.name)).map((card) => (
                     <div key={card.name} className="w-full profile-commission-card relative cursor-pointer" style={{ aspectRatio: '0.718' }}>
                       <ProfileCard name={card.name} title={card.type} handle={card.name.toLowerCase().replace(/\s+/g, "-")} status="" contactText="" avatarUrl={card.image} rarity={undefined} showUserInfo={false} enableTilt={true} enableMobileTilt={false} behindGlowEnabled={false} innerGradient="none" onContactClick={() => setSelectedCard(card)} />
                     </div>
@@ -371,7 +331,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-                    {payoutSources.length ? payoutSources.map((source) => <StreakTooltip key={source.id} source={source} now={now} isOwnProfile={isOwnProfile} />) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
+                    {payoutSources.length ? payoutSources.map((source) => (
+                      <div key={source.id} className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl">
+                        <div className="flex items-center gap-2"><span className="text-sm font-bold text-white/90">{source.label}</span></div>
+                        <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
+                      </div>
+                    )) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
                   </div>
                 </div>
 
@@ -412,89 +377,100 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
           {/* BADGES TAB */}
           {activeTab === 'badges' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Subscriber */}
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
-                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="heart" defaultEmoteId={data.emotes?.heart} defaultFallback="💖" overrides={data.badgeOverrides} className="w-10 h-10" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('heart', 'Subscriber')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{(data.badges?.subMonths || 0) > 0 ? `Currently ${formatSubTime(data.badges.subMonths)}` : 'Not subscribed'}</p>
-                  {(() => {
-                    const next = getNextUpgrade('sub', data.badges?.subMonths || 0);
-                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
-                    return (
-                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.subMonths || 0) / next.threshold) * 100)}%` }} />
-                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Referrals */}
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
-                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="banana" defaultEmoteId={data.emotes?.banana} defaultFallback="🍌" overrides={data.badgeOverrides} className="w-10 h-10" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('banana', 'Referrals')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{data.badges?.referrals || 0} Referred</p>
-                  {(() => {
-                    const next = getNextUpgrade('referral', data.badges?.referrals || 0);
-                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
-                    return (
-                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.referrals || 0) / next.threshold) * 100)}%` }} />
-                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Gifter */}
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
-                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="gift" defaultEmoteId={data.emotes?.gift} defaultFallback="🎁" overrides={data.badgeOverrides} className="w-10 h-10" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('gift', 'Gifter')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{data.badges?.gifts || 0} Gifts Sent</p>
-                  {(() => {
-                    const next = getNextUpgrade('gift', data.badges?.gifts || 0);
-                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
-                    return (
-                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.gifts || 0) / next.threshold) * 100)}%` }} />
-                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              {/* Commissioner */}
-              {data.badges?.isCommissioner && (
-                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
-                  <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                    <CustomBadgeIcon badgeKey="sparkle" defaultEmoteId={data.emotes?.sparkle} defaultFallback="✨" overrides={data.badgeOverrides} className="w-10 h-10" />
+            <div className="flex flex-col gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {earnedBadges.map((badge) => (
+                  <div key={`badge-tab-${badge.key}`} className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
+                    <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                      <CustomBadgeIcon badgeKey={badge.key} progress={badge.progress} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                      <p className="text-sm text-white/50">{badge.title}</p>
+                      <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('sparkle', 'Commissioner')}</h3>
-                    <p className="text-sm text-white/50">Patron of the arts</p>
-                    <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
-                  </div>
+                ))}
+              </div>
+
+              <div>
+                <button 
+                  onClick={() => setShowLocked(!showLocked)}
+                  className="flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition mb-4"
+                >
+                  <span className={`transform transition-transform ${showLocked ? 'rotate-90' : ''}`}>▶</span>
+                  Not yet unlocked ({lockedBadges.length})
+                </button>
+                
+                <AnimatePresence>
+                  {showLocked && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        {lockedBadges.map((badge) => (
+                          <div key={`locked-${badge.key}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-6 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                            <div className="w-20 h-20 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
+                              <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                              <p className="text-sm text-white/50">{badge.title}</p>
+                              <p className="text-xs text-white/30 font-bold mt-2">Locked</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+
+          {/* ACHIEVEMENTS TAB */}
+          {activeTab === 'achievements' && (
+            <div>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">Achievements</h2>
+              </div>
+              
+              {data.achievements && data.achievements.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {data.achievements.map((ach) => {
+                    const isFeatured = data.featuredBadgeId === ach.id;
+                    return (
+                      <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-5 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
+                        <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+                          🏆
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
+                          <p className="text-xs text-indigo-400 font-bold mb-2">{ach.rarity} Collector</p>
+                          
+                          {isOwnProfile && (
+                            <button
+                              onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition w-full ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                            >
+                              {isFeatured ? 'Featured on Profile' : 'Feature on Profile'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
+                  No achievements unlocked yet. Keep collecting to earn them!
                 </div>
               )}
             </div>
           )}
+
         </motion.div>
       </AnimatePresence>
 
-      {/* ─── EDIT FAVORITES MODAL ─── */}
+      {/* Modals (Edit Favorites, Card Viewer, Color Picker) */}
       <AnimatePresence>
         {isEditingFavorites && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -510,9 +486,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </div>
               </div>
               <div className="overflow-y-auto flex-1 custom-scrollbar p-1">
-                {availableCards.length === 0 ? <p className="text-white/50 text-center py-10">You don't have any cards to showcase.</p> : (
+                {allCards.length === 0 ? <p className="text-white/50 text-center py-10">Loading cards...</p> : (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {availableCards.map(card => {
+                    {allCards.map(card => {
                       const isSelected = tempFavorites.has(card.name);
                       return (
                         <div key={card.name} className={`relative aspect-[0.718] rounded-xl overflow-hidden cursor-pointer transition-all ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'hover:scale-[1.02] opacity-70 hover:opacity-100'}`} onClick={() => toggleFavorite(card.name)}>
@@ -529,7 +505,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
         )}
       </AnimatePresence>
 
-      {/* ─── CARD MODAL VIEWER ─── */}
       <AnimatePresence>
         {selectedCard && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setSelectedCard(null)}>
@@ -540,7 +515,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
         )}
       </AnimatePresence>
 
-      {/* Color Picker Modal */}
       <AnimatePresence>
         {isColorModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
