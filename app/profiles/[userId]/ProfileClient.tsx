@@ -101,6 +101,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [selectedColor, setSelectedColor] = useState('#ffffff');
   const [savingColor, setSavingColor] = useState(false);
 
+  // State for viewing a card in the modal
+  const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
+
   const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
 
@@ -174,38 +177,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
   return (
     <div className="flex flex-col gap-8 w-full">
       {/* 
-        This style block strips out all of the dark gradient overlays, tinting, 
-        and static backgrounds from the ProfileCard so the artwork is pure. 
+        This style block removes the glare and dark color overlay from the cards, 
+        but leaves the card background, border, and shadow intact. 
       */}
       <style dangerouslySetInnerHTML={{__html: `
-        .profile-commission-card .pc-card {
-          background: transparent !important;
-          border: none !important;
-          box-shadow: none !important;
-        }
-        .profile-commission-card .pc-inside,
-        .profile-commission-card .pc-avatar-content,
-        .profile-commission-card .pc-avatar-crop {
-          background: transparent !important;
-          filter: none !important;
-          -webkit-filter: none !important;
-          mix-blend-mode: normal !important;
-        }
-        .profile-commission-card .avatar {
-          filter: none !important;
-          -webkit-filter: none !important;
-          opacity: 1 !important;
-          mix-blend-mode: normal !important;
-        }
-        .profile-commission-card .pc-behind {
-          display: none !important; /* Removes the background glow */
-        }
         .profile-commission-card .pc-shine,
-        .profile-commission-card .pc-glare {
-          display: none !important; /* Removes the shiny/glare overlays */
+        .profile-commission-card .pc-glare,
+        .profile-commission-card .pc-behind {
+          display: none !important;
         }
-        .profile-commission-card .pc-user-info {
-          display: none !important; /* Removes the extra user info footer */
+        .profile-commission-card .pc-inside {
+          background: transparent !important;
         }
       `}} />
 
@@ -296,23 +278,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   {commissionedCards.map((card) => (
                     <div 
                       key={card.name} 
-                      className="w-full profile-commission-card relative" 
-                      style={{ aspectRatio: '0.718' }} // Forces the height so the tilt animation works
+                      className="w-full profile-commission-card relative cursor-pointer" 
+                      style={{ aspectRatio: '0.718' }} // Ensures aspect ratio for the tilt animation
+                      onClick={() => setSelectedCard(card)}
                     >
                       <ProfileCard
                         name={card.name}
                         title={card.type}
-                        handle={card.name.toLowerCase().replace(/\s+/g, "-")}
-                        status=""
-                        contactText=""
-                        avatarUrl={card.image} // Uses full image (allows .gif animation)
-                        rarity={undefined} // Removes the rarity badge & borders
+                        avatarUrl={card.image} // Uses full image (allows GIFs)
+                        rarity={undefined} // Hides rarity
                         showUserInfo={false}
-                        enableTilt={true} // Re-enables animations
-                        enableMobileTilt={false}
-                        behindGlowEnabled={false} // Removes the glow
-                        innerGradient="none" // Removes the tint
-                        isModal={false}
+                        enableTilt={true} // Enables 3D tilt
+                        behindGlowEnabled={false} // Disables background glow
+                        innerGradient="none" // Disables colour tint
                       />
                     </div>
                   ))}
@@ -437,6 +415,29 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* ─── CARD MODAL VIEWER ─── */}
+      <AnimatePresence>
+        {selectedCard && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            onClick={() => setSelectedCard(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <img 
+                src={selectedCard.image} 
+                alt={selectedCard.name} 
+                className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" 
+              />
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Color Picker Modal */}
