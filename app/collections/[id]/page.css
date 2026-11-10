@@ -42,8 +42,9 @@ body::-webkit-scrollbar {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
-  height: 100lvh; /* Extends behind the iOS URL bar and safe areas */
+  /* 150lvh safely bleeds off the bottom of the screen so no black gaps appear 
+     when the URL bar collapses or floats. The extra height is hidden below. */
+  height: 150lvh; 
   z-index: -1;
   pointer-events: none;
   transform: translate3d(0, 0, 0);
@@ -76,8 +77,8 @@ body::-webkit-scrollbar {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
-  height: 100lvh; /* Extends behind the iOS URL bar and safe areas */
+  /* Same fix: over-extend to cover any iOS URL bar calculation gaps */
+  height: 150lvh;
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
@@ -96,12 +97,15 @@ body::-webkit-scrollbar {
 
 /* 
   Reserve the exact space the card will take. 
-  This stops the grid from collapsing when the card mounts, which was
-  interrupting iOS Safari's image loading and causing blank cards.
+  Adding transform: translateZ(0) forces iOS to render the entire card 
+  (bg, border, text, image) as a single layer, stopping the progressive 
+  "pop-in" effect when scrolling.
 */
 .lazy-mount {
   width: 100%;
   aspect-ratio: 0.718;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .card-grid {
