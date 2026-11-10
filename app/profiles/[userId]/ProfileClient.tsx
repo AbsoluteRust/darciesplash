@@ -12,6 +12,7 @@ type ProfileData = {
   avatarUrl: string;
   isOnline: boolean;
   customColor: string | null;
+  favorites?: string[];
   badges: {
     gifts: number;
     referrals: number;
@@ -42,13 +43,8 @@ type CardData = {
   thumbUrl?: string;
   glow?: string;
   rarity?: string;
-  description?: string;
-  details?: string;
-  link?: string;
   collection?: string;
-  related?: string[];
   contraband?: boolean;
-  contrabandArtist?: string;
 };
 
 type BadgeMilestone = {
@@ -103,6 +99,11 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
 
+  // Showcase Favorites State
+  const [isEditingFavorites, setIsEditingFavorites] = useState(false);
+  const [tempFavorites, setTempFavorites] = useState<Set<string>>(new Set());
+  const [isSavingFavorites, setIsSavingFavorites] = useState(false);
+
   const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
 
@@ -154,10 +155,47 @@ export default function ProfileClient({ userId }: { userId: string }) {
     }
   };
 
+  const handleSaveFavorites = async () => {
+    setIsSavingFavorites(true);
+    try {
+      const res = await fetch('/api/profiles/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardNames: Array.from(tempFavorites) }),
+      });
+      if (res.ok) {
+        setIsEditingFavorites(false);
+        fetchProfile();
+      } else {
+        const errData = await res.json();
+        alert(errData.error || 'Failed to save favorites');
+      }
+    } finally {
+      setIsSavingFavorites(false);
+    }
+  };
+
+  const toggleFavorite = (cardName: string) => {
+    setTempFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(cardName)) {
+        next.delete(cardName);
+      } else {
+        if (next.size >= 8) {
+          alert("You can only select up to 8 cards.");
+          return prev;
+        }
+        next.add(cardName);
+      }
+      return next;
+    });
+  };
+
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  const commissionedCards: CardData[] = [];
+  // Filter cards to only show ones from this user's collection
+  const availableCards: CardData[] = [];
   if (data.inventory && userCollection) {
     const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
     for (const card of allCards) {
@@ -166,17 +204,16 @@ export default function ProfileClient({ userId }: { userId: string }) {
         !card.contraband && 
         card.collection === userCollection
       ) {
-        commissionedCards.push(card);
+        availableCards.push(card);
       }
     }
   }
 
+  // Only display the ones the user has favorited
+  const displayedCards = availableCards.filter(c => data.favorites?.includes(c.name));
+
   return (
     <div className="flex flex-col gap-8 w-full">
-      {/* 
-        This style block nukes any CSS filters or blend modes on the images 
-        and containers, forcing full saturation while keeping the card frame intact.
-      */}
       <style dangerouslySetInnerHTML={{__html: `
         .profile-commission-card .avatar,
         .profile-commission-card .pc-avatar-crop,
@@ -274,13 +311,30 @@ export default function ProfileClient({ userId }: { userId: string }) {
           {/* COMMISSIONS TAB */}
           {activeTab === 'commissions' && (
             <div>
-              {commissionedCards.length === 0 ? (
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold text-white">Showcase</h2>
+                {canEdit && (
+                  <button
+                    onClick={() => {
+                      setTempFavorites(new Set(data.favorites || []));
+                      setIsEditingFavorites(true);
+                    }}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-bold transition"
+                  >
+                    Edit Showcase
+                  </button>
+                )}
+              </div>
+
+              {displayedCards.length === 0 ? (
                 <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
-                  No commissions found for this user.
+                  {canEdit 
+                    ? "You haven't showcased any commissions yet. Click 'Edit Showcase' to pick up to 8 of your favourites."
+                    : "No commissions showcased."}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                  {commissionedCards.map((card) => (
+                  {displayedCards.map((card) => (
                     <div 
                       key={card.name} 
                       className="w-full profile-commission-card relative cursor-pointer" 
@@ -424,6 +478,71 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* ─── EDIT FAVORITES MODAL ─── */}
+      <AnimatePresence>
+        {isEditingFavorites && (
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
+              className="bg-[#0a0a14] border border-white/10 rounded-3xl p-6 w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Edit Showcase</h2>
+                  <p className="text-white/50 text-sm mt-1">Pick up to 8 commissions to display on your profile.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setIsEditingFavorites(false)} 
+                    className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    onClick={handleSaveFavorites} 
+                    disabled={isSavingFavorites} 
+                    className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition disabled:opacity-50"
+                  >
+                    {isSavingFavorites ? 'Saving...' : `Save (${tempFavorites.size}/8)`}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="overflow-y-auto flex-1 custom-scrollbar p-1">
+                {availableCards.length === 0 ? (
+                  <p className="text-white/50 text-center py-10">You don't have any cards to showcase.</p>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {availableCards.map(card => {
+                      const isSelected = tempFavorites.has(card.name);
+                      return (
+                        <div 
+                          key={card.name} 
+                          className={`relative aspect-[0.718] rounded-xl overflow-hidden cursor-pointer transition-all ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'hover:scale-[1.02] opacity-70 hover:opacity-100'}`}
+                          onClick={() => toggleFavorite(card.name)}
+                        >
+                          <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                          {isSelected && (
+                            <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center">
+                              <div className="w-10 h-10 bg-indigo-500 text-white rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white">
+                                ✓
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* ─── CARD MODAL VIEWER ─── */}
