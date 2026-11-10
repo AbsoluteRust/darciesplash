@@ -8,7 +8,8 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ userId: string }> }
 ) {
-  const { userId } = await params;
+  const { userId: rawUserId } = await params;
+  const userId = String(rawUserId);
 
   // 1. Fetch name & avatar from the Bot
   let userInfo = { name: "Unknown User", avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png" };
@@ -89,14 +90,19 @@ export async function GET(
     if (rawStreaks) streakSources = typeof rawStreaks === 'string' ? JSON.parse(rawStreaks) : rawStreaks;
   } catch {}
 
-  // 7. Fetch Favorites (Handles both string and array formats)
+  // 7. Fetch Favorites
+  const favKey = `user_favorites:${userId}`;
   let favorites: string[] = [];
   try {
-    const rawFavs = await kv.get(`user_favorites:${userId}`);
-    if (Array.isArray(rawFavs)) {
-      favorites = rawFavs;
-    } else if (typeof rawFavs === 'string') {
-      favorites = JSON.parse(rawFavs);
+    const rawFavs = await kv.get(favKey);
+    console.log(`[profiles API] FETCHING FROM ${favKey}:`, rawFavs);
+    
+    if (rawFavs) {
+      if (Array.isArray(rawFavs)) {
+        favorites = rawFavs;
+      } else if (typeof rawFavs === 'string') {
+        favorites = JSON.parse(rawFavs);
+      }
     }
   } catch (err) {
     console.error("[profiles API] Failed to parse favorites:", err);

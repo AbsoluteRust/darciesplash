@@ -20,9 +20,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Max 8 cards allowed' }, { status: 400 });
     }
 
-    // Store the raw array. @vercel/kv will stringify it automatically.
-    await kv.set(`user_favorites:${session.user.id}`, cardNames);
+    // Force both to string to ensure the key is identical to the GET route
+    const userId = String(session.user.id);
+    const key = `user_favorites:${userId}`;
+    const payload = JSON.stringify(cardNames);
     
+    // Write to database
+    await kv.set(key, payload);
+    
+    // Verify what we just wrote
+    const verify = await kv.get(key);
+    console.log(`[favorites API] SAVED to ${key}:`, payload);
+    console.log(`[favorites API] VERIFIED:`, verify);
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error('[favorites API] Error:', err);

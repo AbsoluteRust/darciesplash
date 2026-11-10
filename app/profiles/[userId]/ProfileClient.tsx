@@ -171,6 +171,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
+      const result = await res.json();
+      console.log("Save response from server:", result);
+
       // Update the UI immediately and close the modal
       setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
       setIsEditingFavorites(false);
