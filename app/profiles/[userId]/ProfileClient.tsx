@@ -77,19 +77,13 @@ type CardData = {
 
 const DEFAULT_HIGHLIGHT = '#6366f1';
 const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1); // Jan 1 2027 00:00:00 UTC
-// Mirrors MAJOR_ACTION_STARDUST in lib/stardust.js (awardMajorActionStardust)
 const MAJOR_ACTION_STARDUST = 6800;
-// Total stardust you can earn this week from pack tiers (Tier 4 reward)
 const STARDUST_WEEK_MAX = 660;
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 
-// Pack point caps and 2027 changes (mirror lib/pack-points.js)
+// Pack point caps (mirror config.js)
 const PACK_POINTS_CAP_BASE = 200_000;
 const PACK_POINTS_CAP_PREMIUM = 500_000;
-const PACK_POINT_MULTIPLIER_2027 = 1.5;
-const PACK_POINT_GUILD_2027 = 15_000;
-const PACK_COST_BASE = 10_000;
-const PACK_COST_2027 = 15_000;
 
 const STARDUST_TIERS = [
   { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
@@ -268,18 +262,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const weekDrops = stardustWeek?.drops ?? 0;
   const weekPuzzles = stardustWeek?.puzzles ?? 0;
   const weekEarned = stardustWeek?.weekEarned ?? 0;
-
-  // --- 2027 pack point projection ---
-  const streakBreakdown = data.stats?.streakBreakdown || [];
-  const currentBase = streakBreakdown.find(s => s.id === 'base')?.points || 0;
-  const currentGuild = streakBreakdown.find(s => s.id === 'guild')?.points || 0;
-  const isInGuild = streakBreakdown.some(s => s.id === 'guild');
-  const currentDailyTotal = data.stats?.streakTotal || 0;
-  const othersCurrent = Math.max(0, currentDailyTotal - currentBase - currentGuild);
-  const futureGuildBonus = isInGuild ? PACK_POINT_GUILD_2027 : 0;
-  const futureDailyTotal = futureGuildBonus + Math.round(othersCurrent * PACK_POINT_MULTIPLIER_2027);
-  const futureDelta = futureDailyTotal - currentDailyTotal;
-  const hasBreakdown = streakBreakdown.length > 0;
 
   // --- BADGE LOGIC ---
   const earnedBadges: any[] = [];
@@ -632,99 +614,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       </div>
                     )) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
                   </div>
-                </div>
-
-                {/* ─── PACK POINT CHANGES (Jan 1, 2027) ─── */}
-                <div className="bg-[#0a0a14]/80 border border-indigo-500/25 rounded-3xl p-6">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <p className="text-indigo-400 uppercase tracking-widest text-xs font-bold mb-1">Coming January 1, 2027</p>
-                      <h3 className="text-xl font-bold text-white">Pack Point Changes</h3>
-                      <p className="text-sm text-white/50 mt-1">Effective when stardust launches.</p>
-                    </div>
-                  </div>
-
-                  {hasBreakdown ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-                      <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
-                        <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-1">Current daily</p>
-                        <p className="text-2xl font-black text-white">+{currentDailyTotal.toLocaleString()} <span className="text-sm font-normal text-white/40">pp/day</span></p>
-                      </div>
-                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
-                        <p className="text-xs text-indigo-300 uppercase tracking-widest font-bold mb-1">After changes</p>
-                        <p className="text-2xl font-black text-indigo-400">
-                          +{futureDailyTotal.toLocaleString()} <span className="text-sm font-normal text-white/40">pp/day</span>
-                          {futureDelta !== 0 && (
-                            <span className={`ml-2 text-xs font-bold ${futureDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {futureDelta > 0 ? '+' : ''}{futureDelta.toLocaleString()}
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-white/40 italic mb-5">Daily income data unavailable — projections will appear once it loads.</p>
-                  )}
-
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 font-bold">✕</div>
-                        <div>
-                          <p className="text-sm font-bold text-white">Daily Base</p>
-                          <p className="text-xs text-white/50">Removed</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-black text-red-400 line-through">
-                        {currentBase > 0 ? `${currentBase.toLocaleString()} pp` : '5,000 pp'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">⬆</div>
-                        <div>
-                          <p className="text-sm font-bold text-white">Darcie's Discord</p>
-                          <p className="text-xs text-white/50">
-                            {isInGuild ? 'Increased' : 'Increased — join to earn'}
-                          </p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-black text-green-400">
-                        {PACK_POINT_GUILD_2027.toLocaleString()} pp
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">×</div>
-                        <div>
-                          <p className="text-sm font-bold text-white">All other sources</p>
-                          <p className="text-xs text-white/50">Multiplied</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-black text-indigo-400">×{PACK_POINT_MULTIPLIER_2027}</span>
-                    </div>
-
-                    <div className="flex items-center justify-between p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold">$</div>
-                        <div>
-                          <p className="text-sm font-bold text-white">Pack Price</p>
-                          <p className="text-xs text-white/50">Increased</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-black text-amber-400">
-                        {PACK_COST_BASE.toLocaleString()} → {PACK_COST_2027.toLocaleString()} pp
-                      </span>
-                    </div>
-                  </div>
-
-                  {!isInGuild && hasBreakdown && (
-                    <p className="text-xs text-indigo-300 mt-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
-                      💡 Join Darcie's Discord to earn +{PACK_POINT_GUILD_2027.toLocaleString()} pp/day after launch.
-                    </p>
-                  )}
                 </div>
 
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
