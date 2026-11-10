@@ -113,6 +113,12 @@ export async function GET(
     }
   } catch (err) {}
 
+  // 8b. Derive darsubscribbler status for pack point cap
+  // Prefer the KV roles hash if populated; fall back to breakdown entry (bot-verified)
+  const isDarsubscribbler =
+    !!roles?.darsubscribbler ||
+    streakBreakdown.some((s: any) => s.id === 'darsubscribbler');
+
   // 9. Stardust
   const stardust = Number(await kv.hget('user_stardust', userId).catch(() => 0)) || 0;
 
@@ -184,6 +190,7 @@ export async function GET(
     id: userId,
     ...userInfo,
     isOnline,
+    isDarsubscribbler,
     badges,
     emotes,
     customColor,

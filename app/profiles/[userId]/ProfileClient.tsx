@@ -32,6 +32,7 @@ type ProfileData = {
   name: string;
   avatarUrl: string;
   isOnline: boolean;
+  isDarsubscribbler?: boolean;
   customColor: string | null;
   favorites?: string[];
   badgeOverrides?: Record<string, any>;
@@ -81,6 +82,12 @@ const MAJOR_ACTION_STARDUST = 6800;
 // Total stardust you can earn this week from pack tiers (Tier 4 reward)
 const STARDUST_WEEK_MAX = 660;
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
+
+// Pack point caps and 2027 changes (mirror what the bot will enforce)
+const PACK_POINTS_CAP_BASE = 200_000;
+const PACK_POINTS_CAP_PREMIUM = 500_000;
+const PACK_POINT_MULTIPLIER_2027 = 1.5;
+const PACK_POINT_GUILD_2027 = 15_000;
 
 const STARDUST_TIERS = [
   { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
@@ -242,6 +249,14 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const tierCount = Math.floor(streakScore / 1000);
   const currentProgress = streakScore % 1000;
 
+  // --- Pack point cap ---
+  const isCommissioner = data.badges?.isCommissioner ?? false;
+  const isDarsubscribbler = data.isDarsubscribbler ?? false;
+  const hasIncreasedCap = isCommissioner || isDarsubscribbler;
+  const packPointsCap = hasIncreasedCap ? PACK_POINTS_CAP_PREMIUM : PACK_POINTS_CAP_BASE;
+  const currentPackPoints = data.stats?.packPoints ?? 0;
+  const overCap = currentPackPoints > packPointsCap;
+
   // --- Stardust weekly ---
   const stardustWeek = data.stats?.stardustWeek || null;
   const featureStartsAt = stardustWeek?.featureStartsAt ?? STARDUST_FEATURE_START;
@@ -251,6 +266,18 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const weekDrops = stardustWeek?.drops ?? 0;
   const weekPuzzles = stardustWeek?.puzzles ?? 0;
   const weekEarned = stardustWeek?.weekEarned ?? 0;
+
+  // --- 2027 pack point projection ---
+  const streakBreakdown = data.stats?.streakBreakdown || [];
+  const currentBase = streakBreakdown.find(s => s.id === 'base')?.points || 0;
+  const currentGuild = streakBreakdown.find(s => s.id === 'guild')?.points || 0;
+  const isInGuild = streakBreakdown.some(s => s.id === 'guild');
+  const currentDailyTotal = data.stats?.streakTotal || 0;
+  const othersCurrent = Math.max(0, currentDailyTotal - currentBase - currentGuild);
+  const futureGuildBonus = isInGuild ? PACK_POINT_GUILD_2027 : 0;
+  const futureDailyTotal = futureGuildBonus + Math.round(othersCurrent * PACK_POINT_MULTIPLIER_2027);
+  const futureDelta = futureDailyTotal - currentDailyTotal;
+  const hasBreakdown = streakBreakdown.length > 0;
 
   // --- BADGE LOGIC ---
   const earnedBadges: any[] = [];
@@ -400,9 +427,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Collector Points</p>
                 <p className="text-4xl font-black text-white">{data.stats?.collectorPoints?.toLocaleString() || '0'}</p>
               </div>
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
-                <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Pack Points</p>
-                <p className="text-4xl font-black text-white">{data.stats?.packPoints?.toLocaleString() || '0'}</p>
+              <div className={`bg-[#0a0a14]/80 border rounded-3xl p-6 flex flex-col justify-between ${overCap ? 'border-amber-500/40' : 'border-white/10'}`}>
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-white/40 uppercase tracking-widest text-xs font-bold">Pack Points</p>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${hasIncreasedCap ? 'text-indigo-400/80' : 'text-white/30'}`}>
+                    {hasIncreasedCap ? '500K cap' : '200K cap'}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-4xl font-black text-white">{currentPackPoints.toLocaleString()}</p>
+                  <p className={`text-xs mt-1 ${overCap ? 'text-amber-400 font-bold' : 'text-white/40'}`}>
+                    {overCap ? 'Over cap — spend to earn more' : `of ${packPointsCap.toLocaleString()}`}
+                  </p>
+                </div>
               </div>
 
               <div className="col-span-1 lg:col-span-3 flex flex-col gap-6">
@@ -416,7 +453,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                     </p>
                   </div>
 
-                  {/* Countdown to feature start (spans both columns) */}
                   {!stardustActive && (
                     <div className="mb-4 p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col gap-1.5">
                       <div className="flex items-center gap-2">
@@ -433,7 +469,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* ─── LEFT HALF: Weekly Pack Tiers ─── */}
+                    {/* LEFT: Weekly Pack Tiers */}
                     <div>
                       <div className="mb-3">
                         <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Pack Tiers</p>
@@ -518,7 +554,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       </div>
                     </div>
 
-                    {/* ─── RIGHT HALF: Major Actions ─── */}
+                    {/* RIGHT: Major Actions */}
                     <div>
                       <div className={`mb-3 ${stardustActive ? '' : 'opacity-60'}`}>
                         <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Major Actions</p>
@@ -594,6 +630,86 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       </div>
                     )) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
                   </div>
+                </div>
+
+                {/* ─── PACK POINT CHANGES (Jan 1, 2027) ─── */}
+                <div className="bg-[#0a0a14]/80 border border-indigo-500/25 rounded-3xl p-6">
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <p className="text-indigo-400 uppercase tracking-widest text-xs font-bold mb-1">Coming January 1, 2027</p>
+                      <h3 className="text-xl font-bold text-white">Pack Point Changes</h3>
+                      <p className="text-sm text-white/50 mt-1">Effective when stardust launches.</p>
+                    </div>
+                  </div>
+
+                  {hasBreakdown ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                      <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                        <p className="text-xs text-white/40 uppercase tracking-widest font-bold mb-1">Current daily</p>
+                        <p className="text-2xl font-black text-white">+{currentDailyTotal.toLocaleString()} <span className="text-sm font-normal text-white/40">pp/day</span></p>
+                      </div>
+                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30">
+                        <p className="text-xs text-indigo-300 uppercase tracking-widest font-bold mb-1">After changes</p>
+                        <p className="text-2xl font-black text-indigo-400">
+                          +{futureDailyTotal.toLocaleString()} <span className="text-sm font-normal text-white/40">pp/day</span>
+                          {futureDelta !== 0 && (
+                            <span className={`ml-2 text-xs font-bold ${futureDelta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {futureDelta > 0 ? '+' : ''}{futureDelta.toLocaleString()}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-white/40 italic mb-5">Daily income data unavailable — projections will appear once it loads.</p>
+                  )}
+
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 font-bold">✕</div>
+                        <div>
+                          <p className="text-sm font-bold text-white">Daily Base</p>
+                          <p className="text-xs text-white/50">Removed</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-red-400 line-through">
+                        {currentBase > 0 ? `${currentBase.toLocaleString()} pp` : '5,000 pp'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">⬆</div>
+                        <div>
+                          <p className="text-sm font-bold text-white">Darcie's Discord</p>
+                          <p className="text-xs text-white/50">
+                            {isInGuild ? 'Increased' : 'Increased — join to earn'}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-green-400">
+                        {PACK_POINT_GUILD_2027.toLocaleString()} pp
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-indigo-500/5 border border-indigo-500/20 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">×</div>
+                        <div>
+                          <p className="text-sm font-bold text-white">All other sources</p>
+                          <p className="text-xs text-white/50">Multiplied</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-indigo-400">×{PACK_POINT_MULTIPLIER_2027}</span>
+                    </div>
+                  </div>
+
+                  {!isInGuild && hasBreakdown && (
+                    <p className="text-xs text-indigo-300 mt-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                      💡 Join Darcie's Discord to earn +{PACK_POINT_GUILD_2027.toLocaleString()} pp/day after launch.
+                    </p>
+                  )}
                 </div>
 
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
