@@ -260,10 +260,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
               {featuredAchievement && (
                 <div className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform ml-2 border-l border-white/10 pl-4">
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/50 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)]">
-                    <span className="text-xl md:text-2xl">🏆</span>
+                    <CustomBadgeIcon badgeKey={featuredAchievement.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-6 h-6 md:w-8 md:h-8" />
                   </div>
                   <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                    {featuredAchievement.label}
+                    {data.badgeOverrides?.[featuredAchievement.id]?.name || featuredAchievement.label}
                   </span>
                 </div>
               )}
@@ -437,27 +437,27 @@ export default function ProfileClient({ userId }: { userId: string }) {
               {/* Unlocked Achievements */}
               <div>
                 {unlockedAchievements.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-3">
                     {unlockedAchievements.map((ach) => {
                       const isFeatured = data.featuredBadgeId === ach.id;
+                      const override = data.badgeOverrides?.[ach.id];
                       return (
-                        <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-5 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
-                          <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
-                            🏆
+                        <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
+                          <div className="w-14 h-14 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center shadow-inner">
+                            <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
-                            <p className="text-xs text-indigo-400 font-bold mb-2">{ach.rarity} Collector</p>
-                            
-                            {isOwnProfile && (
-                              <button
-                                onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition w-full ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                              >
-                                {isFeatured ? 'Featured on Profile' : 'Feature on Profile'}
-                              </button>
-                            )}
+                            <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                            <p className="text-xs text-indigo-400 font-bold">{ach.rarity} Collector</p>
                           </div>
+                          {isOwnProfile && (
+                            <button
+                              onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                            >
+                              {isFeatured ? 'Featured' : 'Feature'}
+                            </button>
+                          )}
                         </div>
                       );
                     })}
@@ -482,19 +482,22 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <AnimatePresence>
                   {showLockedAchievements && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
-                        {lockedAchievements.map((ach) => (
-                          <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-5 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
-                            <div className="w-16 h-16 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center text-3xl text-white/20">
-                              🏆
+                      <div className="flex flex-col gap-3 pt-2">
+                        {lockedAchievements.map((ach) => {
+                          const override = data.badgeOverrides?.[ach.id];
+                          return (
+                            <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-4 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                              <div className="w-14 h-14 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
+                                <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                                <p className="text-xs text-white/40 font-bold mb-1">{ach.rarity} Collector</p>
+                                <p className="text-xs text-white/30">Locked</p>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
-                              <p className="text-xs text-white/40 font-bold mb-2">{ach.rarity} Collector</p>
-                              <p className="text-xs text-white/30">Locked</p>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </motion.div>
                   )}

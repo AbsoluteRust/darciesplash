@@ -11,6 +11,24 @@ const BADGE_KEYS = [
   { id: 'love', label: 'Loyalty', defaultName: 'Loyalty', defaultIcon: '💜', hasTiers: false },
 ];
 
+const ACHIEVEMENT_KEYS = [
+  // Collection collector achievements
+  { id: 'The Darcie Collector', label: 'The Darcie Collector', defaultIcon: '🏆' },
+  { id: 'The Tobi Collector', label: 'The Tobi Collector', defaultIcon: '🏆' },
+  { id: 'The Madolche Collector', label: 'The Madolche Collector', defaultIcon: '🏆' },
+  { id: 'The Celestial Collector', label: 'The Celestial Collector', defaultIcon: '🏆' },
+  { id: 'The Lunalux Collector', label: 'The Lunalux Collector', defaultIcon: '🏆' },
+  // Chromatic fanatic achievements
+  { id: 'Chromatic Fanatic: Darcie', label: 'Chromatic Fanatic: Darcie', defaultIcon: '🌈' },
+  { id: 'Chromatic Fanatic: Tobi', label: 'Chromatic Fanatic: Tobi', defaultIcon: '🌈' },
+  { id: 'Chromatic Fanatic: Madolche', label: 'Chromatic Fanatic: Madolche', defaultIcon: '🌈' },
+  { id: 'Chromatic Fanatic: Celestial', label: 'Chromatic Fanatic: Celestial', defaultIcon: '🌈' },
+  { id: 'Chromatic Fanatic: Lunalux', label: 'Chromatic Fanatic: Lunalux', defaultIcon: '🌈' },
+  // Special achievements
+  { id: 'High Reroller', label: 'High Reroller', defaultIcon: '🎲' },
+  { id: 'Contraband Collector', label: 'Contraband Collector', defaultIcon: '🚫' },
+];
+
 const TIER_LABELS: Record<string, string[]> = {
   heart: ['1 Month', '3 Months', '6 Months', '1 Year'],
   banana: ['1 Referral', '5 Referrals', '10 Referrals', '15 Referrals'],
@@ -22,29 +40,38 @@ export default function AdminBadgeManager() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [expandedTier, setExpandedTier] = useState<string | null>(null);
-  const [uploading, setUploading] = useState<string | null>(null); // Tracks which input is uploading
+  const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/admin/badges')
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data) => {
         setOverrides(data.overrides || {});
-        setLoading(false);
-      });
+      })
+      .catch((err) => {
+        console.error('[admin-badges] load failed:', err);
+        alert(`Failed to load badge overrides: ${err.message}`);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleChange = (key: string, field: string, value: string, tierIdx?: number) => {
     setOverrides((prev) => {
       const next = { ...prev };
-      if (!next[key]) next[key] = {};
-      
+      const current = { ...(next[key] || {}) };
+
       if (tierIdx !== undefined) {
-        if (!next[key].tiers) next[key].tiers = {};
-        if (!next[key].tiers[tierIdx]) next[key].tiers[tierIdx] = {};
-        next[key].tiers[tierIdx][field] = value;
+        const tiers = current.tiers ? { ...current.tiers } : {};
+        tiers[tierIdx] = { ...(tiers[tierIdx] || {}), [field]: value };
+        current.tiers = tiers;
       } else {
-        next[key][field] = value;
+        current[field] = value;
       }
+
+      next[key] = current;
       return next;
     });
   };
@@ -79,12 +106,19 @@ export default function AdminBadgeManager() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch('/api/admin/badges', {
+      const res = await fetch('/api/admin/badges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ overrides }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Save failed (HTTP ${res.status})`);
+      }
       alert('Badges saved!');
+    } catch (err: any) {
+      console.error('[admin-badges] save failed:', err);
+      alert(`Save failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -115,6 +149,7 @@ export default function AdminBadgeManager() {
           </button>
         </div>
 
+        {/* ─── Legacy Badges ─── */}
         <div className="grid gap-6">
           {BADGE_KEYS.map((badge) => {
             const current = overrides[badge.id] || {};
@@ -123,12 +158,10 @@ export default function AdminBadgeManager() {
             return (
               <div key={badge.id} className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <div className="flex flex-col md:flex-row gap-6 items-center">
-                  {/* Preview */}
                   <div className="w-20 h-20 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center text-3xl">
                     {renderIconPreview(current.iconUrl, badge.defaultIcon)}
                   </div>
 
-                  {/* Base Inputs */}
                   <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-white/50 uppercase mb-1">Display Name</label>
@@ -167,7 +200,6 @@ export default function AdminBadgeManager() {
                     </div>
                   </div>
 
-                  {/* Tier Toggle */}
                   {badge.hasTiers && (
                     <button
                       onClick={() => setExpandedTier(isExpanded ? null : badge.id)}
@@ -178,7 +210,6 @@ export default function AdminBadgeManager() {
                   )}
                 </div>
 
-                {/* Expandable Tiers */}
                 <AnimatePresence>
                   {badge.hasTiers && isExpanded && (
                     <motion.div
@@ -229,6 +260,70 @@ export default function AdminBadgeManager() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ─── Achievement Badges ─── */}
+        <div className="mt-12 mb-4">
+          <h2 className="text-2xl font-black text-white">Achievement Badges</h2>
+          <p className="text-white/50 text-sm mt-1">
+            Customize the icons and names shown on the Achievements tab. Leave blank to use defaults.
+          </p>
+        </div>
+
+        <div className="grid gap-4">
+          {ACHIEVEMENT_KEYS.map((ach) => {
+            const current = overrides[ach.id] || {};
+            return (
+              <div key={ach.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <div className="w-16 h-16 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center text-3xl">
+                    {renderIconPreview(current.iconUrl, ach.defaultIcon)}
+                  </div>
+
+                  <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-white/50 uppercase mb-1">Display Name</label>
+                      <input
+                        type="text"
+                        value={current.name ?? ''}
+                        onChange={(e) => handleChange(ach.id, 'name', e.target.value)}
+                        placeholder={ach.label}
+                        className="w-full bg-black/50 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white/50 uppercase mb-1 flex justify-between">
+                        <span>Icon</span>
+                        <label className="text-indigo-400 hover:text-indigo-300 cursor-pointer transition">
+                          {uploading === ach.id ? 'Uploading...' : 'Upload Icon'}
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleUpload(file, ach.id);
+                            }}
+                            disabled={uploading === ach.id}
+                          />
+                        </label>
+                      </label>
+                      <input
+                        type="text"
+                        value={current.iconUrl ?? ''}
+                        onChange={(e) => handleChange(ach.id, 'iconUrl', e.target.value)}
+                        placeholder={`URL or ${ach.defaultIcon}`}
+                        className="w-full bg-black/50 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="text-xs text-white/25 mt-3 pl-1">
+                  Key: <code className="text-white/40">{ach.id}</code>
+                </div>
               </div>
             );
           })}
