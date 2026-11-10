@@ -92,8 +92,11 @@ export default function Iridescence({ color = [1, 1, 1], speed = 1.0, amplitude 
     const mesh = new Mesh(gl, { geometry, program });
     let animateId;
 
+    // Pause rendering when tab is hidden — no visual change, only stops
+    // the wasted GPU work that Firefox can't hide as well as Chrome.
     function update(t) {
       animateId = requestAnimationFrame(update);
+      if (typeof document !== 'undefined' && document.hidden) return;
       program.uniforms.uTime.value = t * 0.001;
       renderer.render({ scene: mesh });
     }
