@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
+import StandardCard from '@/components/StandardCard';
+import { DEFAULT_MILESTONES, type Milestone } from '@/lib/loyalty-milestones';
 
 type ProfileData = {
   id: string;
@@ -24,6 +26,30 @@ type ProfileData = {
     banana: string | null;
     love: string | null;
   };
+  // NEW: Add these to your /api/profiles/[userId] route
+  stats?: {
+    stardust: number;
+    collectorPoints: number;
+    packPoints: number;
+    streakSources: string[];
+  };
+  inventory?: Record<string, number>; // "Card Name|Rarity": Count
+};
+
+type CardData = {
+  name: string;
+  type: string;
+  image: string;
+  thumbUrl?: string;
+  glow?: string;
+  rarity?: string;
+  description?: string;
+  details?: string;
+  link?: string;
+  collection?: string;
+  related?: string[];
+  contraband?: boolean;
+  contrabandArtist?: string;
 };
 
 function formatSubTime(months: number) {
@@ -39,9 +65,17 @@ function BadgeIcon({ emoteId, fallbackText }: { emoteId: string | null, fallback
   return <img src={`https://cdn.discordapp.com/emojis/${emoteId}.png`} alt={fallbackText} className="w-8 h-8 object-contain" />;
 }
 
+// Helper to get the next upgrade for a specific badge type
+function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): Milestone | null {
+  const milestones = DEFAULT_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
+  return milestones.find(m => m.threshold > currentValue) || null;
+}
+
 export default function ProfileClient({ userId }: { userId: string }) {
   const [data, setData] = useState<ProfileData | null>(null);
+  const [allCards, setAllCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'commissions' | 'points' | 'badges'>('commissions');
   
   // Edit state
   const { userId: currentUserId, roles } = useCollectionFilter();
@@ -54,11 +88,18 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const fetchProfile = async () => {
     try {
-      const res = await fetch(`/api/profiles/${userId}`, { cache: 'no-store' });
-      if (res.ok) {
-        const json = await res.json();
+      const [profileRes, cardsRes] = await Promise.all([
+        fetch(`/api/profiles/${userId}`, { cache: 'no-store' }),
+        fetch(`/api/cards/list`, { cache: 'no-store' }) // Fetch global cards to render commissions
+      ]);
+
+      if (profileRes.ok) {
+        const json = await profileRes.json();
         setData(json);
         if (json.customColor) setSelectedColor(json.customColor);
+      }
+      if (cardsRes.ok) {
+        setAllCards(await cardsRes.json());
       }
     } finally {
       setLoading(false);
@@ -91,11 +132,23 @@ export default function ProfileClient({ userId }: { userId: string }) {
     }
   };
 
-  if (loading) return <div className="text-white/50 text-center animate-pulse">Loading profile...</div>;
-  if (!data) return <div className="text-red-400 text-center">User not found.</div>;
+  if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
+  if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
+
+  // Parse inventory to find commissioned cards
+  const commissionedCards: CardData[] = [];
+  if (data.inventory) {
+    const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
+    for (const card of allCards) {
+      if (ownedCardNames.has(card.name.toLowerCase()) && !card.contraband) {
+        commissionedCards.push(card);
+      }
+    }
+  }
 
   return (
-    <>
+    <div className="flex flex-col gap-8 w-full">
+      {/* ─── TOP SECTION (Profile Header) ─── */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -112,7 +165,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
           </div>
 
           <div className="flex flex-col items-center md:items-start flex-1">
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-2">
               {data.customColor ? (
                 <h1 className="text-3xl md:text-5xl font-black" style={{ color: data.customColor }}>
                   {data.name}
@@ -135,45 +188,211 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </button>
               )}
             </div>
-
-            {/* Badges Row */}
-            <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-              {data.badges.subMonths > 0 && (
-                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                  <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
-                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
-                    Subscribed: {formatSubTime(data.badges.subMonths)}
-                  </span>
-                </div>
-              )}
-              {data.badges.isCommissioner && (
-                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                  <BadgeIcon emoteId={data.emotes.sparkle} fallbackText="✨" />
-                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">Commissioner</span>
-                </div>
-              )}
-              {data.badges.gifts > 0 && (
-                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                  <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
-                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{data.badges.gifts} Gifts Sent</span>
-                </div>
-              )}
-              {data.badges.referrals > 0 && (
-                <div className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                  <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
-                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{data.badges.referrals} Referrals</span>
-                </div>
-              )}
-              {data.badges.loyalty.map(year => (
-                <div key={year} className="group relative flex flex-col items-center justify-center w-16 h-16 bg-white/5 border border-white/10 rounded-2xl cursor-help hover:bg-white/10 transition-colors">
-                  <BadgeIcon emoteId={data.emotes.love} fallbackText="💜" />
-                  <span className="absolute -bottom-10 bg-black text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">{year} Loyalty Card</span>
-                </div>
-              ))}
-            </div>
+            
+            <p className="text-white/50 mb-6">ID: {data.id}</p>
           </div>
         </div>
       </motion.div>
+
+      {/* ─── TABS NAVIGATION ─── */}
+      <div className="flex justify-center w-full">
+        <div className="flex bg-[#0a0a14]/80 border border-white/10 rounded-full p-1 backdrop-blur-xl">
+          {(['commissions', 'points', 'badges'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-6 py-2.5 rounded-full text-sm font-bold capitalize transition-all ${
+                activeTab === tab 
+                  ? 'bg-indigo-600 text-white shadow-lg' 
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── TAB CONTENT ─── */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="w-full"
+        >
+          {/* COMMISSIONS TAB */}
+          {activeTab === 'commissions' && (
+            <div>
+              {commissionedCards.length === 0 ? (
+                <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
+                  No commissions found in this collection.
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+                  {commissionedCards.map((card) => (
+                    <div key={card.name} className="w-full">
+                      <StandardCard
+                        name={card.name}
+                        title={card.type}
+                        type={card.type}
+                        image={card.image}
+                        thumbUrl={card.thumbUrl}
+                        rarity={card.rarity}
+                        glow={card.glow}
+                        isPlay={true} // Forces rarity to show
+                        enableTilt={true} // Animations enabled
+                        onClick={() => {}} // Could open a modal if desired
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* POINTS TAB */}
+          {activeTab === 'points' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Stardust */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
+                <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Stardust</p>
+                <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                  {data.stats?.stardust?.toLocaleString() || '0'}
+                </p>
+              </div>
+
+              {/* Collector Points */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
+                <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Collector Points</p>
+                <p className="text-4xl font-black text-white">
+                  {data.stats?.collectorPoints?.toLocaleString() || '0'}
+                </p>
+              </div>
+
+              {/* Pack Points */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
+                <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Pack Points</p>
+                <p className="text-4xl font-black text-white">
+                  {data.stats?.packPoints?.toLocaleString() || '0'}
+                </p>
+              </div>
+
+              {/* Streak Sources */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 col-span-1 md:col-span-2 lg:col-span-3">
+                <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-4">/streak Sources</p>
+                <div className="flex flex-wrap gap-2">
+                  {data.stats?.streakSources?.length ? data.stats.streakSources.map((src, i) => (
+                    <span key={i} className="px-3 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white/80">
+                      {src}
+                    </span>
+                  )) : (
+                    <span className="text-white/30 italic text-sm">No streak sources found.</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* BADGES TAB */}
+          {activeTab === 'badges' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Subscriber Badge */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
+                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                  <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Subscriber</h3>
+                  <p className="text-sm text-white/50 mb-3">
+                    {data.badges.subMonths > 0 ? `Currently ${formatSubTime(data.badges.subMonths)}` : 'Not subscribed'}
+                  </p>
+                  
+                  {(() => {
+                    const next = getNextUpgrade('sub', data.badges.subMonths);
+                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
+                    return (
+                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full" 
+                          style={{ width: `${Math.min(100, (data.badges.subMonths / next.threshold) * 100)}%` }}
+                        />
+                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Referral Badge */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
+                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                  <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Referrals</h3>
+                  <p className="text-sm text-white/50 mb-3">{data.badges.referrals} Referred</p>
+                  
+                  {(() => {
+                    const next = getNextUpgrade('referral', data.badges.referrals);
+                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
+                    return (
+                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full" 
+                          style={{ width: `${Math.min(100, (data.badges.referrals / next.threshold) * 100)}%` }}
+                        />
+                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Gift Badge */}
+              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
+                <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                  <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white mb-1">Gifter</h3>
+                  <p className="text-sm text-white/50 mb-3">{data.badges.gifts} Gifts Sent</p>
+                  
+                  {(() => {
+                    const next = getNextUpgrade('gift', data.badges.gifts);
+                    if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
+                    return (
+                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full" 
+                          style={{ width: `${Math.min(100, (data.badges.gifts / next.threshold) * 100)}%` }}
+                        />
+                        <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Commissioner Badge */}
+              {data.badges.isCommissioner && (
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
+                  <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                    <BadgeIcon emoteId={data.emotes.sparkle} fallbackText="✨" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-bold text-white mb-1">Commissioner</h3>
+                    <p className="text-sm text-white/50">Patron of the arts</p>
+                    <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Color Picker Modal */}
       <AnimatePresence>
@@ -210,6 +429,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }

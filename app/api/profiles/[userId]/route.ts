@@ -39,9 +39,6 @@ export async function GET(
   const manualSubMonths = Number(rawBadges.sub_months || 0);
 
   // 2b. Fetch Ko-fi subscription months from the bot and merge with manual.
-  // Manual value (from the old /manage-badges system) and Ko-fi value (from
-  // webhook + backfill) are two separate histories. Take the larger of the
-  // two so anyone counted by either system shows their badge.
   let kofiSubMonths = 0;
   try {
     const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
@@ -87,6 +84,25 @@ export async function GET(
   const userColors = (await kv.hgetall("user_profile_colors")) || {};
   const customColor = userColors[userId] || null;
 
+  // 6. Fetch Inventory & Stats for the new Profile Tabs
+  const inventory = (await kv.hgetall(`user_cards:${userId}`)) || {};
+  
+  const collectorPoints = Number(await kv.hget('user_scores', userId)) || 0;
+  const packPoints = Number(await kv.hget('user_pack_points', userId)) || 0;
+
+  // Stardust is calculated based on major actions (subs, referrals, gifts, commissions)
+  const stardust = (badges.subMonths * 6800) + (badges.referrals * 6800) + (badges.gifts * 6800) + (badges.isCommissioner ? 6800 : 0);
+
+  let streakSources: string[] = [];
+  try {
+    const rawStreaks = await kv.hget('user_streak_sources', userId);
+    if (rawStreaks) {
+      streakSources = typeof rawStreaks === 'string' ? JSON.parse(rawStreaks) : rawStreaks;
+    }
+  } catch {
+    // Ignore malformed streak sources
+  }
+
   return NextResponse.json({
     id: userId,
     ...userInfo,
@@ -94,5 +110,12 @@ export async function GET(
     badges,
     emotes,
     customColor,
+    inventory,
+    stats: {
+      stardust,
+      collectorPoints,
+      packPoints,
+      streakSources,
+    }
   });
 }
