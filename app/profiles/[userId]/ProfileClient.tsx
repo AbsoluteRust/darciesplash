@@ -43,6 +43,7 @@ type ProfileData = {
     collectorPoints: number;
     packPoints: number;
     streakTotal: number;
+    streakScore: number;
     streakBreakdown: StreakSource[];
   };
   inventory?: Record<string, number>;
@@ -128,7 +129,9 @@ function StreakTooltip({ source, now, isOwnProfile }: { source: StreakSource, no
           <span className="text-xs text-white/40">({source.current}/{source.max})</span>
         )}
       </div>
-      <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()}</span>
+      <span className={`text-sm font-black ${source.points > 0 ? 'text-green-400' : 'text-indigo-400'}`}>
+        {source.points > 0 ? `+${source.points.toLocaleString()} pp` : '+ Score'}
+      </span>
 
       <AnimatePresence>
         {isOpen && (
@@ -308,6 +311,15 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const displayedCards = availableCards.filter(c => data.favorites?.includes(c.name));
 
+  // Split the breakdown into Payouts (Pack Points) vs Score Sources
+  const payoutSources = data.stats?.streakBreakdown?.filter(s => 
+    ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id)
+  ) || [];
+
+  const scoreSources = data.stats?.streakBreakdown?.filter(s => 
+    ['daily', 'weekly-score', 'monthly-score', 'lifetime'].includes(s.id)
+  ) || [];
+
   return (
     <div className="flex flex-col gap-8 w-full">
       <style dangerouslySetInnerHTML={{__html: `
@@ -429,24 +441,49 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <p className="text-4xl font-black text-white">{data.stats?.packPoints?.toLocaleString() || '0'}</p>
               </div>
 
-              {/* Streak Sources */}
-              <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 col-span-1 lg:col-span-3">
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Pack points streaks</p>
-                    <p className="text-2xl font-black text-white">
-                      Total: <span className="text-green-400">+{data.stats?.streakTotal?.toLocaleString() || 0}</span> <span className="text-sm font-normal text-white/50">pp/day</span>
-                    </p>
+              {/* Streak Sections */}
+              <div className="col-span-1 lg:col-span-3 flex flex-col gap-6">
+                
+                {/* 1. PACK POINTS STREAKS (PAYOUTS) */}
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Pack points streaks</p>
+                      <p className="text-2xl font-black text-white">
+                        Total: <span className="text-green-400">+{data.stats?.streakTotal?.toLocaleString() || 0}</span> <span className="text-sm font-normal text-white/50">pp/day</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                    {payoutSources.length ? payoutSources.map((source) => (
+                      <StreakTooltip key={source.id} source={source} now={now} isOwnProfile={isOwnProfile} />
+                    )) : (
+                      <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>
+                    )}
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-                  {data.stats?.streakBreakdown?.length ? data.stats.streakBreakdown.map((source) => (
-                    <StreakTooltip key={source.id} source={source} now={now} isOwnProfile={isOwnProfile} />
-                  )) : (
-                    <span className="text-white/30 italic text-sm col-span-2">No active streaks found.</span>
-                  )}
+
+                {/* 2. STREAK SCORE (PROGRESSION) */}
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Streak Score</p>
+                      <p className="text-2xl font-black text-white">
+                        Total: <span className="text-indigo-400">{(data.stats?.streakScore || 0).toLocaleString()}</span> <span className="text-sm font-normal text-white/50">score</span>
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                    {scoreSources.length ? scoreSources.map((source) => (
+                      <StreakTooltip key={source.id} source={source} now={now} isOwnProfile={isOwnProfile} />
+                    )) : (
+                      <span className="text-white/30 italic text-sm col-span-2">No streak score sources active.</span>
+                    )}
+                  </div>
                 </div>
+
               </div>
 
             </div>
