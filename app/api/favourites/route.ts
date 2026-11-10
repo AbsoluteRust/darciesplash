@@ -1,4 +1,4 @@
-// app/api/profiles/favorites/route.ts
+// app/api/favorites/route.ts
 import { NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { kv } from '@vercel/kv';

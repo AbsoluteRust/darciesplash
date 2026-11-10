@@ -158,7 +158,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const handleSaveFavorites = async () => {
     setIsSavingFavorites(true);
     try {
-      const res = await fetch('/api/profiles/favorites', {
+      const res = await fetch('/api/favorites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardNames: Array.from(tempFavorites) }),
