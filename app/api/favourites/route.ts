@@ -20,9 +20,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Max 8 cards allowed' }, { status: 400 });
     }
 
-    // Store the array directly — @vercel/kv handles serialization
-    await kv.set(`user_favorites:${session.user.id}`, cardNames);
+    const key = `user_favorites:${session.user.id}`;
+    const serialized = JSON.stringify(cardNames);
     
+    // Write to database
+    await kv.set(key, serialized);
+    
+    // Verify the write immediately
+    const check = await kv.get(key);
+    console.log(`[favorites] Saved for ${session.user.id}:`, serialized);
+    console.log(`[favorites] Read back immediately:`, check);
+
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     console.error('[favorites API] Error:', err);

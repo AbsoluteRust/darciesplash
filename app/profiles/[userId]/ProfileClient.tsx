@@ -99,7 +99,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
 
-  // Showcase Favorites State
   const [isEditingFavorites, setIsEditingFavorites] = useState(false);
   const [tempFavorites, setTempFavorites] = useState<Set<string>>(new Set());
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
@@ -111,8 +110,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const fetchProfile = async () => {
     try {
+      // Added ?t= cache-buster to the profile URL
       const [profileRes, cardsRes] = await Promise.all([
-        fetch(`/api/profiles/${userId}`, { cache: 'no-store' }),
+        fetch(`/api/profiles/${userId}?t=${Date.now()}`, { cache: 'no-store' }),
         fetch(`/api/cards/list`, { cache: 'no-store' })
       ]);
 
@@ -171,9 +171,20 @@ export default function ProfileClient({ userId }: { userId: string }) {
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
-      // Update UI immediately — DO NOT re-fetch here, the state is already correct
+      // Optimistic update for instant UI feedback
       setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
       setIsEditingFavorites(false);
+
+      // Verify it actually persisted to the database
+      const verifyRes = await fetch(`/api/profiles/${userId}?t=${Date.now()}`, { cache: 'no-store' });
+      if (verifyRes.ok) {
+        const verifyData = await verifyRes.json();
+        if (!verifyData.favorites || verifyData.favorites.length !== newFavs.length) {
+          alert("Warning: Favorites did not persist to the database.");
+        }
+        setData(verifyData);
+      }
+
     } catch (err: any) {
       console.error("Failed to save favorites:", err);
       alert(`Failed to save showcase: ${err.message}`);
