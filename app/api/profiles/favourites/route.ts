@@ -5,13 +5,11 @@ import { kv } from '@vercel/kv';
 
 export async function POST(req: Request) {
   try {
-    // 1. Verify user is logged in
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized: No active session found' }, { status: 401 });
     }
 
-    // 2. Parse the request body
     let body;
     try {
       body = await req.json();
@@ -29,7 +27,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'You can only showcase up to 8 cards' }, { status: 400 });
     }
 
-    // 3. Save to Vercel KV
     await kv.set(`user_favorites:${session.user.id}`, JSON.stringify(cardNames));
     
     return NextResponse.json({ ok: true });
