@@ -163,13 +163,18 @@ export default function ProfileClient({ userId }: { userId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardNames: Array.from(tempFavorites) }),
       });
-      if (res.ok) {
-        setIsEditingFavorites(false);
-        fetchProfile();
-      } else {
-        const errData = await res.json();
-        alert(errData.error || 'Failed to save favorites');
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("Save failed:", text);
+        throw new Error(`Server returned ${res.status}`);
       }
+
+      await fetchProfile();
+      setIsEditingFavorites(false);
+    } catch (err: any) {
+      console.error("Failed to save favorites:", err);
+      alert("Failed to save your showcase. Please try again.");
     } finally {
       setIsSavingFavorites(false);
     }
@@ -194,7 +199,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  // Filter cards to only show ones from this user's collection
   const availableCards: CardData[] = [];
   if (data.inventory && userCollection) {
     const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
@@ -209,7 +213,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
     }
   }
 
-  // Only display the ones the user has favorited
   const displayedCards = availableCards.filter(c => data.favorites?.includes(c.name));
 
   return (
