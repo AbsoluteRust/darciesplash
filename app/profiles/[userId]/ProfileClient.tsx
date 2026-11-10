@@ -78,6 +78,8 @@ const DEFAULT_HIGHLIGHT = '#6366f1';
 const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1); // Jan 1 2027 00:00:00 UTC
 // Mirrors MAJOR_ACTION_STARDUST in lib/stardust.js (awardMajorActionStardust)
 const MAJOR_ACTION_STARDUST = 6800;
+// Total stardust you can earn this week from pack tiers (Tier 4 reward)
+const STARDUST_WEEK_MAX = 660;
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 
 const STARDUST_TIERS = [
@@ -91,15 +93,16 @@ type MajorAction = {
   id: string;
   label: string;
   icon: string;
+  subtitle: string;
   href?: string;
   hrefLabel?: string;
 };
 
 const MAJOR_ACTIONS: MajorAction[] = [
-  { id: 'referral',     label: 'Referral',     icon: '🍌' },
-  { id: 'subscription', label: 'Subscription', icon: '💖', href: KOFI_TIERS_URL, hrefLabel: 'Subscribe on Ko-fi' },
-  { id: 'gift',         label: 'Gift',         icon: '🎁' },
-  { id: 'commission',   label: 'Commission',   icon: '✨' },
+  { id: 'referral',     label: 'Referral',     icon: '🍌', subtitle: 'Infinitely repeatable' },
+  { id: 'subscription', label: 'Subscription', icon: '💖', subtitle: 'Repeatable once per month', href: KOFI_TIERS_URL, hrefLabel: 'Subscribe on Ko-fi' },
+  { id: 'gift',         label: 'Gift',         icon: '🎁', subtitle: 'Infinitely repeatable' },
+  { id: 'commission',   label: 'Commission',   icon: '✨', subtitle: 'Infinitely repeatable' },
 ];
 
 function formatSubTime(months: number) {
@@ -440,7 +443,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                             <span className="text-xs font-normal text-white/50 ml-2">✨ · resets Monday 00:00 UTC</span>
                           </p>
                         ) : (
-                          <p className="text-xs text-white/40">One-time per week — climb through tiers of activity.</p>
+                          <p className="text-xs text-white/40">One-time per week — cumulative toward a 660 ✨ weekly cap.</p>
                         )}
                       </div>
 
@@ -474,7 +477,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                                     <span className="text-xs text-green-400/70">{t.desc}</span>
                                   </div>
                                 </div>
-                                <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()} ✨</span>
+                                <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
                               </div>
                             );
                           }
@@ -490,7 +493,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                                       <span className="text-xs text-white/50">{reqParts.join(' · ')}</span>
                                     </div>
                                   </div>
-                                  <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()} ✨</span>
+                                  <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
                                 </div>
                                 <div className="w-full bg-black/50 rounded-full h-2 mt-2">
                                   <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
@@ -508,7 +511,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                                   <span className="text-xs text-white/40">{t.desc}</span>
                                 </div>
                               </div>
-                              <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()} ✨</span>
+                              <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
                             </div>
                           );
                         })}
@@ -517,39 +520,34 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
                     {/* ─── RIGHT HALF: Major Actions ─── */}
                     <div>
-                      <div className="mb-3">
+                      <div className={`mb-3 ${stardustActive ? '' : 'opacity-60'}`}>
                         <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Major Actions</p>
                         <p className="text-lg font-black text-white">
                           +{MAJOR_ACTION_STARDUST.toLocaleString()} <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">✨</span>
-                          <span className="text-xs font-normal text-white/50 ml-2">per action · no weekly cap</span>
+                          <span className="text-xs font-normal text-white/50 ml-2">per action</span>
                         </p>
                       </div>
 
-                      <div className="flex flex-col gap-3">
+                      <div className={`flex flex-col gap-3 ${stardustActive ? '' : 'opacity-50'}`}>
                         {MAJOR_ACTIONS.map((action) => {
                           const baseClass = 'relative flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/25 rounded-xl';
                           const inner = (
                             <>
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-base">
+                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-base shrink-0">
                                   {action.icon}
                                 </div>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col min-w-0">
                                   <span className="text-sm font-bold text-white">{action.label}</span>
-                                  <span className="text-xs text-white/40">
-                                    Infinitely repeatable
-                                    {action.href && (
-                                      <>
-                                        {' · '}
-                                        <span className="text-indigo-400 group-hover:text-indigo-300 underline underline-offset-2">
-                                          {action.hrefLabel} →
-                                        </span>
-                                      </>
-                                    )}
-                                  </span>
+                                  <span className="text-xs text-white/40">{action.subtitle}</span>
+                                  {action.href && (
+                                    <span className="text-xs text-indigo-400 group-hover:text-indigo-300 underline underline-offset-2 mt-1">
+                                      {action.hrefLabel} →
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <span className="text-sm font-black text-purple-400">+{MAJOR_ACTION_STARDUST.toLocaleString()} ✨</span>
+                              <span className="text-sm font-black text-purple-400 shrink-0 ml-2">+{MAJOR_ACTION_STARDUST.toLocaleString()} ✨</span>
                             </>
                           );
 
@@ -560,7 +558,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                                 href={action.href}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className={`${baseClass} group hover:border-purple-500/50 hover:bg-purple-500/15 transition`}
+                                className={`${baseClass} group ${stardustActive ? 'hover:border-purple-500/50 hover:bg-purple-500/15' : 'hover:opacity-100'} transition`}
                               >
                                 {inner}
                               </a>
@@ -586,7 +584,11 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
                     {payoutSources.length ? payoutSources.map((source) => (
-                      <div key={source.id} className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl">
+                      <div
+                        key={source.id}
+                        title={source.description}
+                        className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl transition-colors hover:bg-white/[0.06] hover:border-white/10 cursor-help"
+                      >
                         <div className="flex items-center gap-2"><span className="text-sm font-bold text-white/90">{source.label}</span></div>
                         <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
                       </div>
