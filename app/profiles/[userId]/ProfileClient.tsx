@@ -101,13 +101,11 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [selectedColor, setSelectedColor] = useState('#ffffff');
   const [savingColor, setSavingColor] = useState(false);
 
-  // State for viewing a card in the modal
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
 
   const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
 
-  // Find which collection this user owns
   const userCollection = Object.entries(COLLECTION_OWNERS).find(([_, owners]) => owners.includes(userId))?.[0];
 
   const fetchProfile = async () => {
@@ -159,7 +157,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  // Filter cards to only show ones from this user's collection
   const commissionedCards: CardData[] = [];
   if (data.inventory && userCollection) {
     const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
@@ -176,6 +173,29 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-8 w-full">
+      {/* 
+        This style block nukes any CSS filters or blend modes on the images 
+        and containers, forcing full saturation while keeping the card frame intact.
+      */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .profile-commission-card .avatar,
+        .profile-commission-card .pc-avatar-crop,
+        .profile-commission-card .pc-avatar-content,
+        .profile-commission-card .pc-content,
+        .profile-commission-card .pc-inside,
+        .profile-commission-card .pc-card {
+          filter: none !important;
+          -webkit-filter: none !important;
+          mix-blend-mode: normal !important;
+          opacity: 1 !important;
+        }
+        .profile-commission-card .pc-shine,
+        .profile-commission-card .pc-glare,
+        .profile-commission-card .pc-behind {
+          display: none !important;
+        }
+      `}} />
+
       {/* ─── TOP SECTION (Profile Header) ─── */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -263,8 +283,8 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   {commissionedCards.map((card) => (
                     <div 
                       key={card.name} 
-                      className="w-full relative cursor-pointer" 
-                      style={{ aspectRatio: '0.718' }} // Forces correct height for tilt
+                      className="w-full profile-commission-card relative cursor-pointer" 
+                      style={{ aspectRatio: '0.718' }}
                     >
                       <ProfileCard
                         name={card.name}
@@ -272,14 +292,14 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         handle={card.name.toLowerCase().replace(/\s+/g, "-")}
                         status=""
                         contactText=""
-                        avatarUrl={card.image} // Uses full image (allows .gif animation)
-                        rarity={undefined} // Removes rarity badge and border colors
+                        avatarUrl={card.image}
+                        rarity={undefined}
                         showUserInfo={false}
-                        enableTilt={true} // Re-enables 3D tilt animations
+                        enableTilt={true}
                         enableMobileTilt={false}
-                        behindGlowEnabled={false} // Removes the colored background glow
-                        innerGradient="linear-gradient(145deg, rgba(25, 25, 35, 0.95) 0%, rgba(10, 10, 15, 0.95) 100%)" // Neutral dark card background
-                        onContactClick={() => setSelectedCard(card)} // Opens the card in a modal
+                        behindGlowEnabled={false}
+                        innerGradient="none"
+                        onContactClick={() => setSelectedCard(card)}
                       />
                     </div>
                   ))}
