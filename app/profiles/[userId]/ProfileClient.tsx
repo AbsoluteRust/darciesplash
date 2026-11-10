@@ -176,21 +176,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-8 w-full">
-      {/* 
-        This style block removes the glare and dark color overlay from the cards, 
-        but leaves the card background, border, and shadow intact. 
-      */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .profile-commission-card .pc-shine,
-        .profile-commission-card .pc-glare,
-        .profile-commission-card .pc-behind {
-          display: none !important;
-        }
-        .profile-commission-card .pc-inside {
-          background: transparent !important;
-        }
-      `}} />
-
       {/* ─── TOP SECTION (Profile Header) ─── */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -278,19 +263,23 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   {commissionedCards.map((card) => (
                     <div 
                       key={card.name} 
-                      className="w-full profile-commission-card relative cursor-pointer" 
-                      style={{ aspectRatio: '0.718' }} // Ensures aspect ratio for the tilt animation
-                      onClick={() => setSelectedCard(card)}
+                      className="w-full relative cursor-pointer" 
+                      style={{ aspectRatio: '0.718' }} // Forces correct height for tilt
                     >
                       <ProfileCard
                         name={card.name}
                         title={card.type}
-                        avatarUrl={card.image} // Uses full image (allows GIFs)
-                        rarity={undefined} // Hides rarity
+                        handle={card.name.toLowerCase().replace(/\s+/g, "-")}
+                        status=""
+                        contactText=""
+                        avatarUrl={card.image} // Uses full image (allows .gif animation)
+                        rarity={undefined} // Removes rarity badge and border colors
                         showUserInfo={false}
-                        enableTilt={true} // Enables 3D tilt
-                        behindGlowEnabled={false} // Disables background glow
-                        innerGradient="none" // Disables colour tint
+                        enableTilt={true} // Re-enables 3D tilt animations
+                        enableMobileTilt={false}
+                        behindGlowEnabled={false} // Removes the colored background glow
+                        innerGradient="linear-gradient(145deg, rgba(25, 25, 35, 0.95) 0%, rgba(10, 10, 15, 0.95) 100%)" // Neutral dark card background
+                        onContactClick={() => setSelectedCard(card)} // Opens the card in a modal
                       />
                     </div>
                   ))}
