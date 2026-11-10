@@ -5,7 +5,6 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 export default function LazyMount({
   children,
   rootMargin = '600px',
-  placeholderHeight = 560,
   className = '',
 }: {
   children: ReactNode;
@@ -43,9 +42,6 @@ export default function LazyMount({
     <div
       ref={ref}
       className={`lazy-mount${visible ? ' lazy-mount--visible' : ''}${className ? ` ${className}` : ''}`}
-      style={{
-        minHeight: visible ? undefined : placeholderHeight,
-      }}
     >
       {visible ? children : null}
     </div>

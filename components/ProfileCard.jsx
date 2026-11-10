@@ -1,7 +1,4 @@
-'use client';
-
 import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
-import { scheduleFit } from '@/lib/fit-text-scheduler';
 import './ProfileCard.css';
 
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
@@ -57,13 +54,33 @@ function useFitText(text, minFontSize = 10) {
     const el = ref.current;
     if (!el) return;
 
-    // Enqueue with the shared scheduler. This batches layout reads/writes
-    // across all mounting cards so the browser does 2 forced syncs per
-    // BATCH instead of ~10 per card.
-    scheduleFit(el, minFontSize, () => {});
+    const fit = () => {
+      el.style.fontSize = '';
+      const natural = parseFloat(getComputedStyle(el).fontSize) || 0;
+      if (!natural) return;
 
-    const fitNow = () => scheduleFit(el, minFontSize, () => {});
-    const ro = new ResizeObserver(fitNow);
+      const available = el.clientWidth;
+      if (available === 0) return;
+
+      if (el.scrollWidth <= available) return;
+
+      let lo = minFontSize;
+      let hi = natural;
+      el.style.fontSize = `${lo}px`;
+      if (el.scrollWidth > available) return;
+
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollWidth <= available) lo = mid;
+        else hi = mid;
+      }
+      el.style.fontSize = `${lo}px`;
+    };
+
+    fit();
+
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
   }, [text, minFontSize]);
@@ -101,9 +118,7 @@ const ProfileCardComponent = ({
   const wrapRef = useRef(null);
   const shellRef = useRef(null);
 
-  // Cached dimensions. Reading `shell.clientWidth/clientHeight` every rAF
-  // frame during hover forces layout in Firefox. Cache them once, refresh
-  // only on resize.
+  // Cache shell dimensions to avoid forced layout reads during rAF
   const dimsRef = useRef({ w: 1, h: 1 });
 
   const enterTimerRef = useRef(null);
@@ -179,7 +194,6 @@ const ProfileCardComponent = ({
       const wrap = wrapRef.current;
       if (!shell || !wrap) return;
 
-      // ---- Use cached dims instead of forced layout reads ----
       const width = dimsRef.current.w;
       const height = dimsRef.current.h;
 
@@ -447,7 +461,7 @@ const ProfileCardComponent = ({
                   srcSet={optimizedSrcSet(avatarUrl)}
                   sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
                   alt={`${name || 'User'} avatar`}
-                  loading={priority ? 'eager' : 'lazy'}
+                  loading="eager"
                   decoding="async"
                   fetchPriority={priority ? 'high' : 'low'}
                   onLoad={() => setAvatarLoaded(true)}
@@ -463,7 +477,7 @@ const ProfileCardComponent = ({
                         <img
                           src={miniAvatarUrl || avatarUrl}
                           alt={`${name || 'User'} mini avatar`}
-                          loading="lazy"
+                          loading="eager"
                           onError={e => {
                             const t = e.target;
                             t.style.opacity = '0.5';
@@ -505,7 +519,7 @@ const ProfileCardComponent = ({
                 srcSet={optimizedSrcSet(avatarUrl)}
                 sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
                 alt=""
-                loading="lazy"
+                loading="eager"
                 decoding="async"
               />
             </div>
