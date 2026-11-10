@@ -133,37 +133,37 @@ export async function GET(
     badgeOverrides = (await kv.get('custom_badges')) || {};
   } catch (err) {}
 
-  // 12. Achievements (Collector Badges)
+  // 12. Achievements (Collection Badges)
   let achievements: any[] = [];
   let featuredBadgeId: string | null = null;
+  
   try {
     const { COLLECTION_OWNERS } = require('@/lib/collection-owners');
-    const userCollection = Object.entries(COLLECTION_OWNERS).find(([_, owners]) => (owners as string[]).includes(userId))?.[0];
+    const collectionKeys = Object.keys(COLLECTION_OWNERS); // ['celestial', 'darcie', 'tobi', 'madolche']
     
-    if (userCollection) {
-      const cardsRes = await fetch(`${botUrl}/api/cards/list`, { cache: "no-store" });
-      if (cardsRes.ok) {
-        const allCards = await cardsRes.json();
-        const ownedCardNames = new Set(Object.keys(inventory).map(k => k.split('|')[0].toLowerCase()));
-        
-        // Find all cards in this user's collection
-        const collectionCards = allCards.filter((c: any) => c.collection === userCollection);
-        
-        // Group by rarity
-        const rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'];
+    const cardsRes = await fetch(`${botUrl}/api/cards/list`, { cache: "no-store" });
+    if (cardsRes.ok) {
+      const allCards = await cardsRes.json();
+      const ownedCardNames = new Set(Object.keys(inventory).map(k => k.split('|')[0].toLowerCase()));
+      
+      const rarities = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'];
+      
+      // Scan EVERY collection for EVERY rarity
+      for (const coll of collectionKeys) {
         for (const rarity of rarities) {
-          const tierCards = collectionCards.filter((c: any) => c.rarity === rarity);
+          const tierCards = allCards.filter((c: any) => c.collection === coll && c.rarity === rarity && !c.contraband);
           if (tierCards.length === 0) continue;
           
           const hasAll = tierCards.every((c: any) => ownedCardNames.has(c.name.toLowerCase()));
-          if (hasAll) {
-            achievements.push({
-              id: `${userCollection}_${rarity.toLowerCase()}_collector`,
-              label: `${rarity} ${userCollection.charAt(0).toUpperCase() + userCollection.slice(1)} Collector`,
-              rarity,
-              collection: userCollection
-            });
-          }
+          const collName = coll.charAt(0).toUpperCase() + coll.slice(1);
+          
+          achievements.push({
+            id: `${coll}_${rarity.toLowerCase()}_collector`,
+            label: `${rarity} ${collName} Collector`,
+            rarity,
+            collection: coll,
+            unlocked: hasAll
+          });
         }
       }
     }

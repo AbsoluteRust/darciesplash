@@ -122,7 +122,8 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'commissions' | 'points' | 'badges' | 'achievements'>('commissions');
   const [now, setNow] = useState(Date.now());
-  const [showLocked, setShowLocked] = useState(false);
+  const [showLockedBadges, setShowLockedBadges] = useState(false);
+  const [showLockedAchievements, setShowLockedAchievements] = useState(false);
   
   const { userId: currentUserId, roles } = useCollectionFilter();
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
@@ -204,7 +205,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
     earnedBadges.push({ key: 'love', progress: 1, title: `${year} Loyalty Card`, label: 'Loyalty', defaultEmote: data.emotes?.love, fallback: '💜' });
   });
   
-  const featuredAchievement = data.achievements?.find(a => a.id === data.featuredBadgeId);
+  // --- ACHIEVEMENT LOGIC ---
+  const unlockedAchievements = data.achievements?.filter(a => a.unlocked) || [];
+  const lockedAchievements = data.achievements?.filter(a => !a.unlocked) || [];
+  const featuredAchievement = unlockedAchievements.find(a => a.id === data.featuredBadgeId);
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -395,15 +399,15 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
               <div>
                 <button 
-                  onClick={() => setShowLocked(!showLocked)}
+                  onClick={() => setShowLockedBadges(!showLockedBadges)}
                   className="flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition mb-4"
                 >
-                  <span className={`transform transition-transform ${showLocked ? 'rotate-90' : ''}`}>▶</span>
+                  <span className={`transform transition-transform ${showLockedBadges ? 'rotate-90' : ''}`}>▶</span>
                   Not yet unlocked ({lockedBadges.length})
                 </button>
                 
                 <AnimatePresence>
-                  {showLocked && (
+                  {showLockedBadges && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                         {lockedBadges.map((badge) => (
@@ -428,42 +432,75 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
           {/* ACHIEVEMENTS TAB */}
           {activeTab === 'achievements' && (
-            <div>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-white">Achievements</h2>
-              </div>
+            <div className="flex flex-col gap-8">
               
-              {data.achievements && data.achievements.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {data.achievements.map((ach) => {
-                    const isFeatured = data.featuredBadgeId === ach.id;
-                    return (
-                      <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-5 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
-                        <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
-                          🏆
+              {/* Unlocked Achievements */}
+              <div>
+                {unlockedAchievements.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {unlockedAchievements.map((ach) => {
+                      const isFeatured = data.featuredBadgeId === ach.id;
+                      return (
+                        <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-5 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
+                          <div className="w-16 h-16 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center text-3xl shadow-inner">
+                            🏆
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
+                            <p className="text-xs text-indigo-400 font-bold mb-2">{ach.rarity} Collector</p>
+                            
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition w-full ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                              >
+                                {isFeatured ? 'Featured on Profile' : 'Feature on Profile'}
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
-                          <p className="text-xs text-indigo-400 font-bold mb-2">{ach.rarity} Collector</p>
-                          
-                          {isOwnProfile && (
-                            <button
-                              onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition w-full ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
-                            >
-                              {isFeatured ? 'Featured on Profile' : 'Feature on Profile'}
-                            </button>
-                          )}
-                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
+                    No achievements unlocked yet. Keep collecting to earn them!
+                  </div>
+                )}
+              </div>
+
+              {/* Locked Achievements */}
+              <div>
+                <button 
+                  onClick={() => setShowLockedAchievements(!showLockedAchievements)}
+                  className="flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition mb-4"
+                >
+                  <span className={`transform transition-transform ${showLockedAchievements ? 'rotate-90' : ''}`}>▶</span>
+                  Not yet unlocked ({lockedAchievements.length})
+                </button>
+                
+                <AnimatePresence>
+                  {showLockedAchievements && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                        {lockedAchievements.map((ach) => (
+                          <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-5 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                            <div className="w-16 h-16 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center text-3xl text-white/20">
+                              🏆
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-md font-bold text-white mb-1 truncate">{ach.label}</h3>
+                              <p className="text-xs text-white/40 font-bold mb-2">{ach.rarity} Collector</p>
+                              <p className="text-xs text-white/30">Locked</p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
-                  No achievements unlocked yet. Keep collecting to earn them!
-                </div>
-              )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
             </div>
           )}
 
