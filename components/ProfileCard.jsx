@@ -4,8 +4,15 @@ import './ProfileCard.css';
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
 const OPTIMIZE_WIDTHS = [256, 384, 640, 828, 1080, 1200];
 
+// Helper function that returns raw URLs for GIFs to keep them animated.
 function optimizedUrl(url, width) {
   if (!url) return url;
+  
+  // Do not run Next.js image optimization on GIFs (it turns them into static WebPs)
+  if (url.toLowerCase().endsWith('.gif') || url.toLowerCase().includes('.gif?')) {
+    return url;
+  }
+
   if (!url.startsWith('/') && !url.includes('.public.blob.vercel-storage.com')) {
     return url;
   }

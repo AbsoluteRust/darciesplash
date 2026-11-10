@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 import StandardCard from '@/components/StandardCard';
+import { COLLECTION_OWNERS } from '@/lib/collection-owners';
 
 type ProfileData = {
   id: string;
@@ -56,7 +57,6 @@ type BadgeMilestone = {
   label: string;
 };
 
-// Local definitions for badge upgrade thresholds
 const BADGE_MILESTONES: BadgeMilestone[] = [
   { type: 'sub', threshold: 1, label: '1 Month' },
   { type: 'sub', threshold: 3, label: '3 Months' },
@@ -85,7 +85,6 @@ function BadgeIcon({ emoteId, fallbackText }: { emoteId: string | null, fallback
   return <img src={`https://cdn.discordapp.com/emojis/${emoteId}.png`} alt={fallbackText} className="w-8 h-8 object-contain" />;
 }
 
-// Helper to get the next upgrade for a specific badge type
 function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): BadgeMilestone | null {
   const milestones = BADGE_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
   return milestones.find(m => m.threshold > currentValue) || null;
@@ -97,7 +96,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'commissions' | 'points' | 'badges'>('commissions');
   
-  // Edit state
   const { userId: currentUserId, roles } = useCollectionFilter();
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffffff');
@@ -105,6 +103,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const isOwnProfile = currentUserId === userId;
   const canEdit = isOwnProfile && roles?.darsubscribbler;
+
+  // Find which collection this user owns
+  const userCollection = Object.entries(COLLECTION_OWNERS).find(([_, owners]) => owners.includes(userId))?.[0];
 
   const fetchProfile = async () => {
     try {
@@ -155,12 +156,16 @@ export default function ProfileClient({ userId }: { userId: string }) {
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  // Parse inventory to find commissioned cards
+  // Filter cards to only show ones from this user's collection
   const commissionedCards: CardData[] = [];
-  if (data.inventory) {
+  if (data.inventory && userCollection) {
     const ownedCardNames = new Set(Object.keys(data.inventory).map(k => k.split('|')[0].toLowerCase()));
     for (const card of allCards) {
-      if (ownedCardNames.has(card.name.toLowerCase()) && !card.contraband) {
+      if (
+        ownedCardNames.has(card.name.toLowerCase()) && 
+        !card.contraband && 
+        card.collection === userCollection
+      ) {
         commissionedCards.push(card);
       }
     }
@@ -168,6 +173,16 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-8 w-full">
+      {/* Injecting a small style block to force full colour on these specific cards */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .profile-commission-card .pc-card-wrapper,
+        .profile-commission-card .pc-card-shell,
+        .profile-commission-card .pc-card {
+          filter: none !important;
+          -webkit-filter: none !important;
+        }
+      `}} />
+
       {/* ─── TOP SECTION (Profile Header) ─── */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -253,17 +268,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                   {commissionedCards.map((card) => (
-                    <div key={card.name} className="w-full">
+                    <div key={card.name} className="w-full profile-commission-card">
                       <StandardCard
                         name={card.name}
                         title={card.type}
                         type={card.type}
                         image={card.image}
                         thumbUrl={card.thumbUrl}
-                        rarity={card.rarity}
+                        rarity={undefined} // <-- Removes Rarity Tier badge & border colour
                         glow={card.glow}
-                        isPlay={true} // Forces rarity to show
-                        enableTilt={true} // Animations enabled
+                        isPlay={false}
+                        enableTilt={true} // <-- Animations enabled
                         onClick={() => {}} 
                       />
                     </div>
@@ -276,31 +291,24 @@ export default function ProfileClient({ userId }: { userId: string }) {
           {/* POINTS TAB */}
           {activeTab === 'points' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Stardust */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Stardust</p>
                 <p className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
                   {data.stats?.stardust?.toLocaleString() || '0'}
                 </p>
               </div>
-
-              {/* Collector Points */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Collector Points</p>
                 <p className="text-4xl font-black text-white">
                   {data.stats?.collectorPoints?.toLocaleString() || '0'}
                 </p>
               </div>
-
-              {/* Pack Points */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Pack Points</p>
                 <p className="text-4xl font-black text-white">
                   {data.stats?.packPoints?.toLocaleString() || '0'}
                 </p>
               </div>
-
-              {/* Streak Sources */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 col-span-1 md:col-span-2 lg:col-span-3">
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-4">/streak Sources</p>
                 <div className="flex flex-wrap gap-2">
@@ -319,7 +327,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
           {/* BADGES TAB */}
           {activeTab === 'badges' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Subscriber Badge */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
                   <BadgeIcon emoteId={data.emotes.heart} fallbackText="💖" />
@@ -329,16 +336,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   <p className="text-sm text-white/50 mb-3">
                     {data.badges.subMonths > 0 ? `Currently ${formatSubTime(data.badges.subMonths)}` : 'Not subscribed'}
                   </p>
-                  
                   {(() => {
                     const next = getNextUpgrade('sub', data.badges.subMonths);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-indigo-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (data.badges.subMonths / next.threshold) * 100)}%` }}
-                        />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.subMonths / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -346,7 +349,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </div>
               </div>
 
-              {/* Referral Badge */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
                   <BadgeIcon emoteId={data.emotes.banana} fallbackText="🍌" />
@@ -354,16 +356,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-white mb-1">Referrals</h3>
                   <p className="text-sm text-white/50 mb-3">{data.badges.referrals} Referred</p>
-                  
                   {(() => {
                     const next = getNextUpgrade('referral', data.badges.referrals);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-indigo-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (data.badges.referrals / next.threshold) * 100)}%` }}
-                        />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.referrals / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -371,7 +369,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </div>
               </div>
 
-              {/* Gift Badge */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
                   <BadgeIcon emoteId={data.emotes.gift} fallbackText="🎁" />
@@ -379,16 +376,12 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-white mb-1">Gifter</h3>
                   <p className="text-sm text-white/50 mb-3">{data.badges.gifts} Gifts Sent</p>
-                  
                   {(() => {
                     const next = getNextUpgrade('gift', data.badges.gifts);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-indigo-500 h-2 rounded-full" 
-                          style={{ width: `${Math.min(100, (data.badges.gifts / next.threshold) * 100)}%` }}
-                        />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.gifts / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -396,7 +389,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </div>
               </div>
 
-              {/* Commissioner Badge */}
               {data.badges.isCommissioner && (
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                   <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
