@@ -86,13 +86,19 @@ export async function GET(
   } catch {}
 
   // Fetch the user's showcased favorites
+  // 7. Fetch Favorites
   let favorites: string[] = [];
   try {
     const rawFavs = await kv.get(`user_favorites:${userId}`);
-    if (rawFavs) {
-      favorites = typeof rawFavs === 'string' ? JSON.parse(rawFavs) : (rawFavs as string[]);
+    if (Array.isArray(rawFavs)) {
+      favorites = rawFavs;
+    } else if (typeof rawFavs === 'string') {
+      // Fallback for any old string-formatted entries
+      favorites = JSON.parse(rawFavs);
     }
-  } catch {}
+  } catch (err) {
+    console.error("Failed to parse favorites:", err);
+  }
 
   return NextResponse.json({
     id: userId,

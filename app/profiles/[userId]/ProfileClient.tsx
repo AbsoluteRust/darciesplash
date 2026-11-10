@@ -171,12 +171,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
-      // Instantly update the UI so the cards appear without waiting
+      // Update UI immediately — DO NOT re-fetch here, the state is already correct
       setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
       setIsEditingFavorites(false);
-
-      // Quietly fetch the profile in the background to ensure sync
-      await fetchProfile();
     } catch (err: any) {
       console.error("Failed to save favorites:", err);
       alert(`Failed to save showcase: ${err.message}`);
