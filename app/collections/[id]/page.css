@@ -39,9 +39,11 @@ body::-webkit-scrollbar {
 
 .iridescence-container {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100vw;
-  height: 100dvh; /* Dynamic viewport height fixes the black band gap when iOS URL bar collapses */
+  height: 100vh;
+  height: 100lvh; /* Extends behind the iOS URL bar and safe areas */
   z-index: -1;
   pointer-events: none;
   transform: translate3d(0, 0, 0);
@@ -71,11 +73,14 @@ body::-webkit-scrollbar {
 
 .madolche-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100vw;
-  height: 100dvh;
+  height: 100vh;
+  height: 100lvh; /* Extends behind the iOS URL bar and safe areas */
   overflow: hidden;
   z-index: 0;
+  pointer-events: none;
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
@@ -1307,13 +1312,6 @@ html.entering-prev .collections-page {
    Performance containment
    ============================================================ */
 
-/* Removed `contain: layout` completely from the grid and sections. 
-   iOS Safari uses it as a signal to progressively paint the grid elements 
-   (background, then text, then image) as they scroll, which caused the 
-   visual pop-in effect. */
-
-/* The modal overlay, panels, and lightbox are self-contained compositing
-   units. `contain: paint` makes each an independent paint context. */
 .emote-modal-overlay {
   contain: paint;
 }
