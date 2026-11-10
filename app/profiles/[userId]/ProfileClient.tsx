@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 import StandardCard from '@/components/StandardCard';
-import { DEFAULT_MILESTONES, type Milestone } from '@/lib/loyalty-milestones';
 
 type ProfileData = {
   id: string;
@@ -26,14 +25,13 @@ type ProfileData = {
     banana: string | null;
     love: string | null;
   };
-  // NEW: Add these to your /api/profiles/[userId] route
   stats?: {
     stardust: number;
     collectorPoints: number;
     packPoints: number;
     streakSources: string[];
   };
-  inventory?: Record<string, number>; // "Card Name|Rarity": Count
+  inventory?: Record<string, number>;
 };
 
 type CardData = {
@@ -52,6 +50,28 @@ type CardData = {
   contrabandArtist?: string;
 };
 
+type BadgeMilestone = {
+  type: 'sub' | 'referral' | 'gift';
+  threshold: number;
+  label: string;
+};
+
+// Local definitions for badge upgrade thresholds
+const BADGE_MILESTONES: BadgeMilestone[] = [
+  { type: 'sub', threshold: 1, label: '1 Month' },
+  { type: 'sub', threshold: 3, label: '3 Months' },
+  { type: 'sub', threshold: 6, label: '6 Months' },
+  { type: 'sub', threshold: 12, label: '1 Year' },
+  { type: 'sub', threshold: 24, label: '2 Years' },
+  { type: 'sub', threshold: 36, label: '3 Years' },
+  { type: 'sub', threshold: 60, label: '5 Years' },
+  { type: 'referral', threshold: 1, label: 'First Referral' },
+  { type: 'referral', threshold: 5, label: '5 Referrals' },
+  { type: 'referral', threshold: 15, label: '15 Referrals' },
+  { type: 'gift', threshold: 5, label: '5 Gifts' },
+  { type: 'gift', threshold: 10, label: '10 Gifts' },
+];
+
 function formatSubTime(months: number) {
   if (months < 12) return `${months} Month${months === 1 ? '' : 's'}`;
   const years = Math.floor(months / 12);
@@ -66,8 +86,8 @@ function BadgeIcon({ emoteId, fallbackText }: { emoteId: string | null, fallback
 }
 
 // Helper to get the next upgrade for a specific badge type
-function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): Milestone | null {
-  const milestones = DEFAULT_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
+function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): BadgeMilestone | null {
+  const milestones = BADGE_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
   return milestones.find(m => m.threshold > currentValue) || null;
 }
 
@@ -90,7 +110,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
     try {
       const [profileRes, cardsRes] = await Promise.all([
         fetch(`/api/profiles/${userId}`, { cache: 'no-store' }),
-        fetch(`/api/cards/list`, { cache: 'no-store' }) // Fetch global cards to render commissions
+        fetch(`/api/cards/list`, { cache: 'no-store' })
       ]);
 
       if (profileRes.ok) {
@@ -228,7 +248,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
             <div>
               {commissionedCards.length === 0 ? (
                 <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
-                  No commissions found in this collection.
+                  No commissions found for this user.
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
@@ -244,7 +264,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         glow={card.glow}
                         isPlay={true} // Forces rarity to show
                         enableTilt={true} // Animations enabled
-                        onClick={() => {}} // Could open a modal if desired
+                        onClick={() => {}} 
                       />
                     </div>
                   ))}
