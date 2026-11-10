@@ -116,6 +116,21 @@ export async function GET(
   // 9. Stardust
   const stardust = Number(await kv.hget('user_stardust', userId).catch(() => 0)) || 0;
 
+  let stardustWeek: any = null;
+  try {
+    const sdRes = await fetch(`${botUrl}/api/user/stardust?userId=${encodeURIComponent(userId)}`, {
+      headers: botHeaders,
+      cache: "no-store",
+    });
+    if (sdRes.ok) {
+      stardustWeek = await sdRes.json();
+    } else {
+      console.error('[profile] stardust fetch failed:', sdRes.status);
+    }
+  } catch (err) {
+    console.error('[profile] stardust fetch threw:', err);
+  }
+
   // 10. Favorites
   const favKey = `user_favorites:${userId}`;
   let favorites: string[] = [];
@@ -184,6 +199,7 @@ export async function GET(
       streakTotal,
       streakScore,
       streakBreakdown,
+      stardustWeek,
     }
   });
 }

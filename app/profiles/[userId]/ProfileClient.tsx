@@ -16,6 +16,17 @@ type StreakSource = {
   servers?: { id: string; name: string; icon: string; inviteUrl: string; joined: boolean }[];
 };
 
+type StardustWeek = {
+  tier: number;
+  packs: number;
+  drops: number;
+  puzzles: number;
+  weekEarned: number;
+  weekKey: string;
+  featureStartsAt: number;
+  active: boolean;
+};
+
 type ProfileData = {
   id: string;
   name: string;
@@ -47,6 +58,7 @@ type ProfileData = {
     streakTotal: number;
     streakScore: number;
     streakBreakdown: StreakSource[];
+    stardustWeek?: StardustWeek | null;
   };
   inventory?: Record<string, number>;
 };
@@ -63,6 +75,14 @@ type CardData = {
 };
 
 const DEFAULT_HIGHLIGHT = '#6366f1';
+const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1); // Jan 1 2027 00:00:00 UTC
+
+const STARDUST_TIERS = [
+  { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
+  { num: 2, reqPacks: 8,  reqDrops: 0, reqPuzzles: 0, reward: 300, desc: 'Open 8 packs' },
+  { num: 3, reqPacks: 12, reqDrops: 1, reqPuzzles: 0, reward: 620, desc: 'Open 12 packs + catch 1 drop' },
+  { num: 4, reqPacks: 16, reqDrops: 1, reqPuzzles: 1, reward: 660, desc: 'Open 16 packs + catch 1 drop + solve 1 puzzle' },
+];
 
 function formatSubTime(months: number) {
   if (months < 12) return `${months} Month${months === 1 ? '' : 's'}`;
@@ -70,6 +90,20 @@ function formatSubTime(months: number) {
   const rem = months % 12;
   if (rem === 0) return `${years} Year${years === 1 ? '' : 's'}`;
   return `${years} Year${years === 1 ? '' : 's'}, ${rem} Month${rem === 1 ? '' : 's'}`;
+}
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '0s';
+  const d = Math.floor(ms / 86400000);
+  const h = Math.floor((ms % 86400000) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const parts: string[] = [];
+  if (d > 0) parts.push(`${d}d`);
+  if (d > 0 || h > 0) parts.push(`${h}h`);
+  if (d > 0 || h > 0 || m > 0) parts.push(`${m}m`);
+  parts.push(`${s}s`);
+  return parts.join(' ');
 }
 
 function CustomBadgeIcon({ 
@@ -80,12 +114,12 @@ function CustomBadgeIcon({
   overrides, 
   className = "w-8 h-8" 
 }: { 
-  badgeKey: string, 
-  progress?: number,
-  defaultEmoteId: string | null | undefined, 
-  defaultFallback: string, 
-  overrides: Record<string, any> | undefined | null,
-  className?: string
+  badgeKey: string; 
+  progress?: number;
+  defaultEmoteId: string | null | undefined; 
+  defaultFallback: string; 
+  overrides: Record<string, any> | undefined | null;
+  className?: string;
 }) {
   const custom = overrides?.[badgeKey];
   
@@ -187,9 +221,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const tierCount = Math.floor(streakScore / 1000);
   const currentProgress = streakScore % 1000;
 
+  // --- Stardust weekly ---
+  const stardustWeek = data.stats?.stardustWeek || null;
+  const featureStartsAt = stardustWeek?.featureStartsAt ?? STARDUST_FEATURE_START;
+  const stardustActive = (stardustWeek?.active ?? false) && now >= featureStartsAt;
+  const currentStardustTier = stardustWeek?.tier ?? 0;
+  const weekPacks = stardustWeek?.packs ?? 0;
+  const weekDrops = stardustWeek?.drops ?? 0;
+  const weekPuzzles = stardustWeek?.puzzles ?? 0;
+  const weekEarned = stardustWeek?.weekEarned ?? 0;
+
   // --- BADGE LOGIC ---
-  const earnedBadges = [];
-  const lockedBadges = [];
+  const earnedBadges: any[] = [];
+  const lockedBadges: any[] = [];
 
   if ((data.badges?.subMonths || 0) > 0) earnedBadges.push({ key: 'heart', progress: data.badges.subMonths, title: `Subscribed: ${formatSubTime(data.badges.subMonths)}`, label: 'Subscriber', defaultEmote: data.emotes?.heart, fallback: '💖' });
   else lockedBadges.push({ key: 'heart', title: 'Subscribe to unlock', label: 'Subscriber', defaultEmote: data.emotes?.heart, fallback: '💖' });
@@ -341,6 +385,112 @@ export default function ProfileClient({ userId }: { userId: string }) {
               </div>
 
               <div className="col-span-1 lg:col-span-3 flex flex-col gap-6">
+
+                {/* ─── WEEKLY STARDUST ─── */}
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Stardust</p>
+                      {stardustActive ? (
+                        <p className="text-2xl font-black text-white">
+                          This week: <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">+{weekEarned.toLocaleString()}</span>
+                          <span className="text-sm font-normal text-white/50 ml-2">✨ · resets Monday 00:00 UTC</span>
+                        </p>
+                      ) : (
+                        <p className="text-sm text-white/50">Earn stardust each week by hitting higher tiers of packs, drops, and puzzle solves.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Countdown to feature start */}
+                  {!stardustActive && (
+                    <div className="mb-4 p-5 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex flex-col gap-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">⏳</span>
+                        <span className="text-xs font-bold uppercase tracking-widest text-indigo-300">Feature unlocks in</span>
+                      </div>
+                      <div className="text-3xl md:text-4xl font-black font-mono tabular-nums text-indigo-400">
+                        {formatCountdown(featureStartsAt - now)}
+                      </div>
+                      <p className="text-xs text-white/50 mt-1">
+                        Starting January 1, 2027 (UTC), open packs, catch drops, and solve puzzles each week to climb the tiers below.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tier list */}
+                  <div className="flex flex-col gap-3 mt-4">
+                    {STARDUST_TIERS.map((t) => {
+                      const reached = stardustActive && currentStardustTier >= t.num;
+                      const isNext = stardustActive && currentStardustTier === t.num - 1;
+                      const reqParts: string[] = [];
+                      if (t.reqPacks > 0) {
+                        reqParts.push(isNext ? `${weekPacks} / ${t.reqPacks} packs` : `${t.reqPacks} packs`);
+                      }
+                      if (t.reqDrops > 0) {
+                        reqParts.push(isNext ? `${weekDrops} / ${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}` : `${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}`);
+                      }
+                      if (t.reqPuzzles > 0) {
+                        reqParts.push(isNext ? `${weekPuzzles} / ${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}` : `${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}`);
+                      }
+
+                      const ratios: number[] = [Math.min(weekPacks / t.reqPacks, 1)];
+                      if (t.reqDrops > 0) ratios.push(Math.min(weekDrops / t.reqDrops, 1));
+                      if (t.reqPuzzles > 0) ratios.push(Math.min(weekPuzzles / t.reqPuzzles, 1));
+                      const progressPct = Math.min(...ratios) * 100;
+
+                      if (reached) {
+                        return (
+                          <div key={t.num} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">✓</div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-bold text-green-400">Tier {t.num}</span>
+                                <span className="text-xs text-green-400/70">{t.desc}</span>
+                              </div>
+                            </div>
+                            <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()} ✨</span>
+                          </div>
+                        );
+                      }
+
+                      if (isNext) {
+                        return (
+                          <div key={t.num} className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{t.num}</div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-indigo-400">Tier {t.num}</span>
+                                  <span className="text-xs text-white/50">{reqParts.join(' · ')}</span>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()} ✨</span>
+                            </div>
+                            <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                              <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // locked
+                      return (
+                        <div key={t.num} className="relative flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl opacity-60">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/40 text-sm">🔒</div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold text-white/60">Tier {t.num}</span>
+                              <span className="text-xs text-white/40">{t.desc}</span>
+                            </div>
+                          </div>
+                          <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()} ✨</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
                   <div className="flex justify-between items-end mb-4">
                     <div>
