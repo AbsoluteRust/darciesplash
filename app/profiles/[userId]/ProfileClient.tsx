@@ -316,9 +316,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
     ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id)
   ) || [];
 
-  const scoreSources = data.stats?.streakBreakdown?.filter(s => 
-    ['daily', 'weekly-score', 'monthly-score', 'lifetime'].includes(s.id)
-  ) || [];
+  const streakScore = data.stats?.streakScore || 0;
+  const tierCount = Math.floor(streakScore / 1000);
+  const currentProgress = streakScore % 1000;
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -466,21 +466,54 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
                 {/* 2. STREAK SCORE (PROGRESSION) */}
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
-                  <div className="flex justify-between items-end mb-4">
+                  <div className="flex justify-between items-end mb-6">
                     <div>
                       <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Streak Score</p>
                       <p className="text-2xl font-black text-white">
-                        Total: <span className="text-indigo-400">{(data.stats?.streakScore || 0).toLocaleString()}</span> <span className="text-sm font-normal text-white/50">score</span>
+                        Total: <span className="text-indigo-400">{streakScore.toLocaleString()}</span> <span className="text-sm font-normal text-white/50">score</span>
                       </p>
                     </div>
+                    <p className="text-xs text-white/40 max-w-xs text-right">
+                      Earn Streak Score by keeping up your daily emote activity. Every 1,000 score unlocks a permanent Lifetime Bonus.
+                    </p>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-                    {scoreSources.length ? scoreSources.map((source) => (
-                      <StreakTooltip key={source.id} source={source} now={now} isOwnProfile={isOwnProfile} />
-                    )) : (
-                      <span className="text-white/30 italic text-sm col-span-2">No streak score sources active.</span>
-                    )}
+                  <div className="flex flex-col gap-3 mt-4">
+                    {/* Render Completed Tiers */}
+                    {Array.from({ length: tierCount }).map((_, i) => (
+                      <div key={`tier-${i}`} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">
+                            ✓
+                          </div>
+                          <span className="text-sm font-bold text-green-400">Tier {i + 1} Lifetime Bonus</span>
+                        </div>
+                        <span className="text-sm font-black text-green-400">+100 pp / day</span>
+                      </div>
+                    ))}
+
+                    {/* Render Next Tier Progression */}
+                    <div className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">
+                            {tierCount + 1}
+                          </div>
+                          <span className="text-sm font-bold text-indigo-400">
+                            Tier {tierCount + 1} Lifetime Bonus
+                          </span>
+                        </div>
+                        <span className="text-sm font-black text-indigo-400">
+                          {currentProgress.toLocaleString()} / 1,000
+                        </span>
+                      </div>
+                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                        <div 
+                          className="bg-indigo-500 h-2 rounded-full transition-all duration-500" 
+                          style={{ width: `${(currentProgress / 1000) * 100}%` }} 
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
 
