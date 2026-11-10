@@ -460,7 +460,7 @@ const ProfileCardComponent = ({
                   sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
                   alt={`${name || 'User'} avatar`}
                   loading="eager"
-                  decoding="async"
+                  decoding="sync"
                   fetchPriority={priority ? 'high' : 'low'}
                   onLoad={() => setAvatarLoaded(true)}
                   onError={e => {
@@ -518,7 +518,7 @@ const ProfileCardComponent = ({
                 sizes="(max-width: 600px) 45vw, (max-width: 900px) 33vw, 22vw"
                 alt=""
                 loading="eager"
-                decoding="async"
+                decoding="sync"
               />
             </div>
           )}

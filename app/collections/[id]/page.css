@@ -16,10 +16,6 @@ body::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
-/* 
-  Match the background to the darkest color of the shaders. 
-  This way, when the URL bar hides and reveals a gap, it blends in.
-*/
 body {
   background-color: #050510;
 }
@@ -49,8 +45,10 @@ body {
 }
 
 /* 
-  Backgrounds: Using 100vh aligns perfectly with the screen and prevents 
-  the WebGL camera from panning upwards towards the clock.
+  CROSS-BROWSER BLACK BAR FIX:
+  We stack vh, dvh, and lvh. Safari picks lvh, Firefox picks dvh.
+  This guarantees the background covers the screen regardless of 
+  how the browser handles the URL bar.
 */
 .iridescence-container {
   position: fixed;
@@ -58,6 +56,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
 }
@@ -68,6 +68,8 @@ body {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
+  height: 100lvh;
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
@@ -82,7 +84,6 @@ body {
   pointer-events: none;
 }
 
-/* Force the WebGL canvas to stretch perfectly */
 .iridescence-container canvas,
 .madolche-bg canvas {
   width: 100% !important;
@@ -91,14 +92,16 @@ body {
 }
 
 /* 
-  POP-IN FIX: 
-  Removed the forced GPU layers (translateZ) here. Forcing 20+ cards onto 
-  their own GPU layers causes iOS to run out of memory and paint them in chunks. 
-  Reserving the space is enough.
+  FIREFOX POP-IN FIX:
+  content-visibility: auto tells Firefox to completely skip rendering
+  the card until it's right on the edge of the viewport, preventing
+  the chunk-by-chunk painting.
 */
 .lazy-mount {
   width: 100%;
   aspect-ratio: 0.718;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
 }
 
 .pc-card-wrapper {
