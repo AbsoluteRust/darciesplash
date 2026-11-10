@@ -16,16 +16,15 @@ body::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
-/* Set a fallback background color so that if the WebGL canvas fails to 
-   paint a frame during a resize, it doesn't flash black or grey. */
+/* Set a dark fallback background so if the browser bounces, it matches 
+   the shader's darkest colors instead of flashing grey or white. */
 body {
-  background-color: #000;
+  background-color: #050510;
 }
 
 .collections-page {
   position: relative;
   min-height: 100vh;
-  /* Ensure the page content sits above the fixed background */
   z-index: 1;
 }
 
@@ -47,18 +46,16 @@ body {
 }
 
 /* 
-  Use 100lvh (Largest Viewport Height). This ensures the background is 
-  always as tall as the screen, even when the iOS URL bar hides. 
-  We removed the GPU transforms (translateZ, isolation) because they 
-  cause iOS Safari to clip the WebGL canvas when the URL bar moves.
+  Over-extend the backgrounds to 150lvh and center them. 
+  This guarantees the shader covers the screen even when the iOS URL bar 
+  hides or the page bounces (rubber bands).
 */
 .iridescence-container {
   position: fixed;
-  top: 0;
+  top: -25lvh;
   left: 0;
   width: 100vw;
-  height: 100vh;
-  height: 100lvh; 
+  height: 150lvh;
   z-index: 0;
   pointer-events: none;
 }
@@ -85,11 +82,10 @@ body {
 
 .madolche-bg {
   position: fixed;
-  top: 0;
+  top: -25lvh;
   left: 0;
   width: 100vw;
-  height: 100vh;
-  height: 100lvh;
+  height: 150lvh;
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
@@ -104,13 +100,27 @@ body {
 }
 
 /* 
-  Reserve the exact space the card will take. 
-  We removed transform: translateZ(0) because it was causing iOS to split 
-  the card into multiple paint layers (the progressive pop-in effect).
+  Force the WebGL canvas to physically stretch to fill the 150lvh container.
+  This prevents the black bar that happens when the library's inline height 
+  doesn't update fast enough during an iOS viewport resize.
+*/
+.iridescence-container canvas,
+.madolche-bg canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
+}
+
+/* 
+  Reserve the exact space the card will take and force GPU rasterization.
+  This is the fix that stopped the progressive pop-in effect on iOS.
 */
 .lazy-mount {
   width: 100%;
   aspect-ratio: 0.718;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .card-grid {
