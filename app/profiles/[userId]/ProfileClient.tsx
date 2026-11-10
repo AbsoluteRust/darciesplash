@@ -90,7 +90,12 @@ function formatSubTime(months: number) {
   return `${years} Year${years === 1 ? '' : 's'}, ${rem} Month${rem === 1 ? '' : 's'}`;
 }
 
-// Updated Badge Icon to handle custom URLs/Emotes
+function getNextUpgrade(type: 'sub' | 'referral' | 'gift', currentValue: number): BadgeMilestone | null {
+  const milestones = BADGE_MILESTONES.filter(m => m.type === type).sort((a, b) => a.threshold - b.threshold);
+  return milestones.find(m => m.threshold > currentValue) || null;
+}
+
+// Updated to be crash-proof if iconUrl is not a string
 function CustomBadgeIcon({ 
   badgeKey, 
   defaultEmoteId, 
@@ -99,25 +104,26 @@ function CustomBadgeIcon({
   className = "w-8 h-8" 
 }: { 
   badgeKey: string, 
-  defaultEmoteId: string | null, 
+  defaultEmoteId: string | null | undefined, 
   defaultFallback: string, 
-  overrides: Record<string, { name?: string; iconUrl?: string }> | undefined,
+  overrides: Record<string, { name?: string; iconUrl?: string }> | undefined | null,
   className?: string
 }) {
   const custom = overrides?.[badgeKey];
+  const iconUrl = typeof custom?.iconUrl === 'string' ? custom.iconUrl : null;
 
-  if (custom?.iconUrl) {
-    if (custom.iconUrl.startsWith('http')) {
-      return <img src={custom.iconUrl} alt="badge" className={`${className} object-contain`} />;
+  if (iconUrl) {
+    if (iconUrl.startsWith('http')) {
+      return <img src={iconUrl} alt="badge" className={`${className} object-contain`} />;
     }
     // Handle Discord Emote format <:name:id> or <a:name:id>
-    const match = custom.iconUrl.match(/<(a?):(\w+):(\d+)>/);
+    const match = iconUrl.match(/<(a?):(\w+):(\d+)>/);
     if (match) {
       const ext = match[1] === 'a' ? 'gif' : 'png';
       return <img src={`https://cdn.discordapp.com/emojis/${match[3]}.${ext}`} alt="badge" className={`${className} object-contain`} />;
     }
     // Handle standard Emoji
-    return <span className={`${className} flex items-center justify-center text-xl`}>{custom.iconUrl}</span>;
+    return <span className={`${className} flex items-center justify-center text-xl`}>{iconUrl}</span>;
   }
 
   // Fallback to KV Emote ID
@@ -130,7 +136,6 @@ function CustomBadgeIcon({
 }
 
 function StreakTooltip({ source, now, isOwnProfile }: { source: StreakSource, now: number, isOwnProfile: boolean }) {
-  // ... [Keep the exact same StreakTooltip from the previous file] ...
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout>();
   const handleMouseEnter = () => { clearTimeout(timeoutRef.current); setIsOpen(true); };
@@ -181,7 +186,6 @@ function StreakTooltip({ source, now, isOwnProfile }: { source: StreakSource, no
 }
 
 export default function ProfileClient({ userId }: { userId: string }) {
-  // ... [Keep all state variables and hooks from previous file] ...
   const [data, setData] = useState<ProfileData | null>(null);
   const [allCards, setAllCards] = useState<CardData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,7 +224,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   useEffect(() => { fetchProfile(); const int = setInterval(fetchProfile, 30000); return () => clearInterval(int); }, [userId]);
 
-  // ... [Keep handleSaveColor, handleSaveFavorites, toggleFavorite from previous file] ...
   const handleSaveColor = async () => { setSavingColor(true); try { const res = await fetch('/api/profiles/color', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colorHex: selectedColor }) }); if (res.ok) { setIsColorModalOpen(false); fetchProfile(); } else { const errData = await res.json(); alert(`Failed to save color: ${errData.error || 'Unknown error'}`); } } finally { setSavingColor(false); } };
   const handleSaveFavorites = async () => { setIsSavingFavorites(true); const newFavs = Array.from(tempFavorites); try { const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardNames: newFavs }) }); if (!res.ok) throw new Error(`HTTP error ${res.status}`); setData(prev => prev ? { ...prev, favorites: newFavs } : prev); setIsEditingFavorites(false); } catch (err: any) { alert(`Failed to save showcase: ${err.message}`); } finally { setIsSavingFavorites(false); } };
   const toggleFavorite = (cardName: string) => { setTempFavorites(prev => { const next = new Set(prev); if (next.has(cardName)) next.delete(cardName); else { if (next.size >= 8) { alert("You can only select up to 8 cards."); return prev; } next.add(cardName); } return next; }); };
@@ -242,18 +245,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const tierCount = Math.floor(streakScore / 1000);
   const currentProgress = streakScore % 1000;
 
+  const getBadgeName = (key: string, fallback: string) => data.badgeOverrides?.[key]?.name || fallback;
+
   // Determine which badges to show in the header
   const activeBadges = [];
-  if (data.badges.subMonths > 0) activeBadges.push({ key: 'heart', defaultEmote: data.emotes.heart, fallback: '💖', title: `Subscribed: ${formatSubTime(data.badges.subMonths)}` });
-  if (data.badges.isCommissioner) activeBadges.push({ key: 'sparkle', defaultEmote: data.emotes.sparkle, fallback: '✨', title: 'Commissioner' });
-  if (data.badges.gifts > 0) activeBadges.push({ key: 'gift', defaultEmote: data.emotes.gift, fallback: '🎁', title: `${data.badges.gifts} Gifts Sent` });
-  if (data.badges.referrals > 0) activeBadges.push({ key: 'banana', defaultEmote: data.emotes.banana, fallback: '🍌', title: `${data.badges.referrals} Referrals` });
-  data.badges.loyalty.forEach(year => {
-    activeBadges.push({ key: 'love', defaultEmote: data.emotes.love, fallback: '💜', title: `${year} Loyalty Card` });
+  if ((data.badges?.subMonths || 0) > 0) activeBadges.push({ key: 'heart', defaultEmote: data.emotes?.heart, fallback: '💖', title: `Subscribed: ${formatSubTime(data.badges.subMonths)}` });
+  if (data.badges?.isCommissioner) activeBadges.push({ key: 'sparkle', defaultEmote: data.emotes?.sparkle, fallback: '✨', title: 'Commissioner' });
+  if ((data.badges?.gifts || 0) > 0) activeBadges.push({ key: 'gift', defaultEmote: data.emotes?.gift, fallback: '🎁', title: `${data.badges.gifts} Gifts Sent` });
+  if ((data.badges?.referrals || 0) > 0) activeBadges.push({ key: 'banana', defaultEmote: data.emotes?.banana, fallback: '🍌', title: `${data.badges.referrals} Referrals` });
+  (data.badges?.loyalty || []).forEach(year => {
+    activeBadges.push({ key: 'love', defaultEmote: data.emotes?.love, fallback: '💜', title: `${year} Loyalty Card` });
   });
-
-  // Helper to get custom badge name
-  const getBadgeName = (key: string, fallback: string) => data.badgeOverrides?.[key]?.name || fallback;
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -292,20 +294,13 @@ export default function ProfileClient({ userId }: { userId: string }) {
               )}
             </div>
             
-            {/* Badges in Header (No boxes, simple hover tooltips) */}
             <div className="flex flex-wrap gap-4 items-center">
               {activeBadges.length === 0 ? (
                 <span className="text-white/30 text-sm italic">No badges unlocked yet.</span>
               ) : (
                 activeBadges.map((badge, i) => (
                   <div key={i} className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform">
-                    <CustomBadgeIcon 
-                      badgeKey={badge.key} 
-                      defaultEmoteId={badge.defaultEmote} 
-                      defaultFallback={badge.fallback} 
-                      overrides={data.badgeOverrides} 
-                      className="w-10 h-10 md:w-12 md:h-12 drop-shadow-lg"
-                    />
+                    <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10 md:w-12 md:h-12 drop-shadow-lg" />
                     <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
                       {badge.title}
                     </span>
@@ -313,7 +308,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 ))
               )}
             </div>
-
           </div>
         </div>
       </motion.div>
@@ -422,17 +416,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
               {/* Subscriber */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="heart" defaultEmoteId={data.emotes.heart} defaultFallback="💖" overrides={data.badgeOverrides} className="w-10 h-10" />
+                  <CustomBadgeIcon badgeKey="heart" defaultEmoteId={data.emotes?.heart} defaultFallback="💖" overrides={data.badgeOverrides} className="w-10 h-10" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('heart', 'Subscriber')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{data.badges.subMonths > 0 ? `Currently ${formatSubTime(data.badges.subMonths)}` : 'Not subscribed'}</p>
+                  <p className="text-sm text-white/50 mb-3">{(data.badges?.subMonths || 0) > 0 ? `Currently ${formatSubTime(data.badges.subMonths)}` : 'Not subscribed'}</p>
                   {(() => {
-                    const next = getNextUpgrade('sub', data.badges.subMonths);
+                    const next = getNextUpgrade('sub', data.badges?.subMonths || 0);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.subMonths / next.threshold) * 100)}%` }} />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.subMonths || 0) / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -443,17 +437,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
               {/* Referrals */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="banana" defaultEmoteId={data.emotes.banana} defaultFallback="🍌" overrides={data.badgeOverrides} className="w-10 h-10" />
+                  <CustomBadgeIcon badgeKey="banana" defaultEmoteId={data.emotes?.banana} defaultFallback="🍌" overrides={data.badgeOverrides} className="w-10 h-10" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('banana', 'Referrals')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{data.badges.referrals} Referred</p>
+                  <p className="text-sm text-white/50 mb-3">{data.badges?.referrals || 0} Referred</p>
                   {(() => {
-                    const next = getNextUpgrade('referral', data.badges.referrals);
+                    const next = getNextUpgrade('referral', data.badges?.referrals || 0);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.referrals / next.threshold) * 100)}%` }} />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.referrals || 0) / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -464,17 +458,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
               {/* Gifter */}
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                 <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                  <CustomBadgeIcon badgeKey="gift" defaultEmoteId={data.emotes.gift} defaultFallback="🎁" overrides={data.badgeOverrides} className="w-10 h-10" />
+                  <CustomBadgeIcon badgeKey="gift" defaultEmoteId={data.emotes?.gift} defaultFallback="🎁" overrides={data.badgeOverrides} className="w-10 h-10" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('gift', 'Gifter')}</h3>
-                  <p className="text-sm text-white/50 mb-3">{data.badges.gifts} Gifts Sent</p>
+                  <p className="text-sm text-white/50 mb-3">{data.badges?.gifts || 0} Gifts Sent</p>
                   {(() => {
-                    const next = getNextUpgrade('gift', data.badges.gifts);
+                    const next = getNextUpgrade('gift', data.badges?.gifts || 0);
                     if (!next) return <p className="text-xs text-green-400 font-bold">Max tier reached!</p>;
                     return (
                       <div className="w-full bg-black/50 rounded-full h-2 mt-2">
-                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, (data.badges.gifts / next.threshold) * 100)}%` }} />
+                        <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${Math.min(100, ((data.badges?.gifts || 0) / next.threshold) * 100)}%` }} />
                         <p className="text-xs text-white/40 mt-2">Next: {next.label}</p>
                       </div>
                     );
@@ -483,10 +477,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
               </div>
 
               {/* Commissioner */}
-              {data.badges.isCommissioner && (
+              {data.badges?.isCommissioner && (
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
                   <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                    <CustomBadgeIcon badgeKey="sparkle" defaultEmoteId={data.emotes.sparkle} defaultFallback="✨" overrides={data.badgeOverrides} className="w-10 h-10" />
+                    <CustomBadgeIcon badgeKey="sparkle" defaultEmoteId={data.emotes?.sparkle} defaultFallback="✨" overrides={data.badgeOverrides} className="w-10 h-10" />
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold text-white mb-1">{getBadgeName('sparkle', 'Commissioner')}</h3>
@@ -497,11 +491,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
               )}
             </div>
           )}
-
         </motion.div>
       </AnimatePresence>
 
-      {/* ... [Keep the rest of the modals: Edit Favorites, Card Viewer, Color Picker] ... */}
+      {/* ─── EDIT FAVORITES MODAL ─── */}
       <AnimatePresence>
         {isEditingFavorites && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
@@ -536,6 +529,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
         )}
       </AnimatePresence>
 
+      {/* ─── CARD MODAL VIEWER ─── */}
       <AnimatePresence>
         {selectedCard && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setSelectedCard(null)}>
@@ -546,6 +540,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
         )}
       </AnimatePresence>
 
+      {/* Color Picker Modal */}
       <AnimatePresence>
         {isColorModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
