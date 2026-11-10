@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { forwardRef, useRef, useMemo, useLayoutEffect, useEffect } from 'react';
+import { forwardRef, useRef, useMemo, useLayoutEffect, useEffect, useState } from 'react';
 import { Color } from 'three';
 
 const hexToNormalizedRGB = hex => {
@@ -106,6 +106,19 @@ SilkPlane.displayName = 'SilkPlane';
 const Silk = ({ speed = 5, scale = 1, color = '#7B7481', noiseIntensity = 1.5, rotation = 0, lightMode = false }) => {
   const meshRef = useRef();
 
+  // Stop the entire render loop when the tab is hidden. No visual change —
+  // the shader is not visible to anyone during that time anyway.
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof document === 'undefined') return true;
+    return !document.hidden;
+  });
+
+  useEffect(() => {
+    const onVisibilityChange = () => setIsVisible(!document.hidden);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
   const uniforms = useMemo(
     () => ({
       uSpeed: { value: speed },
@@ -130,7 +143,7 @@ const Silk = ({ speed = 5, scale = 1, color = '#7B7481', noiseIntensity = 1.5, r
   }, [speed, scale, noiseIntensity, color, rotation, lightMode, uniforms]);
 
   return (
-    <Canvas dpr={[1, 2]} frameloop="always">
+    <Canvas dpr={[1, 2]} frameloop={isVisible ? 'always' : 'never'}>
       <SilkPlane ref={meshRef} uniforms={uniforms} />
     </Canvas>
   );
