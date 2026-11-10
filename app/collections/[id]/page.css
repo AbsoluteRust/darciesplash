@@ -24,6 +24,9 @@ body {
 .collections-page {
   position: relative;
   min-height: 100vh;
+  /* Give a 20vh buffer at the bottom so cards don't stutter into the URL bar */
+  padding-bottom: 20vh;
+  z-index: 1;
 }
 
 .collections-page::-webkit-scrollbar {
@@ -45,12 +48,12 @@ body {
 
 /* 
   Revert to 100lvh to keep the WebGL renderer happy.
-  Add GPU promotion (translate3d) so iOS Safari doesn't clip it.
-  Add a fallback background color so any gaps match the theme.
+  Add GPU promotion and a background color so gaps match the theme.
 */
 .iridescence-container {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
   height: 100lvh;
@@ -65,7 +68,8 @@ body {
 
 .madolche-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   width: 100vw;
   height: 100vh;
   height: 100lvh;
@@ -92,27 +96,8 @@ body {
 .madolche-bg canvas {
   width: 100% !important;
   height: 100% !important;
+  object-fit: cover;
   display: block;
-}
-
-.remix-modal-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 40px;
-
-  width: auto;
-  max-width: 100%;
-  overflow-y: auto;
-  padding-bottom: 40px;
-}
-
-.remix-modal-stack::-webkit-scrollbar {
-  display: none;
-}
-
-.remix-modal-item {
-  margin-bottom: 60px;
 }
 
 /* 
@@ -133,7 +118,6 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 32px;
-  /* Prevent layout thrashing across the grid */
   contain: layout;
 }
 
@@ -234,19 +218,22 @@ body {
 }
 
 .remix-modal-stack {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 32px;
-
-  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  width: auto;
+  max-width: 100%;
   overflow-y: auto;
   padding-bottom: 40px;
-
-  scrollbar-width: none;
 }
 
 .remix-modal-stack::-webkit-scrollbar {
   display: none;
+}
+
+.remix-modal-item {
+  margin-bottom: 60px;
 }
 
 .emote-modal-overlay {
@@ -255,11 +242,9 @@ body {
   background: rgba(0,0,0,0.65);
   backdrop-filter: blur(6px);
   z-index: 9999;
-
   display: flex;
   justify-content: center;
   align-items: flex-start;
-
   overflow-y: auto;
   overflow-x: hidden;
   contain: paint;
@@ -283,10 +268,8 @@ body {
 .full-wallpaper {
   width: auto;
   height: auto;
-
   max-width: 100%;
   max-height: 100%;
-
   object-fit: contain;
   display: block;
 }
@@ -356,12 +339,8 @@ html.entering-prev .collections-page {
   will-change: opacity, transform;
 }
 
-.collection-hint--next {
-  bottom: 32px;
-}
-.collection-hint--prev {
-  top: 32px;
-}
+.collection-hint--next { bottom: 32px; }
+.collection-hint--prev { top: 32px; }
 
 .collection-hint__label {
   font-size: 10px;
@@ -377,17 +356,10 @@ html.entering-prev .collections-page {
   line-height: 1.1;
 }
 
-.collection-hint__arrow {
-  font-size: 22px;
-  line-height: 1;
-}
+.collection-hint__arrow { font-size: 22px; line-height: 1; }
 
-.collection-hint--next .collection-hint__arrow {
-  animation-name: hintArrowBounceDown;
-}
-.collection-hint--prev .collection-hint__arrow {
-  animation-name: hintArrowBounceUp;
-}
+.collection-hint--next .collection-hint__arrow { animation-name: hintArrowBounceDown; }
+.collection-hint--prev .collection-hint__arrow { animation-name: hintArrowBounceUp; }
 
 @keyframes hintArrowBounceDown {
   0%, 100% { transform: translateY(0); }
@@ -400,26 +372,13 @@ html.entering-prev .collections-page {
 
 /* ---- Card transition animations (inside the modal) ---- */
 
-.emote-modal.card-leaving-next {
-  animation: cardSlideOutUp 180ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
-}
-.emote-modal.card-leaving-prev {
-  animation: cardSlideOutDown 180ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
-}
+.emote-modal.card-leaving-next { animation: cardSlideOutUp 180ms cubic-bezier(0.55, 0, 0.55, 1) forwards; }
+.emote-modal.card-leaving-prev { animation: cardSlideOutDown 180ms cubic-bezier(0.55, 0, 0.55, 1) forwards; }
+.emote-modal.card-entering-next { animation: cardSlideInFromBottom 280ms cubic-bezier(0.22, 1, 0.36, 1); }
+.emote-modal.card-entering-prev { animation: cardSlideInFromTop 280ms cubic-bezier(0.22, 1, 0.36, 1); }
 
-.emote-modal.card-entering-next {
-  animation: cardSlideInFromBottom 280ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.emote-modal.card-entering-prev {
-  animation: cardSlideInFromTop 280ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes cardSlideOutUp {
-  to { transform: translateY(-300px); opacity: 0; }
-}
-@keyframes cardSlideOutDown {
-  to { transform: translateY(300px); opacity: 0; }
-}
+@keyframes cardSlideOutUp { to { transform: translateY(-300px); opacity: 0; } }
+@keyframes cardSlideOutDown { to { transform: translateY(300px); opacity: 0; } }
 @keyframes cardSlideInFromBottom {
   from { transform: translateY(300px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
@@ -440,7 +399,7 @@ html.entering-prev .collections-page {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* On touch devices, fade only to keep layers light */
+/* On touch devices, animate opacity only to prevent compositor layer overload */
 @media (hover: none) and (pointer: coarse) {
   .lazy-mount--visible {
     animation: lazyMountFadeInTouch 320ms ease-out both;
@@ -454,25 +413,13 @@ html.entering-prev .collections-page {
 
 /* ---- Bigger slide for cross-collection transitions inside the modal ---- */
 
-.emote-modal.card-leaving-next.card-crossing {
-  animation: cardCrossOutUp 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
-}
-.emote-modal.card-leaving-prev.card-crossing {
-  animation: cardCrossOutDown 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards;
-}
-.emote-modal.card-entering-next.card-crossing {
-  animation: cardCrossInFromBottom 420ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.emote-modal.card-entering-prev.card-crossing {
-  animation: cardCrossInFromTop 420ms cubic-bezier(0.22, 1, 0.36, 1);
-}
+.emote-modal.card-leaving-next.card-crossing { animation: cardCrossOutUp 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards; }
+.emote-modal.card-leaving-prev.card-crossing { animation: cardCrossOutDown 300ms cubic-bezier(0.55, 0, 0.55, 1) forwards; }
+.emote-modal.card-entering-next.card-crossing { animation: cardCrossInFromBottom 420ms cubic-bezier(0.22, 1, 0.36, 1); }
+.emote-modal.card-entering-prev.card-crossing { animation: cardCrossInFromTop 420ms cubic-bezier(0.22, 1, 0.36, 1); }
 
-@keyframes cardCrossOutUp {
-  to { transform: translateY(-200px); opacity: 0; }
-}
-@keyframes cardCrossOutDown {
-  to { transform: translateY(200px); opacity: 0; }
-}
+@keyframes cardCrossOutUp { to { transform: translateY(-200px); opacity: 0; } }
+@keyframes cardCrossOutDown { to { transform: translateY(200px); opacity: 0; } }
 @keyframes cardCrossInFromBottom {
   from { transform: translateY(200px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
@@ -482,63 +429,13 @@ html.entering-prev .collections-page {
   to   { transform: translateY(0);     opacity: 1; }
 }
 
-/* ---- Modal-level hint panel (sits above modal overlay) ---- */
-
-.collection-hint--modal {
-  z-index: 10001;
-}
-
-/* ---- Mobile edge padding ---- */
+.collection-hint--modal { z-index: 10001; }
 
 @media (max-width: 900px) {
-  .grid-container {
-    padding: 40px 16px;
-  }
-
-  .emote-modal-overlay {
-    padding-left: 12px;
-    padding-right: 12px;
-  }
-
-  .emote-layout {
-    padding-left: 8px;
-    padding-right: 8px;
-  }
-
-  .emote-info-boxes {
-    padding-left: 4px;
-    padding-right: 4px;
-  }
-}
-
-@media (max-width: 600px) {
-  .grid-container {
-    padding: 32px 14px;
-  }
-
-  .emote-modal-overlay {
-    padding-left: 10px;
-    padding-right: 10px;
-  }
-
-  .emote-layout {
-    padding-left: 6px;
-    padding-right: 6px;
-  }
-}
-
-@media (max-width: 900px) {
-  .emote-modal-overlay {
-    padding-bottom: 260px;
-  }
-}
-
-@media (max-width: 600px) {
-  .emote-modal-overlay {
-    padding-bottom: 260px;
-  }
-}
-@media (max-width: 900px) {
+  .grid-container { padding: 40px 16px; }
+  .emote-modal-overlay { padding-left: 12px; padding-right: 12px; padding-bottom: 260px; }
+  .emote-layout { padding-left: 8px; padding-right: 8px; }
+  .emote-info-boxes { padding-left: 4px; padding-right: 4px; }
   .emote-modal-overlay::after {
     content: "Tap outside to close";
     position: absolute;
@@ -551,6 +448,12 @@ html.entering-prev .collections-page {
     pointer-events: none;
     user-select: none;
   }
+}
+
+@media (max-width: 600px) {
+  .grid-container { padding: 32px 14px; }
+  .emote-modal-overlay { padding-left: 10px; padding-right: 10px; padding-bottom: 260px; }
+  .emote-layout { padding-left: 6px; padding-right: 6px; }
 }
 
 /* ---- Related cards panel (desktop only) ---- */
@@ -576,17 +479,9 @@ html.entering-prev .collections-page {
   contain: paint;
 }
 
-@media (min-width: 1200px) {
-  .related-panel {
-    display: flex;
-  }
-}
+@media (min-width: 1200px) { .related-panel { display: flex; } }
 
-@media (min-width: 900px) {
-  .emote-modal .full-wallpaper {
-    max-height: 85vh;
-  }
-}
+@media (min-width: 900px) { .emote-modal .full-wallpaper { max-height: 85vh; } }
 
 .related-panel__label {
   font-size: 10px;
@@ -607,9 +502,7 @@ html.entering-prev .collections-page {
   padding-right: 2px;
 }
 
-.related-panel__grid::-webkit-scrollbar {
-  display: none;
-}
+.related-panel__grid::-webkit-scrollbar { display: none; }
 
 .related-card-mini {
   position: relative;
@@ -680,11 +573,7 @@ html.entering-prev .collections-page {
   contain: paint;
 }
 
-@media (min-width: 1200px) {
-  .chroma-panel {
-    display: flex;
-  }
-}
+@media (min-width: 1200px) { .chroma-panel { display: flex; } }
 
 .chroma-panel__label {
   font-size: 10px;
@@ -705,9 +594,7 @@ html.entering-prev .collections-page {
   padding-right: 2px;
 }
 
-.chroma-panel__grid::-webkit-scrollbar {
-  display: none;
-}
+.chroma-panel__grid::-webkit-scrollbar { display: none; }
 
 /* ---- Chroma lightbox ---- */
 
@@ -796,14 +683,8 @@ html.entering-prev .collections-page {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.collection-toggle__btn:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.collection-toggle__btn.is-active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-}
+.collection-toggle__btn:hover { color: rgba(255, 255, 255, 0.9); }
+.collection-toggle__btn.is-active { background: rgba(255, 255, 255, 0.14); color: #fff; }
 
 .collection-empty {
   text-align: center;
@@ -860,14 +741,8 @@ html.entering-prev .collections-page {
   letter-spacing: 0.02em;
 }
 
-.collection-edit-banner__text {
-  opacity: 0.9;
-}
-
-.collection-edit-banner__actions {
-  display: flex;
-  gap: 8px;
-}
+.collection-edit-banner__text { opacity: 0.9; }
+.collection-edit-banner__actions { display: flex; gap: 8px; }
 
 .collection-edit-btn {
   padding: 8px 16px;
@@ -880,76 +755,25 @@ html.entering-prev .collections-page {
   transition: background 0.15s ease, transform 0.15s ease;
 }
 
-.collection-edit-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
+.collection-edit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.collection-edit-btn--cancel { background: rgba(0, 0, 0, 0.4); color: #fff; }
+.collection-edit-btn--cancel:hover:not(:disabled) { background: rgba(0, 0, 0, 0.6); }
+.collection-edit-btn--save { background: #fff; color: #ec4899; }
+.collection-edit-btn--save:hover:not(:disabled) { background: rgba(255, 255, 255, 0.9); transform: translateY(-1px); }
 
-.collection-edit-btn--cancel {
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-}
-
-.collection-edit-btn--cancel:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.6);
-}
-
-.collection-edit-btn--save {
-  background: #fff;
-  color: #ec4899;
-}
-
-.collection-edit-btn--save:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.9);
-  transform: translateY(-1px);
-}
-
-/* While in edit mode, disable the automatic grid-nudge transform */
-.collections-page.is-editing-order .grid-container {
-  padding-top: 60px;
-}
-
-.collections-page.is-editing-order .card-grid {
-  cursor: default;
-}
+.collections-page.is-editing-order .grid-container { padding-top: 60px; }
+.collections-page.is-editing-order .card-grid { cursor: default; }
 
 /* ============================================================
-   Section layout feature — appended below
+   Section layout feature
    ============================================================ */
 
-/* The old fixed edit banner is gone; the toolbar is inline now, so
-   remove the 60px gap the old rule above reserved for it. */
-.collections-page.is-editing-order .grid-container {
-  padding-top: 0;
-}
+.collections-page.is-editing-order .grid-container { padding-top: 0; }
 
-/* ---- Section headers (viewer + edit preview) ---- */
-
-.collection-section-header {
-  margin-bottom: 1rem;
-}
-
-.collection-section-header h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #fff;
-  margin: 0 0 0.5rem 0;
-}
-
-.collection-section-rule {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.35);
-  margin: 0 0 0.5rem 0;
-}
-
-.collection-section-header p {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.875rem;
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-/* ---- Edit toolbar (replaces the old fixed banner) ---- */
+.collection-section-header { margin-bottom: 1rem; }
+.collection-section-header h3 { font-size: 1.25rem; font-weight: 700; color: #fff; margin: 0 0 0.5rem 0; }
+.collection-section-rule { border: none; border-top: 1px solid rgba(255, 255, 255, 0.35); margin: 0 0 0.5rem 0; }
+.collection-section-header p { color: rgba(255, 255, 255, 0.6); font-size: 0.875rem; margin: 0; white-space: pre-wrap; }
 
 .collection-edit-toolbar {
   background: rgba(10, 10, 20, 0.9);
@@ -962,31 +786,10 @@ html.entering-prev .collections-page {
   gap: 0.75rem;
 }
 
-.toolbar-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.toolbar-actions {
-  justify-content: flex-end;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  padding-top: 0.75rem;
-}
-
-.toolbar-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: rgba(255, 255, 255, 0.5);
-  min-width: 70px;
-}
-
-.toolbar-tabs {
-  display: flex;
-  gap: 0.25rem;
-}
+.toolbar-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+.toolbar-actions { justify-content: flex-end; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 0.75rem; }
+.toolbar-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255, 255, 255, 0.5); min-width: 70px; }
+.toolbar-tabs { display: flex; gap: 0.25rem; }
 
 .toolbar-tab {
   padding: 0.35rem 0.75rem;
@@ -999,15 +802,8 @@ html.entering-prev .collections-page {
   transition: all 0.15s;
 }
 
-.toolbar-tab:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.toolbar-tab.active {
-  background: rgba(99, 102, 241, 0.4);
-  border-color: rgba(99, 102, 241, 0.7);
-  color: #fff;
-}
+.toolbar-tab:hover { background: rgba(255, 255, 255, 0.1); }
+.toolbar-tab.active { background: rgba(99, 102, 241, 0.4); border-color: rgba(99, 102, 241, 0.7); color: #fff; }
 
 .toolbar-select {
   padding: 0.35rem 0.75rem;
@@ -1018,29 +814,10 @@ html.entering-prev .collections-page {
   font-size: 0.875rem;
 }
 
-.toolbar-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.75);
-  cursor: pointer;
-}
+.toolbar-checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; color: rgba(255, 255, 255, 0.75); cursor: pointer; }
+.toolbar-hint { font-size: 0.75rem; color: rgba(255, 255, 255, 0.45); font-style: italic; }
 
-.toolbar-hint {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.45);
-  font-style: italic;
-}
-
-/* ---- Custom section editor ---- */
-
-.section-editor {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  margin-top: 0.5rem;
-}
+.section-editor { display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem; }
 
 .section-editor__section {
   background: rgba(255, 255, 255, 0.03);
@@ -1049,11 +826,7 @@ html.entering-prev .collections-page {
   padding: 0.75rem;
 }
 
-.section-editor__header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+.section-editor__header { display: flex; align-items: center; gap: 0.5rem; }
 
 .section-editor__title-input {
   flex: 1;
@@ -1079,11 +852,7 @@ html.entering-prev .collections-page {
   font-family: inherit;
 }
 
-.section-editor__counter {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
-  margin-left: 0.25rem;
-}
+.section-editor__counter { font-size: 0.7rem; color: rgba(255, 255, 255, 0.35); margin-left: 0.25rem; }
 
 .section-editor__remove {
   background: transparent;
@@ -1095,23 +864,10 @@ html.entering-prev .collections-page {
   font-size: 0.9rem;
 }
 
-.section-editor__remove:hover:not(:disabled) {
-  background: rgba(255, 80, 80, 0.2);
-  color: #ff8888;
-}
+.section-editor__remove:hover:not(:disabled) { background: rgba(255, 80, 80, 0.2); color: #ff8888; }
+.section-editor__remove:disabled { opacity: 0.3; cursor: not-allowed; }
 
-.section-editor__remove:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.section-editor__grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-  min-height: 40px;
-}
+.section-editor__grid { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; min-height: 40px; }
 
 .section-editor__chip {
   display: flex;
@@ -1125,23 +881,9 @@ html.entering-prev .collections-page {
   color: rgba(255, 255, 255, 0.8);
 }
 
-.section-editor__chip img {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  object-fit: cover;
-}
-
-.section-editor__chip-name {
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.section-editor__card-wrap {
-  position: relative;
-}
+.section-editor__chip img { width: 28px; height: 28px; border-radius: 4px; object-fit: cover; }
+.section-editor__chip-name { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.section-editor__card-wrap { position: relative; }
 
 .section-editor__card-remove {
   position: absolute;
@@ -1160,26 +902,10 @@ html.entering-prev .collections-page {
   justify-content: center;
 }
 
-.section-editor__card-wrap:hover .section-editor__card-remove {
-  display: flex;
-}
-
-.section-editor__empty {
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.35);
-  font-style: italic;
-  margin: 0.5rem 0;
-}
-
-.section-editor__picker {
-  margin-top: 0.5rem;
-}
-
-.section-editor__picker summary {
-  cursor: pointer;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
-}
+.section-editor__card-wrap:hover .section-editor__card-remove { display: flex; }
+.section-editor__empty { font-size: 0.8rem; color: rgba(255, 255, 255, 0.35); font-style: italic; margin: 0.5rem 0; }
+.section-editor__picker { margin-top: 0.5rem; }
+.section-editor__picker summary { cursor: pointer; font-size: 0.8rem; color: rgba(255, 255, 255, 0.6); }
 
 .section-editor__picker-grid {
   display: flex;
@@ -1204,11 +930,7 @@ html.entering-prev .collections-page {
   padding: 0;
 }
 
-.section-editor__picker-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+.section-editor__picker-item img { width: 100%; height: 100%; object-fit: cover; }
 
 .section-editor__add {
   padding: 0.5rem 1rem;
@@ -1221,27 +943,11 @@ html.entering-prev .collections-page {
   align-self: flex-start;
 }
 
-.section-editor__add:hover {
-  background: rgba(255, 255, 255, 0.05);
-}
+.section-editor__add:hover { background: rgba(255, 255, 255, 0.05); }
+.section-editor__warning { color: rgba(255, 160, 60, 0.9); font-size: 0.8rem; margin: 0; }
 
-.section-editor__warning {
-  color: rgba(255, 160, 60, 0.9);
-  font-size: 0.8rem;
-  margin: 0;
-}
-
-/* ---- Rename modal ---- */
-
-.collection-edit-btn--rename {
-  background: rgba(99, 102, 241, 0.35);
-  border-color: rgba(99, 102, 241, 0.7);
-  color: #fff;
-}
-
-.collection-edit-btn--rename:hover:not(:disabled) {
-  background: rgba(99, 102, 241, 0.55);
-}
+.collection-edit-btn--rename { background: rgba(99, 102, 241, 0.35); border-color: rgba(99, 102, 241, 0.7); color: #fff; }
+.collection-edit-btn--rename:hover:not(:disabled) { background: rgba(99, 102, 241, 0.55); }
 
 .rename-modal-overlay {
   position: fixed;
@@ -1268,19 +974,8 @@ html.entering-prev .collections-page {
   gap: 1rem;
 }
 
-.rename-modal h2 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  margin: 0;
-}
-
-.rename-modal__label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
-}
+.rename-modal h2 { font-size: 1.25rem; font-weight: 700; margin: 0; }
+.rename-modal__label { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.85rem; color: rgba(255, 255, 255, 0.7); }
 
 .rename-modal__input {
   padding: 0.55rem 0.75rem;
@@ -1291,24 +986,9 @@ html.entering-prev .collections-page {
   font-size: 0.95rem;
 }
 
-.rename-modal__counter {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.35);
-  align-self: flex-end;
-}
-
-.rename-modal__hint {
-  font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.rename-modal__hint code,
-.rename-modal__warning code {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.1rem 0.35rem;
-  border-radius: 0.25rem;
-  font-size: 0.85em;
-}
+.rename-modal__counter { font-size: 0.7rem; color: rgba(255, 255, 255, 0.35); align-self: flex-end; }
+.rename-modal__hint { font-size: 0.75rem; color: rgba(255, 255, 255, 0.5); }
+.rename-modal__hint code, .rename-modal__warning code { background: rgba(255, 255, 255, 0.1); padding: 0.1rem 0.35rem; border-radius: 0.25rem; font-size: 0.85em; }
 
 .rename-modal__warning {
   font-size: 0.8rem;
@@ -1330,10 +1010,4 @@ html.entering-prev .collections-page {
   margin: 0;
 }
 
-.rename-modal__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
+.rename-modal__actions { display: flex; justify-content: flex-end; gap: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); }
