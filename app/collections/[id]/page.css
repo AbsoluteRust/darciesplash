@@ -16,6 +16,10 @@ body::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
+/* 
+  Match the background to the darkest color of the shaders. 
+  This way, when the URL bar hides and reveals a gap, it blends in.
+*/
 body {
   background-color: #050510;
 }
@@ -45,16 +49,15 @@ body {
 }
 
 /* 
-  THE BLACK BAR FIX:
-  We keep 100lvh as the baseline, but on mobile we render it 130% tall.
-  This covers the URL bar and rubber-band gap easily.
+  Backgrounds: Using 100vh aligns perfectly with the screen and prevents 
+  the WebGL camera from panning upwards towards the clock.
 */
 .iridescence-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100lvh;
+  height: 100vh;
   z-index: 0;
   pointer-events: none;
 }
@@ -64,18 +67,11 @@ body {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100lvh;
+  height: 100vh;
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
   background-color: #1B152F;
-}
-
-@media (max-width: 1024px) {
-  .iridescence-container,
-  .madolche-bg {
-    height: 130lvh;
-  }
 }
 
 .madolche-bg > * {
@@ -86,7 +82,7 @@ body {
   pointer-events: none;
 }
 
-/* Force the WebGL canvas to stretch and cover the new 130lvh height */
+/* Force the WebGL canvas to stretch perfectly */
 .iridescence-container canvas,
 .madolche-bg canvas {
   width: 100% !important;
@@ -95,24 +91,18 @@ body {
 }
 
 /* 
-  THE POP-IN FIX:
-  Force the card wrapper to be a single, solid GPU layer.
-  This stops iOS from breaking it into background, then text, then image.
+  POP-IN FIX: 
+  Removed the forced GPU layers (translateZ) here. Forcing 20+ cards onto 
+  their own GPU layers causes iOS to run out of memory and paint them in chunks. 
+  Reserving the space is enough.
 */
 .lazy-mount {
   width: 100%;
   aspect-ratio: 0.718;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 .pc-card-wrapper {
   width: 100%;
-  transform: translate3d(0, 0, 0);
-  -webkit-transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  isolation: isolate;
 }
 
 .card-grid {

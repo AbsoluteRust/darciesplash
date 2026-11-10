@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export default function LazyMount({
   children,
-  rootMargin = '1500px',
+  rootMargin = '2000px',
   className = '',
 }: {
   children: ReactNode;
