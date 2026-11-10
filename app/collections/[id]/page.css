@@ -16,8 +16,7 @@ body::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
-/* Set a dark fallback background so if the browser bounces, it matches 
-   the shader's darkest colors instead of flashing grey or white. */
+/* Add a solid fallback color so iOS bounce doesn't flash grey/white */
 body {
   background-color: #050510;
 }
@@ -25,7 +24,6 @@ body {
 .collections-page {
   position: relative;
   min-height: 100vh;
-  z-index: 1;
 }
 
 .collections-page::-webkit-scrollbar {
@@ -46,18 +44,55 @@ body {
 }
 
 /* 
-  Over-extend the backgrounds to 150lvh and center them. 
-  This guarantees the shader covers the screen even when the iOS URL bar 
-  hides or the page bounces (rubber bands).
+  Revert to 100lvh to keep the WebGL renderer happy.
+  Add GPU promotion (translate3d) so iOS Safari doesn't clip it.
+  Add a fallback background color so any gaps match the theme.
 */
 .iridescence-container {
   position: fixed;
-  top: -25lvh;
-  left: 0;
+  inset: 0;
   width: 100vw;
-  height: 150lvh;
+  height: 100vh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
+  background-color: #050510; 
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.madolche-bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100lvh;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #1B152F; /* Dark purple fallback */
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.madolche-bg > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Force the canvas to stretch perfectly inside the fixed container */
+.iridescence-container canvas,
+.madolche-bg canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
 }
 
 .remix-modal-stack {
@@ -80,41 +115,10 @@ body {
   margin-bottom: 60px;
 }
 
-.madolche-bg {
-  position: fixed;
-  top: -25lvh;
-  left: 0;
-  width: 100vw;
-  height: 150lvh;
-  overflow: hidden;
-  z-index: 0;
-  pointer-events: none;
-}
-
-.madolche-bg > * {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
 /* 
-  Force the WebGL canvas to physically stretch to fill the 150lvh container.
-  This prevents the black bar that happens when the library's inline height 
-  doesn't update fast enough during an iOS viewport resize.
-*/
-.iridescence-container canvas,
-.madolche-bg canvas {
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover;
-  display: block;
-}
-
-/* 
-  Reserve the exact space the card will take and force GPU rasterization.
-  This is the fix that stopped the progressive pop-in effect on iOS.
+  THE POP-IN FIX: 
+  Reserve the exact space and force GPU rasterization so iOS paints 
+  the entire card as one solid block instead of piece by piece.
 */
 .lazy-mount {
   width: 100%;
@@ -129,6 +133,8 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 32px;
+  /* Prevent layout thrashing across the grid */
+  contain: layout;
 }
 
 .grid-container {
@@ -136,6 +142,11 @@ body {
   max-width: 1600px;
   margin: 0 auto;
   padding: 40px 0;
+}
+
+.collection-section {
+  margin-bottom: 2.5rem;
+  contain: layout;
 }
 
 @media (max-width: 1200px) {
@@ -251,6 +262,7 @@ body {
 
   overflow-y: auto;
   overflow-x: hidden;
+  contain: paint;
 }
 
 .emote-modal-overlay::-webkit-scrollbar {
@@ -428,7 +440,7 @@ html.entering-prev .collections-page {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* On touch devices, animate opacity only to prevent compositor layer overload */
+/* On touch devices, fade only to keep layers light */
 @media (hover: none) and (pointer: coarse) {
   .lazy-mount--visible {
     animation: lazyMountFadeInTouch 320ms ease-out both;
@@ -561,6 +573,7 @@ html.entering-prev .collections-page {
   gap: 10px;
   max-height: 72vh;
   overflow: hidden;
+  contain: paint;
 }
 
 @media (min-width: 1200px) {
@@ -664,6 +677,7 @@ html.entering-prev .collections-page {
   gap: 10px;
   max-height: 72vh;
   overflow: hidden;
+  contain: paint;
 }
 
 @media (min-width: 1200px) {
@@ -710,6 +724,7 @@ html.entering-prev .collections-page {
   padding: 40px;
   cursor: zoom-out;
   animation: fadeIn 180ms ease-out;
+  contain: paint;
 }
 
 .chroma-lightbox__inner {
@@ -909,10 +924,6 @@ html.entering-prev .collections-page {
 }
 
 /* ---- Section headers (viewer + edit preview) ---- */
-
-.collection-section {
-  margin-bottom: 2.5rem;
-}
 
 .collection-section-header {
   margin-bottom: 1rem;
@@ -1325,21 +1336,4 @@ html.entering-prev .collections-page {
   gap: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* ============================================================
-   Performance containment
-   ============================================================ */
-
-.emote-modal-overlay {
-  contain: paint;
-}
-
-.related-panel,
-.chroma-panel {
-  contain: paint;
-}
-
-.chroma-lightbox {
-  contain: paint;
 }

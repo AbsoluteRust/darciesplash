@@ -118,7 +118,6 @@ const ProfileCardComponent = ({
   const wrapRef = useRef(null);
   const shellRef = useRef(null);
 
-  // Cache shell dimensions to avoid forced layout reads during rAF
   const dimsRef = useRef({ w: 1, h: 1 });
 
   const enterTimerRef = useRef(null);
@@ -134,7 +133,6 @@ const ProfileCardComponent = ({
   const SHOW_BADGE = rarity && rarity !== 'Common';
   const isEmoteLike = title !== 'Mobile Wallpaper' && title !== 'Splash Art';
 
-  // ---- Cache shell dimensions ----
   useEffect(() => {
     const shell = shellRef.current;
     if (!shell) return;
