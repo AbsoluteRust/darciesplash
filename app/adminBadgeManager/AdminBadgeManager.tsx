@@ -269,21 +269,30 @@ export default function AdminBadgeManager() {
         <div className="mt-12 mb-4">
           <h2 className="text-2xl font-black text-white">Achievement Badges</h2>
           <p className="text-white/50 text-sm mt-1">
-            Customize the icons and names shown on the Achievements tab. Leave blank to use defaults.
+            Customize the icons, names, and highlight colors for achievements. Leave the color blank to inherit the achievement's rarity color from the game.
           </p>
         </div>
 
         <div className="grid gap-4">
           {ACHIEVEMENT_KEYS.map((ach) => {
             const current = overrides[ach.id] || {};
+            const hasColorOverride = typeof current.color === 'string' && current.color.length > 0;
             return (
               <div key={ach.id} className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <div className="flex flex-col md:flex-row gap-4 items-center">
-                  <div className="w-16 h-16 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center text-3xl">
+                  <div
+                    className="w-16 h-16 shrink-0 rounded-2xl flex items-center justify-center text-3xl border"
+                    style={{
+                      background: hasColorOverride
+                        ? `linear-gradient(135deg, ${current.color}33, ${current.color}1a)`
+                        : undefined,
+                      borderColor: hasColorOverride ? `${current.color}4d` : undefined,
+                    }}
+                  >
                     {renderIconPreview(current.iconUrl, ach.defaultIcon)}
                   </div>
 
-                  <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-bold text-white/50 uppercase mb-1">Display Name</label>
                       <input
@@ -319,10 +328,39 @@ export default function AdminBadgeManager() {
                         className="w-full bg-black/50 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm"
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white/50 uppercase mb-1">Highlight Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={hasColorOverride ? current.color : '#6366f1'}
+                          onChange={(e) => handleChange(ach.id, 'color', e.target.value)}
+                          className="w-12 h-10 shrink-0 bg-black/50 border border-white/20 rounded-lg cursor-pointer p-1"
+                          title="Pick a highlight color"
+                        />
+                        <input
+                          type="text"
+                          value={current.color ?? ''}
+                          onChange={(e) => handleChange(ach.id, 'color', e.target.value)}
+                          placeholder="Inherit rarity color"
+                          className="flex-1 min-w-0 bg-black/50 border border-white/20 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 font-mono"
+                        />
+                        {hasColorOverride && (
+                          <button
+                            onClick={() => handleChange(ach.id, 'color', '')}
+                            className="px-2 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition shrink-0"
+                            title="Clear override, inherit rarity color"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="text-xs text-white/25 mt-3 pl-1">
                   Key: <code className="text-white/40">{ach.id}</code>
+                  {!hasColorOverride && <span className="ml-3 text-white/30">· Highlight inherits the rarity color from the game</span>}
                 </div>
               </div>
             );

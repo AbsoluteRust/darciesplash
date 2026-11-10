@@ -147,6 +147,7 @@ export async function GET(
         label: a.label,
         rarity: a.tier,
         emoji: a.emoji,
+        color: a.color || null,
         unlocked: !!a.unlocked,
       }));
     } else {

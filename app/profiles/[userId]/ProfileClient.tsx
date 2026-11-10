@@ -62,6 +62,8 @@ type CardData = {
   contraband?: boolean;
 };
 
+const DEFAULT_HIGHLIGHT = '#6366f1';
+
 function formatSubTime(months: number) {
   if (months < 12) return `${months} Month${months === 1 ? '' : 's'}`;
   const years = Math.floor(months / 12);
@@ -210,6 +212,11 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const lockedAchievements = data.achievements?.filter(a => !a.unlocked) || [];
   const featuredAchievement = unlockedAchievements.find(a => a.id === data.featuredBadgeId);
 
+  const getHighlightColor = (ach: any): string =>
+    data.badgeOverrides?.[ach.id]?.color || ach.color || DEFAULT_HIGHLIGHT;
+
+  const featuredColor = featuredAchievement ? getHighlightColor(featuredAchievement) : DEFAULT_HIGHLIGHT;
+
   return (
     <div className="flex flex-col gap-8 w-full">
       <style dangerouslySetInnerHTML={{__html: `
@@ -259,7 +266,14 @@ export default function ProfileClient({ userId }: { userId: string }) {
               
               {featuredAchievement && (
                 <div className="group relative flex items-center justify-center cursor-help hover:scale-110 transition-transform ml-2 border-l border-white/10 pl-4">
-                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/50 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                  <div
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-xl border flex items-center justify-center"
+                    style={{
+                      background: `linear-gradient(135deg, ${featuredColor}33, ${featuredColor}1a)`,
+                      borderColor: `${featuredColor}80`,
+                      boxShadow: `0 0 15px ${featuredColor}66`,
+                    }}
+                  >
                     <CustomBadgeIcon badgeKey={featuredAchievement.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-6 h-6 md:w-8 md:h-8" />
                   </div>
                   <span className="absolute -bottom-10 bg-black/90 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10 z-50">
@@ -441,14 +455,25 @@ export default function ProfileClient({ userId }: { userId: string }) {
                     {unlockedAchievements.map((ach) => {
                       const isFeatured = data.featuredBadgeId === ach.id;
                       const override = data.badgeOverrides?.[ach.id];
+                      const highlightColor = getHighlightColor(ach);
                       return (
-                        <div key={ach.id} className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex gap-4 items-center transition-all ${isFeatured ? 'border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.2)]' : 'border-white/10'}`}>
-                          <div className="w-14 h-14 shrink-0 bg-gradient-to-br from-indigo-500/20 to-pink-500/20 border border-indigo-500/30 rounded-2xl flex items-center justify-center shadow-inner">
+                        <div
+                          key={ach.id}
+                          className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex gap-4 items-center transition-all ${isFeatured ? '' : 'border-white/10'}`}
+                          style={isFeatured ? { borderColor: highlightColor, boxShadow: `0 0 20px ${highlightColor}33` } : undefined}
+                        >
+                          <div
+                            className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center shadow-inner"
+                            style={{
+                              background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                              borderColor: `${highlightColor}4d`,
+                            }}
+                          >
                             <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
-                            <p className="text-xs text-indigo-400 font-bold">{ach.rarity} Collector</p>
+                            <p className="text-xs font-bold" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
                           </div>
                           {isOwnProfile && (
                             <button
@@ -485,14 +510,21 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       <div className="flex flex-col gap-3 pt-2">
                         {lockedAchievements.map((ach) => {
                           const override = data.badgeOverrides?.[ach.id];
+                          const highlightColor = getHighlightColor(ach);
                           return (
                             <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-4 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
-                              <div className="w-14 h-14 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
+                              <div
+                                className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center"
+                                style={{
+                                  background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                                  borderColor: `${highlightColor}4d`,
+                                }}
+                              >
                                 <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
-                                <p className="text-xs text-white/40 font-bold mb-1">{ach.rarity} Collector</p>
+                                <p className="text-xs font-bold mb-1" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
                                 <p className="text-xs text-white/30">Locked</p>
                               </div>
                             </div>
