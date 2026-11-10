@@ -83,11 +83,13 @@ const MAJOR_ACTION_STARDUST = 6800;
 const STARDUST_WEEK_MAX = 660;
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 
-// Pack point caps and 2027 changes (mirror what the bot will enforce)
+// Pack point caps and 2027 changes (mirror lib/pack-points.js)
 const PACK_POINTS_CAP_BASE = 200_000;
 const PACK_POINTS_CAP_PREMIUM = 500_000;
 const PACK_POINT_MULTIPLIER_2027 = 1.5;
 const PACK_POINT_GUILD_2027 = 15_000;
+const PACK_COST_BASE = 10_000;
+const PACK_COST_2027 = 15_000;
 
 const STARDUST_TIERS = [
   { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
@@ -702,6 +704,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         </div>
                       </div>
                       <span className="text-sm font-black text-indigo-400">×{PACK_POINT_MULTIPLIER_2027}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold">$</div>
+                        <div>
+                          <p className="text-sm font-bold text-white">Pack Price</p>
+                          <p className="text-xs text-white/50">Increased</p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-black text-amber-400">
+                        {PACK_COST_BASE.toLocaleString()} → {PACK_COST_2027.toLocaleString()} pp
+                      </span>
                     </div>
                   </div>
 
