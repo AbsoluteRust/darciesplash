@@ -46,9 +46,7 @@ body {
 
 /* 
   CROSS-BROWSER BLACK BAR FIX:
-  We stack vh, dvh, and lvh. Safari picks lvh, Firefox picks dvh.
-  This guarantees the background covers the screen regardless of 
-  how the browser handles the URL bar.
+  Stacking vh, dvh, and lvh covers all browser interpretations of the URL bar.
 */
 .iridescence-container {
   position: fixed;
@@ -92,16 +90,11 @@ body {
 }
 
 /* 
-  FIREFOX POP-IN FIX:
-  content-visibility: auto tells Firefox to completely skip rendering
-  the card until it's right on the edge of the viewport, preventing
-  the chunk-by-chunk painting.
+  REVERTED: Removed content-visibility which was breaking the aspect-ratio.
 */
 .lazy-mount {
   width: 100%;
   aspect-ratio: 0.718;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 400px;
 }
 
 .pc-card-wrapper {
