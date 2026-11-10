@@ -171,19 +171,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
 
-      // Optimistic update for instant UI feedback
+      // Update the UI immediately and close the modal
       setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
       setIsEditingFavorites(false);
-
-      // Verify it actually persisted to the database
-      const verifyRes = await fetch(`/api/profiles/${userId}?t=${Date.now()}`, { cache: 'no-store' });
-      if (verifyRes.ok) {
-        const verifyData = await verifyRes.json();
-        if (!verifyData.favorites || verifyData.favorites.length !== newFavs.length) {
-          alert("Warning: Favorites did not persist to the database.");
-        }
-        setData(verifyData);
-      }
 
     } catch (err: any) {
       console.error("Failed to save favorites:", err);

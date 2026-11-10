@@ -58,7 +58,7 @@ export async function GET(
     loyalty,
   };
 
-  // 3. Fetch Emotes
+  // 3. Fetch Emote IDs from the bot's KV
   const guildEmotes = (await kv.get("guild_emotes")) || {};
   const emotes = {
     heart: guildEmotes["lilyHeart"]?.id || null,
@@ -68,16 +68,16 @@ export async function GET(
     love: guildEmotes["lilyLove"]?.id || null,
   };
 
-  // 4. Online Status
+  // 4. Check Online Status
   const heartbeats = (await kv.hgetall("user_heartbeats")) || {};
   const lastPing = Number(heartbeats[userId] || 0);
   const isOnline = Date.now() - lastPing < 120000;
 
-  // 5. Custom Color
+  // 5. Fetch custom color
   const userColors = (await kv.hgetall("user_profile_colors")) || {};
   const customColor = userColors[userId] || null;
 
-  // 6. Inventory & Stats
+  // 6. Fetch Inventory & Stats
   const inventory = (await kv.hgetall(`user_cards:${userId}`)) || {};
   const collectorPoints = Number(await kv.hget('user_scores', userId)) || 0;
   const packPoints = Number(await kv.hget('user_pack_points', userId)) || 0;
@@ -89,14 +89,14 @@ export async function GET(
     if (rawStreaks) streakSources = typeof rawStreaks === 'string' ? JSON.parse(rawStreaks) : rawStreaks;
   } catch {}
 
-  // 7. Fetch Favorites
+  // 7. Fetch Favorites (Handles both string and array formats)
   let favorites: string[] = [];
   try {
     const rawFavs = await kv.get(`user_favorites:${userId}`);
-    if (typeof rawFavs === 'string') {
-      favorites = JSON.parse(rawFavs);
-    } else if (Array.isArray(rawFavs)) {
+    if (Array.isArray(rawFavs)) {
       favorites = rawFavs;
+    } else if (typeof rawFavs === 'string') {
+      favorites = JSON.parse(rawFavs);
     }
   } catch (err) {
     console.error("[profiles API] Failed to parse favorites:", err);
