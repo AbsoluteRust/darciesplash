@@ -87,7 +87,6 @@
   border-radius: 12px;
   background: var(--lt-bg-90);
   border: 1px solid var(--lt-accent-20);
-  backdrop-filter: blur(12px);
 }
 
 .loyalty-progress-bar__text {
@@ -225,6 +224,8 @@
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
+  /* Isolate from rest of page layout */
+  contain: strict;
 }
 
 .loyalty-viewport.is-editing { cursor: crosshair; }
@@ -234,32 +235,26 @@
   outline-offset: -4px;
 }
 
-.loyalty-edge-fade {
+/* ---------- canvas ---------- */
+
+.loyalty-canvas {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 200px;
-  z-index: 5;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
   pointer-events: none;
+  z-index: 1;
 }
 
-.loyalty-edge-fade--left  { left: 0;  background: linear-gradient(to right, var(--lt-bg), transparent); }
-.loyalty-edge-fade--right { right: 0; background: linear-gradient(to left, var(--lt-bg), transparent); }
+/* ---------- world / stars ---------- */
 
 .loyalty-world {
   position: absolute;
   inset: 0;
+  z-index: 2;
   will-change: transform;
 }
-
-.loyalty-svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  display: block;
-}
-
-/* ---------- node ---------- */
 
 .loyalty-node {
   position: absolute;
@@ -273,6 +268,7 @@
   align-items: center;
   gap: 4px;
   font-family: inherit;
+  will-change: transform;
 }
 
 .loyalty-node__wrap {
@@ -280,10 +276,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s ease-out;
 }
 
-.loyalty-node:hover .loyalty-node__wrap { transform: scale(1.15); }
+.loyalty-node:hover .loyalty-node__wrap { transform: scale(1.12); }
 
 .loyalty-star-svg {
   position: absolute;
@@ -292,24 +288,12 @@
   height: 100%;
 }
 
-.loyalty-node.is-unlocked .loyalty-star-halo {
-  animation: loyaltyStarPulse 3s ease-in-out infinite;
-  transform-origin: center;
-  transform-box: fill-box;
-}
-
-@keyframes loyaltyStarPulse {
-  0%, 100% { opacity: 0.9; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.08); }
-}
-
-/* ---------- tier icon (emoji + emote) ---------- */
+/* ---------- tier icon ---------- */
 
 .loyalty-tier-icon-emoji,
 .loyalty-tier-icon-emote {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
@@ -319,6 +303,7 @@
   display: block;
   line-height: 1;
   text-align: center;
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.9);
 }
 
 .loyalty-tier-icon-emote {
@@ -328,7 +313,7 @@
 
 .loyalty-node.is-locked .loyalty-tier-icon-emoji,
 .loyalty-node.is-locked .loyalty-tier-icon-emote {
-  filter: grayscale(0.85) brightness(0.55) drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+  opacity: 0.45;
 }
 
 .loyalty-node__label {
@@ -373,6 +358,20 @@
 }
 
 .loyalty-node.is-editable:hover .loyalty-node__edit-badge { opacity: 1; }
+
+/* ---------- edge fades ---------- */
+
+.loyalty-edge-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 200px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.loyalty-edge-fade--left  { left: 0;  background: linear-gradient(to right, var(--lt-bg), transparent); }
+.loyalty-edge-fade--right { right: 0; background: linear-gradient(to left, var(--lt-bg), transparent); }
 
 /* ---------- hint ---------- */
 
@@ -661,9 +660,7 @@
   color: var(--lt-accent-text);
 }
 
-.loyalty-icon-section__input {
-  width: 100%;
-}
+.loyalty-icon-section__input { width: 100%; }
 
 /* ---------- emote picker ---------- */
 
@@ -728,9 +725,7 @@
   cursor: pointer;
 }
 
-.loyalty-emote-picker__clear:hover {
-  background: var(--lt-accent-18);
-}
+.loyalty-emote-picker__clear:hover { background: var(--lt-accent-18); }
 
 .loyalty-emote-picker__grid {
   display: grid;
@@ -783,13 +778,8 @@
   box-shadow: 0 0 0 2px var(--lt-accent-40);
 }
 
-.loyalty-emote-picker__item.is-ignored {
-  opacity: 0.45;
-}
-
-.loyalty-emote-picker__item.is-ignored:hover {
-  opacity: 0.9;
-}
+.loyalty-emote-picker__item.is-ignored { opacity: 0.45; }
+.loyalty-emote-picker__item.is-ignored:hover { opacity: 0.9; }
 
 .loyalty-emote-picker__empty {
   padding: 1rem;

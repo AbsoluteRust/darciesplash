@@ -23,6 +23,13 @@ const START_X = 2400;
 const END_X = 13600;
 const PADDING = 300;
 
+// How many points to sample along the visible portion of each wave.
+// Only the on-screen slice is drawn — no need for full-world density.
+const DECO_POINTS = 100;
+const MAIN_POINTS = 120;
+
+/* ---------- wave math ---------- */
+
 function mainStringY(x: number, t: number, height: number): number {
   const center = height / 2;
   const waveAmp = Math.min(50, height * 0.15);
@@ -46,15 +53,82 @@ function decoPathY(x: number, idx: number, t: number, height: number): number {
     + Math.sin(x / 180 + phase * 0.3 + t * speed * 0.8) * (amp * 0.2);
 }
 
-function buildPath(fn: (x: number) => number): string {
-  const step = WORLD_WIDTH / 200;
-  let d = '';
-  for (let i = 0; i <= 200; i++) {
-    const x = i * step;
-    d += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + fn(x).toFixed(1) + ' ';
+/* ---------- canvas helpers ---------- */
+
+function drawDecoWave(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  waveFn: (x: number) => number,
+  startX: number,
+  endX: number,
+  points: number,
+) {
+  const grad = ctx.createLinearGradient(0, 0, WORLD_WIDTH, 0);
+  grad.addColorStop(0,    hexToRgba(color, 0));
+  grad.addColorStop(0.15, hexToRgba(color, 0.14));
+  grad.addColorStop(0.5,  hexToRgba(color, 0.28));
+  grad.addColorStop(0.85, hexToRgba(color, 0.14));
+  grad.addColorStop(1,    hexToRgba(color, 0));
+
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = 0; i <= points; i++) {
+    const x = startX + (i / points) * (endX - startX);
+    const y = waveFn(x);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
   }
-  return d;
+  ctx.stroke();
 }
+
+function drawMainWave(
+  ctx: CanvasRenderingContext2D,
+  accent: string,
+  core: string,
+  waveFn: (x: number) => number,
+  startX: number,
+  endX: number,
+  points: number,
+) {
+  const grad = ctx.createLinearGradient(0, 0, WORLD_WIDTH, 0);
+  grad.addColorStop(0,    hexToRgba(accent, 0));
+  grad.addColorStop(0.10, hexToRgba(accent, 0.35));
+  grad.addColorStop(0.50, hexToRgba(core,   0.9));
+  grad.addColorStop(0.90, hexToRgba(accent, 0.35));
+  grad.addColorStop(1,    hexToRgba(accent, 0));
+
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  ctx.beginPath();
+  for (let i = 0; i <= points; i++) {
+    const x = startX + (i / points) * (endX - startX);
+    const y = waveFn(x);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+
+  // Glow pass — wide and dim
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 8;
+  ctx.globalAlpha = 0.22;
+  ctx.stroke();
+
+  // Mid pass — subtle halo
+  ctx.lineWidth = 4;
+  ctx.globalAlpha = 0.4;
+  ctx.stroke();
+
+  // Core pass — thin and bright
+  ctx.lineWidth = 2.5;
+  ctx.globalAlpha = 1;
+  ctx.stroke();
+}
+
+/* ---------- star tier helpers ---------- */
 
 function isMajorTier(tier: number): boolean {
   if (tier === 100) return true;
@@ -75,29 +149,43 @@ function starPalette(tier: number, unlocked: boolean, theme: LoyaltyTheme) {
     return {
       stroke: hexToRgba(theme.starLocked, 0.45),
       fill: hexToRgba(theme.starLocked, 0.15),
-      glow: hexToRgba(theme.starLocked, 0.1),
+      halo: 'transparent',
     };
   }
-  if (tier === 100)      return { stroke: hexToRgba(theme.starFinal, 0.98), fill: hexToRgba(theme.starFinal, 0.4), glow: hexToRgba(theme.starFinal, 0.9) };
-  if (isMajorTier(tier)) return { stroke: hexToRgba(theme.starMajor, 0.98), fill: hexToRgba(theme.starMajor, 0.28), glow: hexToRgba(theme.starMajor, 0.7) };
-  if (tier % 10 === 0)   return { stroke: hexToRgba(theme.starTen, 0.85), fill: hexToRgba(theme.starTen, 0.2), glow: hexToRgba(theme.starTen, 0.55) };
-  if (tier % 5 === 0)    return { stroke: hexToRgba(theme.starFive, 0.7), fill: hexToRgba(theme.starFive, 0.14), glow: hexToRgba(theme.starFive, 0.4) };
-  return { stroke: hexToRgba(theme.starRegular, 0.55), fill: hexToRgba(theme.starRegular, 0.1), glow: hexToRgba(theme.starRegular, 0.25) };
+  if (tier === 100) return {
+    stroke: hexToRgba(theme.starFinal, 0.98),
+    fill: hexToRgba(theme.starFinal, 0.4),
+    halo: hexToRgba(theme.starFinal, 0.28),
+  };
+  if (isMajorTier(tier)) return {
+    stroke: hexToRgba(theme.starMajor, 0.98),
+    fill: hexToRgba(theme.starMajor, 0.28),
+    halo: hexToRgba(theme.starMajor, 0.24),
+  };
+  if (tier % 10 === 0) return {
+    stroke: hexToRgba(theme.starTen, 0.85),
+    fill: hexToRgba(theme.starTen, 0.2),
+    halo: hexToRgba(theme.starTen, 0.18),
+  };
+  if (tier % 5 === 0) return {
+    stroke: hexToRgba(theme.starFive, 0.7),
+    fill: hexToRgba(theme.starFive, 0.14),
+    halo: hexToRgba(theme.starFive, 0.14),
+  };
+  return {
+    stroke: hexToRgba(theme.starRegular, 0.55),
+    fill: hexToRgba(theme.starRegular, 0.1),
+    halo: hexToRgba(theme.starRegular, 0.1),
+  };
 }
 
-function StarSVG({ tier, size, unlocked, theme }: { tier: number; size: number; unlocked: boolean; theme: LoyaltyTheme }) {
+function StarSVG({ tier, size, unlocked, theme }: {
+  tier: number; size: number; unlocked: boolean; theme: LoyaltyTheme;
+}) {
   const pal = starPalette(tier, unlocked, theme);
-  const haloId = `halo-t${tier}-${unlocked ? 'u' : 'l'}`;
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} className="loyalty-star-svg" aria-hidden="true">
-      <defs>
-        <radialGradient id={haloId} cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={pal.glow} stopOpacity="0.95" />
-          <stop offset="55%" stopColor={pal.glow} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={pal.glow} stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <circle cx="50" cy="50" r="48" fill={`url(#${haloId})`} className={unlocked ? 'loyalty-star-halo' : ''} />
+      {unlocked && <circle cx="50" cy="50" r="48" fill={pal.halo} />}
       <polygon
         points="50,8 62,40 96,40 68,60 79,93 50,74 21,93 32,60 4,40 38,40"
         fill={pal.fill}
@@ -109,7 +197,7 @@ function StarSVG({ tier, size, unlocked, theme }: { tier: number; size: number; 
   );
 }
 
-/* ---------- tier icon (emoji OR emote) ---------- */
+/* ---------- tier icon ---------- */
 
 function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
   const parsed = useMemo(() => parseTierIcon(icon), [icon]);
@@ -124,16 +212,15 @@ function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
         className="loyalty-tier-icon-emote"
         style={{ width: size, height: size }}
         draggable={false}
+        loading="lazy"
+        decoding="async"
       />
     );
   }
   if (parsed.type === 'emoji') {
     const size = Math.round(starSize * 0.32);
     return (
-      <span
-        className="loyalty-tier-icon-emoji"
-        style={{ fontSize: `${size}px` }}
-      >
+      <span className="loyalty-tier-icon-emoji" style={{ fontSize: `${size}px` }}>
         {parsed.value}
       </span>
     );
@@ -216,11 +303,7 @@ function EmotePicker({
           ))}
         </select>
         <label className="loyalty-emote-picker__toggle">
-          <input
-            type="checkbox"
-            checked={showIgnored}
-            onChange={e => setShowIgnored(e.target.checked)}
-          />
+          <input type="checkbox" checked={showIgnored} onChange={e => setShowIgnored(e.target.checked)} />
           Ignored
         </label>
         {selectedId && (
@@ -248,7 +331,7 @@ function EmotePicker({
                 onClick={() => onSelect(e)}
                 title={`:${e.name}:${e.guildName ? ` · ${e.guildName}` : ''}${e.collections.length ? ` · ${e.collections.join(', ')}` : ''}`}
               >
-                <img src={url} alt={e.name} draggable={false} />
+                <img src={url} alt={e.name} draggable={false} loading="lazy" decoding="async" />
               </button>
             );
           })}
@@ -281,7 +364,6 @@ function EditTierModal({
   onClose: () => void;
 }) {
   const initial = useMemo(() => parseTierIcon(tier.icon), [tier.icon]);
-
   const [iconMode, setIconMode] = useState<'emoji' | 'emote'>(
     initial.type === 'emote' ? 'emote' : 'emoji'
   );
@@ -293,7 +375,6 @@ function EditTierModal({
       ? buildEmoteMarkup(initial.id, initial.name, initial.animated)
       : ''
   );
-
   const [form, setForm] = useState({
     title: tier.title,
     description: tier.description,
@@ -311,14 +392,6 @@ function EditTierModal({
   }, [emoteValue]);
 
   const previewIcon = iconMode === 'emoji' ? emojiValue : emoteValue;
-
-  function handleEmoteSelect(e: EmoteInfo) {
-    setEmoteValue(buildEmoteMarkup(e.id, e.name, e.animated));
-  }
-
-  function handleEmoteClear() {
-    setEmoteValue('');
-  }
 
   function handleSave() {
     if (!form.title.trim()) return setError('Title is required');
@@ -340,7 +413,6 @@ function EditTierModal({
           <h2 className="loyalty-modal__title">Edit Tier {tier.tier}</h2>
 
           <div className="loyalty-form">
-            {/* ICON */}
             <div className="loyalty-icon-section">
               <div className="loyalty-icon-section__header">
                 <span>Icon</span>
@@ -368,7 +440,7 @@ function EditTierModal({
               {iconMode === 'emoji' ? (
                 <input
                   type="text"
-                  maxLength={4}
+                  maxLength={32}
                   value={emojiValue}
                   onChange={e => setEmojiValue(e.target.value)}
                   className="loyalty-field__icon loyalty-icon-section__input"
@@ -380,8 +452,8 @@ function EditTierModal({
                   collections={emoteData?.collections || []}
                   selectedId={selectedEmoteId}
                   loading={loadingEmotes}
-                  onSelect={handleEmoteSelect}
-                  onClear={handleEmoteClear}
+                  onSelect={e => setEmoteValue(buildEmoteMarkup(e.id, e.name, e.animated))}
+                  onClear={() => setEmoteValue('')}
                 />
               )}
             </div>
@@ -560,20 +632,25 @@ export default function LoyaltyClient({
   const [previewStardust, setPreviewStardust] = useState<number | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const panOffsetRef = useRef(panOffset);
-  const viewportHeightRef = useRef(600);
+  const viewportSizeRef = useRef(viewportSize);
   const dragRef = useRef({ dragging: false, startX: 0, startOffset: 0, moved: 0 });
   const frozenRef = useRef(false);
+  const themeRef = useRef(theme);
+  const activeTierRef = useRef<MergedTier | null>(null);
+  const editingRef = useRef<MergedTier | null>(null);
 
-  const mainPathRef = useRef<SVGPathElement>(null);
-  const decoPathRefs = useRef<(SVGPathElement | null)[]>([]);
   const nodeRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
+  const lastMainTRef = useRef(0);
 
   const cssVars = useMemo(() => themeCssVars(theme) as React.CSSProperties, [theme]);
-  const decoColors = useMemo(
-    () => [theme.deco1, theme.deco2, theme.deco3, theme.deco4, theme.deco5],
-    [theme]
-  );
+
+  useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+  useEffect(() => { viewportSizeRef.current = viewportSize; }, [viewportSize]);
+  useEffect(() => { themeRef.current = theme; }, [theme]);
+  useEffect(() => { activeTierRef.current = activeTier; }, [activeTier]);
+  useEffect(() => { editingRef.current = editing; }, [editing]);
 
   /* ---------- lock body scroll ---------- */
 
@@ -595,13 +672,14 @@ export default function LoyaltyClient({
     };
   }, []);
 
+  /* ---------- viewport tracking ---------- */
+
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
     const update = () => {
       const rect = el.getBoundingClientRect();
       setViewportSize({ width: rect.width, height: rect.height });
-      viewportHeightRef.current = rect.height;
     };
     update();
     const ro = new ResizeObserver(update);
@@ -609,7 +687,19 @@ export default function LoyaltyClient({
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => { panOffsetRef.current = panOffset; }, [panOffset]);
+  /* ---------- canvas size (only when viewport changes) ---------- */
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.floor(viewportSize.width * dpr));
+    const h = Math.max(1, Math.floor(viewportSize.height * dpr));
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+  }, [viewportSize.width, viewportSize.height]);
+
+  /* ---------- positions ---------- */
 
   const positioned = useMemo(() => {
     return tiers.map((t, i) => {
@@ -635,6 +725,8 @@ export default function LoyaltyClient({
 
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
+  const effectiveTierRef = useRef(effectiveTier);
+  useEffect(() => { effectiveTierRef.current = effectiveTier; }, [effectiveTier]);
 
   /* ---------- emote loading ---------- */
 
@@ -680,7 +772,7 @@ export default function LoyaltyClient({
     loadEmotes().catch(() => {});
   }, [loadEmotes]);
 
-  /* ---------- animation loop ---------- */
+  /* ---------- main render loop ---------- */
 
   useEffect(() => {
     let rafId = 0;
@@ -692,31 +784,73 @@ export default function LoyaltyClient({
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      const isFrozen = frozenRef.current || activeTier !== null || editing !== null;
+      const isFrozen =
+        frozenRef.current ||
+        activeTierRef.current !== null ||
+        editingRef.current !== null;
       if (!isFrozen) mainT += dt;
+      lastMainTRef.current = mainT;
 
       const decoT = (now - startTime) / 1000;
-      const height = viewportHeightRef.current;
+      const size = viewportSizeRef.current;
+      const pan = panOffsetRef.current;
+      const th = themeRef.current;
 
-      decoPathRefs.current.forEach((el, i) => {
-        if (el) el.setAttribute('d', buildPath(x => decoPathY(x, i, decoT, height)));
-      });
+      // ----- canvas strings -----
+      const canvas = canvasRef.current;
+      if (canvas && size.width > 0 && size.height > 0) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
 
-      if (mainPathRef.current) {
-        mainPathRef.current.setAttribute('d', buildPath(x => mainStringY(x, mainT, height)));
+          // Reset + clear
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // World-space transform: DPR scale + pan translate
+          ctx.setTransform(dpr, 0, 0, dpr, -pan * dpr, 0);
+
+          // Only draw the visible slice of the world
+          const buf = 80;
+          const startX = Math.max(0, pan - buf);
+          const endX = Math.min(WORLD_WIDTH, pan + size.width + buf);
+
+          const decoColors = [th.deco1, th.deco2, th.deco3, th.deco4, th.deco5];
+          for (let i = 0; i < 5; i++) {
+            drawDecoWave(
+              ctx,
+              decoColors[i],
+              (x) => decoPathY(x, i, decoT, size.height),
+              startX, endX, DECO_POINTS,
+            );
+          }
+
+          drawMainWave(
+            ctx,
+            th.accent,
+            th.stringMid,
+            (x) => mainStringY(x, mainT, size.height),
+            startX, endX, MAIN_POINTS,
+          );
+        }
       }
 
-      positionedRef.current.forEach(m => {
+      // ----- star positions -----
+      // Use transform (composited) instead of top (layout-triggering).
+      const list = positionedRef.current;
+      for (let i = 0; i < list.length; i++) {
+        const m = list[i];
         const el = nodeRefs.current.get(m.tier);
-        if (el) el.style.top = `${mainStringY(m.x, mainT, height)}px`;
-      });
+        if (!el) continue;
+        const y = mainStringY(m.x, mainT, size.height);
+        el.style.transform = `translate(-50%, calc(-50% + ${y}px))`;
+      }
 
       rafId = requestAnimationFrame(tick);
     };
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ---------- pan ---------- */
@@ -764,7 +898,6 @@ export default function LoyaltyClient({
     if (dragRef.current.moved > 5) return;
     if (adminMode) {
       setEditing(t);
-      // Prime the emote list so the picker has it ready
       loadEmotes().catch(() => {});
     } else {
       setActiveTier(t);
@@ -805,9 +938,7 @@ export default function LoyaltyClient({
     }
   }, [overrides, saveOverrides]);
 
-  const handleThemePreview = useCallback((next: LoyaltyTheme) => {
-    setTheme(next);
-  }, []);
+  const handleThemePreview = useCallback((next: LoyaltyTheme) => setTheme(next), []);
 
   const handleThemeOpen = useCallback(() => {
     setThemeSnapshot(theme);
@@ -868,7 +999,7 @@ export default function LoyaltyClient({
         {!trackActive && (
           <div className="loyalty-banner">
             <span className="loyalty-banner__icon">🌌</span>
-            <span>Loyalty progression begins <strong>January 1, 2027</strong>. The rewards and tiers you see here are a work in progress, you aren't meant to see this yet, so please don't share it either.</span>
+            <span>Loyalty progression begins <strong>January 1, 2027</strong>. You can explore every tier and its reward now.</span>
           </div>
         )}
 
@@ -939,66 +1070,8 @@ export default function LoyaltyClient({
           role="region"
           aria-label="Loyalty tier track"
         >
-          <div className="loyalty-edge-fade loyalty-edge-fade--left" />
-          <div className="loyalty-edge-fade loyalty-edge-fade--right" />
-
+          <canvas ref={canvasRef} className="loyalty-canvas" />
           <div className="loyalty-world" style={{ transform: `translateX(${-panOffset}px)` }}>
-            <svg
-              className="loyalty-svg"
-              width={WORLD_WIDTH}
-              height={viewportSize.height}
-              viewBox={`0 0 ${WORLD_WIDTH} ${viewportSize.height}`}
-              aria-hidden="true"
-            >
-              <defs>
-                {decoColors.map((color, i) => (
-                  <linearGradient key={i} id={`deco-grad-${i}`} x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor={color} stopOpacity="0" />
-                    <stop offset="15%" stopColor={color} stopOpacity="0.14" />
-                    <stop offset="50%" stopColor={color} stopOpacity="0.3" />
-                    <stop offset="85%" stopColor={color} stopOpacity="0.14" />
-                    <stop offset="100%" stopColor={color} stopOpacity="0" />
-                  </linearGradient>
-                ))}
-                <linearGradient id="main-grad" x1="0" y1="0" x2={WORLD_WIDTH} y2="0" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stopColor={theme.accent} stopOpacity="0" />
-                  <stop offset="10%" stopColor={theme.accent} stopOpacity="0.35" />
-                  <stop offset="50%" stopColor={theme.stringMid} stopOpacity="0.85" />
-                  <stop offset="90%" stopColor={theme.accent} stopOpacity="0.35" />
-                  <stop offset="100%" stopColor={theme.accent} stopOpacity="0" />
-                </linearGradient>
-                <filter id="loyalty-glow">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
-                  <feMerge>
-                    <feMergeNode in="blur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-
-              {decoColors.map((_, i) => (
-                <path
-                  key={i}
-                  ref={el => { decoPathRefs.current[i] = el; }}
-                  fill="none"
-                  stroke={`url(#deco-grad-${i})`}
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ))}
-
-              <path
-                ref={mainPathRef}
-                fill="none"
-                stroke="url(#main-grad)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                filter="url(#loyalty-glow)"
-              />
-            </svg>
-
             {positioned.map(m => {
               const unlocked = m.tier <= effectiveTier;
               const size = starSize(m.tier);
@@ -1008,7 +1081,7 @@ export default function LoyaltyClient({
                   key={m.tier}
                   type="button"
                   className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
-                  style={{ left: m.x, top: mainStringY(m.x, 0, viewportSize.height), transform: 'translate(-50%, -50%)' }}
+                  style={{ left: m.x, top: 0, transform: 'translate(-50%, -50%)' }}
                   ref={el => {
                     if (el) nodeRefs.current.set(m.tier, el);
                     else nodeRefs.current.delete(m.tier);
@@ -1028,6 +1101,8 @@ export default function LoyaltyClient({
               );
             })}
           </div>
+          <div className="loyalty-edge-fade loyalty-edge-fade--left" />
+          <div className="loyalty-edge-fade loyalty-edge-fade--right" />
         </div>
 
         <div className="loyalty-hint">
