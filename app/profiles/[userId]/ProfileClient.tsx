@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
-import StandardCard from '@/components/StandardCard';
+import ProfileCard from '@/components/ProfileCard';
 import { COLLECTION_OWNERS } from '@/lib/collection-owners';
 
 type ProfileData = {
@@ -173,13 +173,39 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   return (
     <div className="flex flex-col gap-8 w-full">
-      {/* Injecting a small style block to force full colour on these specific cards */}
+      {/* 
+        This style block strips out all of the dark gradient overlays, tinting, 
+        and static backgrounds from the ProfileCard so the artwork is pure. 
+      */}
       <style dangerouslySetInnerHTML={{__html: `
-        .profile-commission-card .pc-card-wrapper,
-        .profile-commission-card .pc-card-shell,
         .profile-commission-card .pc-card {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+        }
+        .profile-commission-card .pc-inside,
+        .profile-commission-card .pc-avatar-content,
+        .profile-commission-card .pc-avatar-crop {
+          background: transparent !important;
           filter: none !important;
           -webkit-filter: none !important;
+          mix-blend-mode: normal !important;
+        }
+        .profile-commission-card .avatar {
+          filter: none !important;
+          -webkit-filter: none !important;
+          opacity: 1 !important;
+          mix-blend-mode: normal !important;
+        }
+        .profile-commission-card .pc-behind {
+          display: none !important; /* Removes the background glow */
+        }
+        .profile-commission-card .pc-shine,
+        .profile-commission-card .pc-glare {
+          display: none !important; /* Removes the shiny/glare overlays */
+        }
+        .profile-commission-card .pc-user-info {
+          display: none !important; /* Removes the extra user info footer */
         }
       `}} />
 
@@ -268,18 +294,25 @@ export default function ProfileClient({ userId }: { userId: string }) {
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                   {commissionedCards.map((card) => (
-                    <div key={card.name} className="w-full profile-commission-card">
-                      <StandardCard
+                    <div 
+                      key={card.name} 
+                      className="w-full profile-commission-card relative" 
+                      style={{ aspectRatio: '0.718' }} // Forces the height so the tilt animation works
+                    >
+                      <ProfileCard
                         name={card.name}
                         title={card.type}
-                        type={card.type}
-                        image={card.image}
-                        thumbUrl={card.thumbUrl}
-                        rarity={undefined} // <-- Removes Rarity Tier badge & border colour
-                        glow={card.glow}
-                        isPlay={false}
-                        enableTilt={true} // <-- Animations enabled
-                        onClick={() => {}} 
+                        handle={card.name.toLowerCase().replace(/\s+/g, "-")}
+                        status=""
+                        contactText=""
+                        avatarUrl={card.image} // Uses full image (allows .gif animation)
+                        rarity={undefined} // Removes the rarity badge & borders
+                        showUserInfo={false}
+                        enableTilt={true} // Re-enables animations
+                        enableMobileTilt={false}
+                        behindGlowEnabled={false} // Removes the glow
+                        innerGradient="none" // Removes the tint
+                        isModal={false}
                       />
                     </div>
                   ))}
