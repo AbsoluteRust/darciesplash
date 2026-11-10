@@ -1,4 +1,7 @@
+'use client';
+
 import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
+import { scheduleFit } from '@/lib/fit-text-scheduler';
 import './ProfileCard.css';
 
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
@@ -54,33 +57,13 @@ function useFitText(text, minFontSize = 10) {
     const el = ref.current;
     if (!el) return;
 
-    const fit = () => {
-      el.style.fontSize = '';
-      const natural = parseFloat(getComputedStyle(el).fontSize) || 0;
-      if (!natural) return;
+    // Enqueue with the shared scheduler. This batches layout reads/writes
+    // across all mounting cards so the browser does 2 forced syncs per
+    // BATCH instead of ~10 per card.
+    scheduleFit(el, minFontSize, () => {});
 
-      const available = el.clientWidth;
-      if (available === 0) return;
-
-      if (el.scrollWidth <= available) return;
-
-      let lo = minFontSize;
-      let hi = natural;
-      el.style.fontSize = `${lo}px`;
-      if (el.scrollWidth > available) return;
-
-      for (let i = 0; i < 8; i++) {
-        const mid = (lo + hi) / 2;
-        el.style.fontSize = `${mid}px`;
-        if (el.scrollWidth <= available) lo = mid;
-        else hi = mid;
-      }
-      el.style.fontSize = `${lo}px`;
-    };
-
-    fit();
-
-    const ro = new ResizeObserver(fit);
+    const fitNow = () => scheduleFit(el, minFontSize, () => {});
+    const ro = new ResizeObserver(fitNow);
     ro.observe(el);
     return () => ro.disconnect();
   }, [text, minFontSize]);
@@ -118,6 +101,11 @@ const ProfileCardComponent = ({
   const wrapRef = useRef(null);
   const shellRef = useRef(null);
 
+  // Cached dimensions. Reading `shell.clientWidth/clientHeight` every rAF
+  // frame during hover forces layout in Firefox. Cache them once, refresh
+  // only on resize.
+  const dimsRef = useRef({ w: 1, h: 1 });
+
   const enterTimerRef = useRef(null);
   const leaveRafRef = useRef(null);
 
@@ -130,6 +118,22 @@ const ProfileCardComponent = ({
     : '';
   const SHOW_BADGE = rarity && rarity !== 'Common';
   const isEmoteLike = title !== 'Mobile Wallpaper' && title !== 'Splash Art';
+
+  // ---- Cache shell dimensions ----
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    const update = () => {
+      dimsRef.current = {
+        w: shell.clientWidth || 1,
+        h: shell.clientHeight || 1,
+      };
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(shell);
+    return () => ro.disconnect();
+  }, []);
 
   const handleCopyEmote = useCallback(async (e) => {
     if (e) {
@@ -175,8 +179,9 @@ const ProfileCardComponent = ({
       const wrap = wrapRef.current;
       if (!shell || !wrap) return;
 
-      const width = shell.clientWidth || 1;
-      const height = shell.clientHeight || 1;
+      // ---- Use cached dims instead of forced layout reads ----
+      const width = dimsRef.current.w;
+      const height = dimsRef.current.h;
 
       const percentX = clamp((100 / width) * x);
       const percentY = clamp((100 / height) * y);
@@ -246,9 +251,7 @@ const ProfileCardComponent = ({
         start();
       },
       toCenter() {
-        const shell = shellRef.current;
-        if (!shell) return;
-        this.setTarget(shell.clientWidth / 2, shell.clientHeight / 2);
+        this.setTarget(dimsRef.current.w / 2, dimsRef.current.h / 2);
       },
       beginInitial(durationMs) {
         initialUntil = performance.now() + durationMs;
@@ -327,13 +330,13 @@ const ProfileCardComponent = ({
       const { beta, gamma } = event;
       if (beta == null || gamma == null) return;
 
-      const centerX = shell.clientWidth / 2;
-      const centerY = shell.clientHeight / 2;
-      const x = clamp(centerX + gamma * mobileTiltSensitivity, 0, shell.clientWidth);
+      const centerX = dimsRef.current.w / 2;
+      const centerY = dimsRef.current.h / 2;
+      const x = clamp(centerX + gamma * mobileTiltSensitivity, 0, dimsRef.current.w);
       const y = clamp(
         centerY + (beta - ANIMATION_CONFIG.DEVICE_BETA_OFFSET) * mobileTiltSensitivity,
         0,
-        shell.clientHeight
+        dimsRef.current.h
       );
 
       tiltEngine.setTarget(x, y);
@@ -374,7 +377,7 @@ const ProfileCardComponent = ({
     };
     shell.addEventListener('click', handleClick);
 
-    const initialX = (shell.clientWidth || 0) - ANIMATION_CONFIG.INITIAL_X_OFFSET;
+    const initialX = (dimsRef.current.w || 0) - ANIMATION_CONFIG.INITIAL_X_OFFSET;
     const initialY = ANIMATION_CONFIG.INITIAL_Y_OFFSET;
     tiltEngine.setImmediate(initialX, initialY);
     tiltEngine.toCenter();
