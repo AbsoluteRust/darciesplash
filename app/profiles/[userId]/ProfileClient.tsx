@@ -165,14 +165,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardNames: newFavs }),
       });
+
+      // Check if the server actually returned JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Server returned non-JSON response:", text);
+        throw new Error(`Server error (Status ${res.status}). The API route might be missing or crashed.`);
+      }
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP error ${res.status}`);
       }
-
-      const result = await res.json();
-      console.log("Save response from server:", result);
 
       // Update the UI immediately and close the modal
       setData(prev => prev ? { ...prev, favorites: newFavs } : prev);

@@ -7,35 +7,29 @@ export async function POST(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized: You must be logged in to save.' }, { status: 401 });
     }
 
     const body = await req.json().catch(() => ({}));
     const { cardNames } = body;
     
     if (!Array.isArray(cardNames)) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid payload format' }, { status: 400 });
     }
+    
     if (cardNames.length > 8) {
-      return NextResponse.json({ error: 'Max 8 cards allowed' }, { status: 400 });
+      return NextResponse.json({ error: 'You can only showcase up to 8 cards' }, { status: 400 });
     }
 
-    // Force both to string to ensure the key is identical to the GET route
     const userId = String(session.user.id);
     const key = `user_favorites:${userId}`;
     const payload = JSON.stringify(cardNames);
     
-    // Write to database
     await kv.set(key, payload);
     
-    // Verify what we just wrote
-    const verify = await kv.get(key);
-    console.log(`[favorites API] SAVED to ${key}:`, payload);
-    console.log(`[favorites API] VERIFIED:`, verify);
-
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, saved: cardNames });
   } catch (err: any) {
     console.error('[favorites API] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }

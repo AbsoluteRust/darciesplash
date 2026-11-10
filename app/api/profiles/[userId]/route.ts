@@ -11,6 +11,8 @@ export async function GET(
   const { userId: rawUserId } = await params;
   const userId = String(rawUserId);
 
+  // ... [Keep your userInfo, badges, kofi, emotes, heartbeats, colors code here] ...
+
   // 1. Fetch name & avatar from the Bot
   let userInfo = { name: "Unknown User", avatarUrl: "https://cdn.discordapp.com/embed/avatars/0.png" };
   try {
@@ -22,29 +24,23 @@ export async function GET(
     if (res.ok) userInfo = await res.json();
   } catch (err) {}
 
-  // 2. Fetch Badges & Roles from KV
   const rawBadges = (await kv.hgetall(`user_badges:${userId}`)) || {};
   const roles = (await kv.get(`account_roles:${userId}`)) || {};
-
   let loyalty: string[] = [];
   if (rawBadges.loyalty) {
     try {
       loyalty = typeof rawBadges.loyalty === "string" ? JSON.parse(rawBadges.loyalty) : rawBadges.loyalty;
     } catch {}
   }
-
   const manualSubMonths = Number(rawBadges.sub_months || 0);
-
+  
   let kofiSubMonths = 0;
   try {
     const botUrl = (process.env.PI_BOT_URL || "").replace(/\/$/, "");
-    const res = await fetch(
-      `${botUrl}/api/kofi/subscription?discordId=${encodeURIComponent(userId)}`,
-      {
-        headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
-        cache: "no-store",
-      }
-    );
+    const res = await fetch(`${botUrl}/api/kofi/subscription?discordId=${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` },
+      cache: "no-store",
+    });
     if (res.ok) {
       const data = await res.json();
       kofiSubMonths = Number(data?.months) || 0;
@@ -59,7 +55,6 @@ export async function GET(
     loyalty,
   };
 
-  // 3. Fetch Emote IDs from the bot's KV
   const guildEmotes = (await kv.get("guild_emotes")) || {};
   const emotes = {
     heart: guildEmotes["lilyHeart"]?.id || null,
@@ -69,16 +64,13 @@ export async function GET(
     love: guildEmotes["lilyLove"]?.id || null,
   };
 
-  // 4. Check Online Status
   const heartbeats = (await kv.hgetall("user_heartbeats")) || {};
   const lastPing = Number(heartbeats[userId] || 0);
   const isOnline = Date.now() - lastPing < 120000;
 
-  // 5. Fetch custom color
   const userColors = (await kv.hgetall("user_profile_colors")) || {};
   const customColor = userColors[userId] || null;
 
-  // 6. Fetch Inventory & Stats
   const inventory = (await kv.hgetall(`user_cards:${userId}`)) || {};
   const collectorPoints = Number(await kv.hget('user_scores', userId)) || 0;
   const packPoints = Number(await kv.hget('user_pack_points', userId)) || 0;
@@ -95,14 +87,9 @@ export async function GET(
   let favorites: string[] = [];
   try {
     const rawFavs = await kv.get(favKey);
-    console.log(`[profiles API] FETCHING FROM ${favKey}:`, rawFavs);
-    
     if (rawFavs) {
-      if (Array.isArray(rawFavs)) {
-        favorites = rawFavs;
-      } else if (typeof rawFavs === 'string') {
-        favorites = JSON.parse(rawFavs);
-      }
+      if (Array.isArray(rawFavs)) favorites = rawFavs;
+      else if (typeof rawFavs === 'string') favorites = JSON.parse(rawFavs);
     }
   } catch (err) {
     console.error("[profiles API] Failed to parse favorites:", err);
@@ -117,11 +104,6 @@ export async function GET(
     customColor,
     inventory,
     favorites,
-    stats: {
-      stardust,
-      collectorPoints,
-      packPoints,
-      streakSources,
-    }
+    stats: { stardust, collectorPoints, packPoints, streakSources }
   });
 }
