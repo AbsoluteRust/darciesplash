@@ -16,7 +16,7 @@ body::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
-/* Add a solid fallback color so iOS bounce doesn't flash grey/white */
+/* Fallback background to stop white/grey flashes */
 body {
   background-color: #050510;
 }
@@ -24,9 +24,9 @@ body {
 .collections-page {
   position: relative;
   min-height: 100vh;
-  /* Give a 20vh buffer at the bottom so cards don't stutter into the URL bar */
-  padding-bottom: 20vh;
   z-index: 1;
+  /* Prevent the browser from jumping when cards mount */
+  overflow-anchor: none;
 }
 
 .collections-page::-webkit-scrollbar {
@@ -47,19 +47,20 @@ body {
 }
 
 /* 
-  Revert to 100lvh to keep the WebGL renderer happy.
-  Add GPU promotion and a background color so gaps match the theme.
+  FIX 1: THE BLACK BAR
+  Instead of forcing a specific height (which iOS miscalculates during scroll),
+  we pin the background to the top and extend it 20vh BELOW the screen.
+  This guarantees the background covers the URL bar area.
 */
 .iridescence-container {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: -20vh; 
   width: 100vw;
-  height: 100vh;
-  height: 100lvh;
   z-index: 0;
   pointer-events: none;
-  background-color: #050510; 
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
@@ -70,13 +71,13 @@ body {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: -20vh;
   width: 100vw;
-  height: 100vh;
-  height: 100lvh;
   overflow: hidden;
   z-index: 0;
   pointer-events: none;
-  background-color: #1B152F; /* Dark purple fallback */
+  background-color: #1B152F;
   transform: translate3d(0, 0, 0);
   -webkit-transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
@@ -91,19 +92,18 @@ body {
   pointer-events: none;
 }
 
-/* Force the canvas to stretch perfectly inside the fixed container */
+/* Force WebGL canvas to stretch to fill the new -20vh expanded container */
 .iridescence-container canvas,
 .madolche-bg canvas {
   width: 100% !important;
   height: 100% !important;
-  object-fit: cover;
   display: block;
 }
 
 /* 
-  THE POP-IN FIX: 
-  Reserve the exact space and force GPU rasterization so iOS paints 
-  the entire card as one solid block instead of piece by piece.
+  FIX 2: THE POP-IN
+  Reserving the space and forcing a dedicated GPU layer so iOS
+  paints the entire card in one pass.
 */
 .lazy-mount {
   width: 100%;

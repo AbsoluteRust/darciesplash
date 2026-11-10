@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export default function LazyMount({
   children,
-  rootMargin = '600px',
+  /* FIX: Increased from 600px to 1500px to preload cards before the URL bar collapses */
+  rootMargin = '1500px',
   className = '',
 }: {
   children: ReactNode;
