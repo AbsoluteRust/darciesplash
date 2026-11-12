@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileCard from '@/components/ProfileCard';
+import PointsHelpTooltip from '@/components/PointsHelpTooltip';
 
 type StreakSource = {
   id: string;
@@ -613,7 +614,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
               </div>
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
                 <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-2">Collector Points</p>
-                <p className="text-4xl font-black text-white">{data.stats?.collectorPoints?.toLocaleString() || '0'}</p>
+                <PointsHelpTooltip kind="collector-points">
+                  <span className="text-4xl font-black text-white tabular-nums">{data.stats?.collectorPoints?.toLocaleString() || '0'}</span>
+                </PointsHelpTooltip>
               </div>
               <div className={`bg-[#0a0a14]/80 border rounded-3xl p-6 flex flex-col justify-between ${overCap ? 'border-amber-500/40' : 'border-white/10'}`}>
                 <div className="flex justify-between items-start mb-2">
@@ -623,7 +626,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   </span>
                 </div>
                 <div>
-                  <p className="text-4xl font-black text-white">{currentPackPoints.toLocaleString()}</p>
+                  <PointsHelpTooltip kind="pack-points">
+                    <span className="text-4xl font-black text-white tabular-nums">{currentPackPoints.toLocaleString()}</span>
+                  </PointsHelpTooltip>
                   <p className={`text-xs mt-1 ${overCap ? 'text-amber-400 font-bold' : 'text-white/40'}`}>
                     {overCap ? 'Over cap — spend to earn more' : `of ${packPointsCap.toLocaleString()}`}
                   </p>

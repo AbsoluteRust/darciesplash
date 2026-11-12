@@ -1,0 +1,190 @@
+/* components/PointsHelpTooltip.css */
+
+.phv-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.phv-value {
+  display: inline-block;
+}
+
+.phv-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  padding: 0;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.phv-trigger:hover,
+.phv-trigger:focus-visible,
+.phv-trigger[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.5);
+  outline: none;
+}
+
+.phv-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 340px;
+  max-width: min(340px, calc(100vw - 2rem));
+  background: rgba(18, 18, 24, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 0.85rem 0.95rem;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  text-align: left;
+  cursor: default;
+  animation: phv-fade-in 120ms ease-out;
+}
+
+@keyframes phv-fade-in {
+  from { opacity: 0; transform: translate(-50%, -4px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.phv-header {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.65);
+  margin-bottom: 0.7rem;
+}
+
+.phv-section { margin-top: 0.6rem; }
+.phv-section:first-of-type { margin-top: 0; }
+
+.phv-section__title {
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.25rem;
+  font-size: 0.82rem;
+}
+
+.phv-section__body { color: rgba(255, 255, 255, 0.75); }
+
+.phv-section__body code {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.78em;
+}
+
+.phv-section__body strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.phv-section__hint {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.phv-section--countdown {
+  padding: 0.6rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(120, 200, 255, 0.08);
+  border: 1px solid rgba(120, 200, 255, 0.18);
+}
+
+.phv-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+}
+
+.phv-countdown__label {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.phv-countdown__value {
+  font-family: ui-monospace, monospace;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #9ce0ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.phv-section--soon .phv-section__body {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.phv-rarity-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+}
+
+.phv-rarity-table td {
+  padding: 0.22rem 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.phv-rarity-table tr:last-child td { border-bottom: none; }
+
+.phv-rarity-table__emoji {
+  width: 1.5rem;
+  text-align: center;
+}
+
+.phv-rarity-table__name { color: rgba(255, 255, 255, 0.85); }
+
+.phv-rarity-table__value {
+  text-align: right;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Narrow screens: centre the tooltip over the viewport instead of the number. */
+@media (max-width: 480px) {
+  .phv-tooltip {
+    position: fixed;
+    left: 1rem;
+    right: 1rem;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: auto;
+    max-width: none;
+  }
+  @keyframes phv-fade-in {
+    from { opacity: 0; transform: translateY(calc(-50% - 4px)); }
+    to   { opacity: 1; transform: translateY(-50%); }
+  }
+}
