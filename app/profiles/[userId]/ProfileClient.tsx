@@ -82,16 +82,14 @@ type CardData = {
 };
 
 const DEFAULT_HIGHLIGHT = '#6366f1';
-const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1); // Jan 1 2027 00:00:00 UTC
+const STARDUST_FEATURE_START = Date.UTC(2027, 0, 1);
 const MAJOR_ACTION_STARDUST = 6800;
 const STARDUST_WEEK_MAX = 660;
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 
-// Pack point caps (mirror config.js)
 const PACK_POINTS_CAP_BASE = 200_000;
 const PACK_POINTS_CAP_PREMIUM = 500_000;
 
-// Rarity colors (mirror config.js RARITY_COLORS)
 const RARITY_COLORS: Record<string, string> = {
   Common:    '#9ca3af',
   Uncommon:  '#22c55e',
@@ -100,6 +98,19 @@ const RARITY_COLORS: Record<string, string> = {
   Legendary: '#eab308',
   Mythic:    '#ef4444',
   Contraband:'#000000',
+};
+
+// Mirrors the admin manager defaults so bars render even for untouched badges.
+const BADGE_TIER_UNITS: Record<string, { singular: string; plural: string }> = {
+  heart:  { singular: 'month',    plural: 'months' },
+  banana: { singular: 'referral', plural: 'referrals' },
+  gift:   { singular: 'gift',     plural: 'gifts' },
+};
+
+const DEFAULT_BADGE_THRESHOLDS: Record<string, number[]> = {
+  heart:  [1, 3, 6, 12],
+  banana: [1, 5, 10, 15],
+  gift:   [5, 10, 25, 50],
 };
 
 const STARDUST_TIERS = [
@@ -147,6 +158,155 @@ function formatCountdown(ms: number): string {
   return parts.join(' ');
 }
 
+function formatTierLabel(threshold: number, badgeKey: string): string {
+  const unit = BADGE_TIER_UNITS[badgeKey];
+  if (!unit) return String(threshold);
+  return `${threshold} ${threshold === 1 ? unit.singular : unit.plural}`;
+}
+
+function resolveTierList(
+  badgeKey: string,
+  overrides: Record<string, any> | undefined | null
+): { threshold: number; iconUrl: string }[] {
+  const custom = overrides?.[badgeKey];
+
+  if (Array.isArray(custom?.tiers) && custom.tiers.length > 0) {
+    const hasThresholds = custom.tiers.some((t: any) => typeof t.threshold === 'number');
+
+    if (hasThresholds) {
+      return custom.tiers
+        .filter((t: any) => typeof t.threshold === 'number')
+        .map((t: any) => ({
+          threshold: Number(t.threshold),
+          iconUrl: typeof t.iconUrl === 'string' ? t.iconUrl : '',
+        }))
+        .sort((a, b) => a.threshold - b.threshold);
+    }
+
+    // Legacy: `tiers: [{ iconUrl }]` from before thresholds existed. Seed
+    // thresholds from the badge's defaults so the bar still works.
+    const defaults = DEFAULT_BADGE_THRESHOLDS[badgeKey] || [];
+    return custom.tiers
+      .map((t: any, i: number) => ({
+        threshold: defaults[i] ?? i + 1,
+        iconUrl: typeof t.iconUrl === 'string' ? t.iconUrl : '',
+      }))
+      .sort((a, b) => a.threshold - b.threshold);
+  }
+
+  // Nothing customized yet — use the admin defaults.
+  return (DEFAULT_BADGE_THRESHOLDS[badgeKey] || []).map((n) => ({
+    threshold: n,
+    iconUrl: '',
+  }));
+}
+
+type TierProgress = {
+  count: number;
+  maxed: boolean;
+  nextThreshold: number | null;
+  nextIconUrl: string | null;
+};
+
+function computeTierProgress(
+  badgeKey: string,
+  count: number,
+  overrides: Record<string, any> | undefined | null
+): TierProgress | null {
+  const tiers = resolveTierList(badgeKey, overrides);
+  if (tiers.length === 0) return null;
+
+  const nextTier = tiers.find((t) => count < t.threshold) || null;
+  if (!nextTier) {
+    return { count, maxed: true, nextThreshold: null, nextIconUrl: null };
+  }
+  return {
+    count,
+    maxed: false,
+    nextThreshold: nextTier.threshold,
+    nextIconUrl: nextTier.iconUrl || null,
+  };
+}
+
+function resolveIconUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  const match = url.match(/<(a?):(\w+):(\d+)>/);
+  if (match) {
+    return `https://cdn.discordapp.com/emojis/${match[3]}.${match[1] === 'a' ? 'gif' : 'png'}`;
+  }
+  return null;
+}
+
+function BadgeProgress({
+  badgeKey,
+  count,
+  overrides,
+  dim = false,
+}: {
+  badgeKey: string;
+  count: number;
+  overrides: Record<string, any> | undefined | null;
+  dim?: boolean;
+}) {
+  const prog = computeTierProgress(badgeKey, count, overrides);
+  if (!prog) return null;
+
+  const nextLabel =
+    prog.maxed || prog.nextThreshold === null
+      ? null
+      : formatTierLabel(prog.nextThreshold, badgeKey);
+
+  const pct =
+    prog.maxed || prog.nextThreshold === null || prog.nextThreshold === 0
+      ? 100
+      : Math.min(100, (prog.count / prog.nextThreshold) * 100);
+
+  const nextIconSrc = resolveIconUrl(prog.nextIconUrl);
+
+  return (
+    <div className={`mt-3 pt-3 border-t ${dim ? 'border-white/5' : 'border-white/10'}`}>
+      {prog.maxed ? (
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-white/40 font-bold">All tiers unlocked</span>
+          <span className="text-indigo-400 font-bold">★ Maxed</span>
+        </div>
+      ) : (
+        <>
+          <div className="flex justify-between items-center text-xs mb-1.5 gap-2">
+            <span className="text-white/60 font-bold tabular-nums">
+              {prog.count} / {prog.nextThreshold}
+            </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              {nextIconSrc && (
+                <img
+                  src={nextIconSrc}
+                  alt=""
+                  className="w-4 h-4 object-contain opacity-70 shrink-0"
+                  draggable={false}
+                />
+              )}
+              <span className="font-bold text-indigo-400 truncate">
+                → {nextLabel}
+              </span>
+            </div>
+          </div>
+          <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct}%`,
+                background: '#6366f1',
+                boxShadow: '0 0 8px rgba(99,102,241,0.4)',
+              }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CustomBadgeIcon({ 
   badgeKey, 
   progress,
@@ -165,16 +325,31 @@ function CustomBadgeIcon({
   const custom = overrides?.[badgeKey];
   
   let iconUrl = null;
-  if (custom?.tiers && progress !== undefined) {
-    const thresholds = [1, 3, 6, 12, 24, 36, 60]; 
-    let activeTierIdx = -1;
-    for (let i = 0; i < thresholds.length; i++) {
-      if (progress >= thresholds[i] && custom.tiers[i]?.iconUrl) {
-        activeTierIdx = i;
+
+  if (Array.isArray(custom?.tiers) && custom.tiers.length > 0 && progress !== undefined) {
+    const tiers = custom.tiers as { threshold?: number; iconUrl?: string }[];
+    const hasThresholds = tiers.some(t => typeof t.threshold === 'number');
+
+    if (hasThresholds) {
+      let chosen: { threshold: number; iconUrl: string } | null = null;
+      for (const t of tiers) {
+        if (typeof t.threshold !== 'number' || !t.iconUrl) continue;
+        if (progress >= t.threshold) {
+          if (!chosen || t.threshold > chosen.threshold) {
+            chosen = { threshold: t.threshold, iconUrl: t.iconUrl };
+          }
+        }
       }
-    }
-    if (activeTierIdx !== -1) {
-      iconUrl = custom.tiers[activeTierIdx].iconUrl;
+      if (chosen) iconUrl = chosen.iconUrl;
+    } else {
+      const thresholds = [1, 3, 6, 12, 24, 36, 60];
+      let activeTierIdx = -1;
+      for (let i = 0; i < thresholds.length; i++) {
+        if (progress >= thresholds[i] && tiers[i]?.iconUrl) {
+          activeTierIdx = i;
+        }
+      }
+      if (activeTierIdx !== -1) iconUrl = tiers[activeTierIdx].iconUrl;
     }
   }
 
@@ -262,7 +437,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const tierCount = Math.floor(streakScore / 1000);
   const currentProgress = streakScore % 1000;
 
-  // --- Pack point cap ---
   const isCommissioner = data.badges?.isCommissioner ?? false;
   const isDarsubscribbler = data.isDarsubscribbler ?? false;
   const hasIncreasedCap = isCommissioner || isDarsubscribbler;
@@ -270,7 +444,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const currentPackPoints = data.stats?.packPoints ?? 0;
   const overCap = currentPackPoints > packPointsCap;
 
-  // --- Stardust weekly ---
   const stardustWeek = data.stats?.stardustWeek || null;
   const featureStartsAt = stardustWeek?.featureStartsAt ?? STARDUST_FEATURE_START;
   const stardustActive = (stardustWeek?.active ?? false) && now >= featureStartsAt;
@@ -280,7 +453,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const weekPuzzles = stardustWeek?.puzzles ?? 0;
   const weekEarned = stardustWeek?.weekEarned ?? 0;
 
-  // --- BADGE LOGIC ---
   const earnedBadges: any[] = [];
   const lockedBadges: any[] = [];
 
@@ -300,7 +472,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
     earnedBadges.push({ key: 'love', progress: 1, title: `${year} Loyalty Card`, label: 'Loyalty', defaultEmote: data.emotes?.love, fallback: '💜' });
   });
   
-  // --- ACHIEVEMENT LOGIC ---
   const unlockedAchievements = data.achievements?.filter(a => a.unlocked) || [];
   const lockedAchievements = data.achievements?.filter(a => !a.unlocked) || [];
   const featuredAchievement = unlockedAchievements.find(a => a.id === data.featuredBadgeId);
@@ -310,9 +481,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   const featuredColor = featuredAchievement ? getHighlightColor(featuredAchievement) : DEFAULT_HIGHLIGHT;
 
-  // Progress bar block — shared between unlocked and locked cards.
-  // Bar fill uses the color of the tier being worked toward, so a Rare-bound bar
-  // is blue even when the achievement's current tier is Uncommon (green).
   const renderProgressBar = (ach: any, dim = false) => {
     const prog: AchievementProgress | null = ach.progress;
     if (!prog || !prog.nextTier || prog.target === 0) return null;
@@ -352,7 +520,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
         }
       `}} />
 
-      {/* ─── TOP SECTION (Profile Header) ─── */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-indigo-500/10 blur-[100px] pointer-events-none" />
         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">
@@ -411,7 +578,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
         </div>
       </motion.div>
 
-      {/* ─── TABS NAVIGATION ─── */}
       <div className="flex justify-center w-full">
         <div className="flex bg-[#0a0a14]/80 border border-white/10 rounded-full p-1 backdrop-blur-xl">
           {(['commissions', 'points', 'badges', 'achievements'] as const).map(tab => (
@@ -420,11 +586,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
         </div>
       </div>
 
-      {/* ─── TAB CONTENT ─── */}
       <AnimatePresence mode="wait">
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }} className="w-full">
           
-          {/* COMMISSIONS TAB */}
           {activeTab === 'commissions' && (
             <div>
               <div className="flex justify-between items-center mb-6">
@@ -445,7 +609,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
           )}
 
-          {/* POINTS TAB */}
           {activeTab === 'points' && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col justify-between">
@@ -473,7 +636,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
               <div className="col-span-1 lg:col-span-3 flex flex-col gap-6">
 
-                {/* ─── WEEKLY STARDUST ─── */}
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
                   <div className="mb-4">
                     <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Stardust</p>
@@ -498,7 +660,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   )}
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* LEFT: Weekly Pack Tiers */}
                     <div>
                       <div className="mb-3">
                         <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Pack Tiers</p>
@@ -583,7 +744,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       </div>
                     </div>
 
-                    {/* RIGHT: Major Actions */}
                     <div>
                       <div className={`mb-3 ${stardustActive ? '' : 'opacity-60'}`}>
                         <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Major Actions</p>
@@ -696,20 +856,26 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
           )}
 
-          {/* BADGES TAB */}
           {activeTab === 'badges' && (
             <div className="flex flex-col gap-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {earnedBadges.map((badge) => (
-                  <div key={`badge-tab-${badge.key}`} className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex gap-4 items-center">
-                    <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
-                      <CustomBadgeIcon badgeKey={badge.key} progress={badge.progress} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                  <div key={`badge-tab-${badge.key}`} className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col">
+                    <div className="flex gap-4 items-center">
+                      <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                        <CustomBadgeIcon badgeKey={badge.key} progress={badge.progress} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                        <p className="text-sm text-white/50">{badge.title}</p>
+                        <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
-                      <p className="text-sm text-white/50">{badge.title}</p>
-                      <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
-                    </div>
+                    <BadgeProgress
+                      badgeKey={badge.key}
+                      count={badge.progress}
+                      overrides={data.badgeOverrides}
+                    />
                   </div>
                 ))}
               </div>
@@ -728,15 +894,23 @@ export default function ProfileClient({ userId }: { userId: string }) {
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
                         {lockedBadges.map((badge) => (
-                          <div key={`locked-${badge.key}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-6 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
-                            <div className="w-20 h-20 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
-                              <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                          <div key={`locked-${badge.key}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-6 flex flex-col opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                            <div className="flex gap-4 items-center">
+                              <div className="w-20 h-20 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
+                                <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                                <p className="text-sm text-white/50">{badge.title}</p>
+                                <p className="text-xs text-white/30 font-bold mt-2">Locked</p>
+                              </div>
                             </div>
-                            <div className="flex-1">
-                              <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
-                              <p className="text-sm text-white/50">{badge.title}</p>
-                              <p className="text-xs text-white/30 font-bold mt-2">Locked</p>
-                            </div>
+                            <BadgeProgress
+                              badgeKey={badge.key}
+                              count={0}
+                              overrides={data.badgeOverrides}
+                              dim
+                            />
                           </div>
                         ))}
                       </div>
@@ -747,11 +921,9 @@ export default function ProfileClient({ userId }: { userId: string }) {
             </div>
           )}
 
-          {/* ACHIEVEMENTS TAB */}
           {activeTab === 'achievements' && (
             <div className="flex flex-col gap-8">
               
-              {/* Unlocked Achievements */}
               <div>
                 {unlockedAchievements.length > 0 ? (
                   <div className="flex flex-col gap-3">
@@ -800,7 +972,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 )}
               </div>
 
-              {/* Locked Achievements */}
               <div>
                 <button 
                   onClick={() => setShowLockedAchievements(!showLockedAchievements)}
@@ -852,7 +1023,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
         </motion.div>
       </AnimatePresence>
 
-      {/* Modals (Edit Favorites, Card Viewer, Color Picker) */}
       <AnimatePresence>
         {isEditingFavorites && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
