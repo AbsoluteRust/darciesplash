@@ -9,15 +9,30 @@ export type TierContent = {
   reward: string;
 };
 
+/* ---------- card rarities ---------- */
+
+// Must match RARITY_ORDER in the bot's config.js. Used both to validate
+// `card` reward kinds server-side and to power the admin rarity dropdown.
+export const CARD_RARITIES = [
+  'Common',
+  'Uncommon',
+  'Rare',
+  'Epic',
+  'Legendary',
+  'Mythic',
+  'Contraband',
+] as const;
+export type CardRarity = typeof CARD_RARITIES[number];
+
 /* ---------- reward kinds ---------- */
 
-// A reward that a user can claim once they reach a tier. `custom` is
-// declared for admins who want a reward logged but not granted
-// automatically (e.g. custom art, manual Discord role).
+// A reward a user can claim once they reach a tier. `custom` and `pack`
+// are declared so admins can log intent, but they still fall through to
+// manual fulfilment in the bot (see lib/loyalty-rewards.js).
 export type RewardKind =
   | { kind: 'pack_points'; amount: number }
-  | { kind: 'card'; cardName: string; rarity: string }
-  | { kind: 'pack' }        // manual fulfilment — no grantPack exists yet
+  | { kind: 'card'; cardName: string; rarity: CardRarity }
+  | { kind: 'pack' }
   | { kind: 'minipack' }
   | { kind: 'custom' };
 

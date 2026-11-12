@@ -4,7 +4,6 @@ import { kv } from '@vercel/kv';
 import {
   buildAllTiers,
   tierForStardust,
-  MAJOR_ACTION_VALUE,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
 
@@ -12,9 +11,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   const session = await auth();
-  const userId = session?.user?.id;
+  const userId = session?.user?.id?.trim();
   if (!userId) {
     return Response.json({ error: 'Not signed in' }, { status: 401 });
+  }
+  if (!/^\d{17,20}$/.test(userId)) {
+    return Response.json(
+      { error: 'Your session is outdated or invalid. Please sign out and back in.' },
+      { status: 400 }
+    );
   }
 
   let body: any;
@@ -26,25 +31,18 @@ export async function POST(req: Request) {
     return Response.json({ error: 'Invalid tier' }, { status: 400 });
   }
 
-  const [overridesRaw, badgesRaw, rolesRaw] = await Promise.all([
+  const [overridesRaw, stardustRaw] = await Promise.all([
     kv.get('loyalty_tiers').catch(() => null),
-    kv.hgetall(`user_badges:${userId}`).catch(() => null),
-    kv.get(`account_roles:${userId}`).catch(() => null),
+    kv.hget('user_stardust', userId).catch(() => null),
   ]);
 
   const overrides: TierOverrides =
     overridesRaw && typeof overridesRaw === 'object'
       ? (overridesRaw as TierOverrides)
       : {};
-  const b = badgesRaw || {};
-  const r = rolesRaw || {};
 
-  const stardust =
-    Number(b.sub_months || 0) * MAJOR_ACTION_VALUE +
-    Number(b.referrals || 0) * MAJOR_ACTION_VALUE +
-    Number(b.gifts || 0) * MAJOR_ACTION_VALUE +
-    (r.commissioner ? MAJOR_ACTION_VALUE : 0);
-
+  // Single source of truth — lib/stardust.js writes to this hash on the bot.
+  const stardust = Number(stardustRaw) || 0;
   const unlockedTier = tierForStardust(stardust);
   if (tierNum > unlockedTier) {
     return Response.json(
@@ -67,23 +65,28 @@ export async function POST(req: Request) {
 
   const botUrl = (process.env.PI_BOT_URL || '').replace(/\/$/, '');
   if (!botUrl) {
-    return Response.json({ error: 'Server config error' }, { status: 500 });
+    return Response.json({ error: 'Bot not configured' }, { status: 500 });
   }
 
-  const res = await fetch(`${botUrl}/api/loyalty/claim`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${process.env.PI_BOT_SECRET}`,
-    },
-    body: JSON.stringify({
-      discordId: userId,
-      tier: tierNum,
-      tierTitle: target.title,
-      rewardKind: target.rewardKind,
-    }),
-  });
-
-  const data = await res.json().catch(() => ({}));
-  return Response.json(data, { status: res.status });
+  try {
+    const res = await fetch(`${botUrl}/api/loyalty/claim`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.PI_BOT_SECRET}`,
+      },
+      body: JSON.stringify({
+        discordId: userId,
+        tier: tierNum,
+        tierTitle: target.title,
+        rewardKind: target.rewardKind,
+      }),
+      cache: 'no-store',
+    });
+    const data = await res.json().catch(() => ({}));
+    return Response.json(data, { status: res.status });
+  } catch (err) {
+    console.error('[loyalty/claim] bot unreachable:', err);
+    return Response.json({ error: 'Bot unreachable' }, { status: 502 });
+  }
 }

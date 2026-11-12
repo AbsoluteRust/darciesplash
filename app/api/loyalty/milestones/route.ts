@@ -3,10 +3,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { kv } from "@vercel/kv";
 import { ADMIN_IDS } from "@/lib/admin";
-import type {
-  RewardKind,
-  TierOverride,
-  TierOverrides,
+import {
+  CARD_RARITIES,
+  type CardRarity,
+  type RewardKind,
+  type TierOverride,
+  type TierOverrides,
 } from "@/lib/loyalty-milestones";
 
 export const dynamic = 'force-dynamic';
@@ -16,6 +18,8 @@ const KEY = "loyalty_tiers";
 // Longest valid emote markup we accept:
 //   <a:32CharEmoteName:1234567890123456789012345>  =  3 + 32 + 1 + 25 + 1 = 62 chars
 const MAX_ICON_LENGTH = 80;
+
+const RARITY_SET = new Set<string>(CARD_RARITIES);
 
 function sanitizeRewardKind(raw: unknown): RewardKind | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -28,9 +32,9 @@ function sanitizeRewardKind(raw: unknown): RewardKind | undefined {
     }
     case 'card': {
       const cardName = typeof r.cardName === 'string' ? r.cardName.trim().slice(0, 120) : '';
-      const rarity = typeof r.rarity === 'string' ? r.rarity.trim().slice(0, 40) : '';
-      if (!cardName || !rarity) return undefined;
-      return { kind: 'card', cardName, rarity };
+      const rarity = typeof r.rarity === 'string' ? r.rarity.trim() : '';
+      if (!cardName || !rarity || !RARITY_SET.has(rarity)) return undefined;
+      return { kind: 'card', cardName, rarity: rarity as CardRarity };
     }
     case 'pack':
       return { kind: 'pack' };

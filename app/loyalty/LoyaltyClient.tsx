@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildAllTiers,
   buildEmoteMarkup,
+  CARD_RARITIES,
   DEFAULT_THEME,
   THEME_GROUPS,
   themeCssVars,
@@ -13,6 +14,7 @@ import {
   TOTAL_TIERS,
   TOTAL_TRACK_COST,
   tierForStardust,
+  type CardRarity,
   type LoyaltyTheme,
   type LoyaltyClaim,
   type LoyaltyClaims,
@@ -394,7 +396,7 @@ function EditTierModal({
   const [cardName, setCardName] = useState(
     tier.rewardKind?.kind === 'card' ? tier.rewardKind.cardName : ''
   );
-  const [cardRarity, setCardRarity] = useState(
+  const [cardRarity, setCardRarity] = useState<CardRarity | ''>(
     tier.rewardKind?.kind === 'card' ? tier.rewardKind.rarity : ''
   );
   const [error, setError] = useState<string | null>(null);
@@ -425,10 +427,9 @@ function EditTierModal({
       rewardKind = { kind: 'pack_points', amount: n };
     } else if (kindType === 'card') {
       const name = cardName.trim();
-      const rar = cardRarity.trim();
       if (!name) return setError('Card name is required');
-      if (!rar) return setError('Card rarity is required');
-      rewardKind = { kind: 'card', cardName: name, rarity: rar };
+      if (!cardRarity) return setError('Card rarity is required');
+      rewardKind = { kind: 'card', cardName: name, rarity: cardRarity };
     } else if (kindType === 'pack') {
       rewardKind = { kind: 'pack' };
     } else if (kindType === 'minipack') {
@@ -562,7 +563,7 @@ function EditTierModal({
               {kindType === 'card' && (
                 <>
                   <label className="loyalty-field loyalty-field--full">
-                    <span>Card name</span>
+                    <span>Card name (exact match against catalogue)</span>
                     <input
                       type="text"
                       value={cardName}
@@ -572,13 +573,20 @@ function EditTierModal({
                   </label>
                   <label className="loyalty-field loyalty-field--full">
                     <span>Card rarity</span>
-                    <input
-                      type="text"
+                    <select
                       value={cardRarity}
-                      onChange={e => setCardRarity(e.target.value)}
-                      placeholder="e.g. Common"
-                    />
+                      onChange={e => setCardRarity(e.target.value as CardRarity | '')}
+                    >
+                      <option value="">— Select rarity —</option>
+                      {CARD_RARITIES.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
                   </label>
+                  <p className="loyalty-form-group__hint">
+                    Rarity must match the catalogue exactly. Mismatches fall back to manual
+                    fulfilment with a log entry in <code>#botlogs</code>.
+                  </p>
                 </>
               )}
 
@@ -795,7 +803,7 @@ export default function LoyaltyClient({
     return () => ro.disconnect();
   }, []);
 
-  /* ---------- canvas size (only when viewport changes) ---------- */
+  /* ---------- canvas size ---------- */
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -912,7 +920,6 @@ export default function LoyaltyClient({
 
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-
           ctx.setTransform(dpr, 0, 0, dpr, -pan * dpr, 0);
 
           const buf = 80;
