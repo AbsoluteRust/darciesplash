@@ -145,9 +145,7 @@ function PackPointsContent() {
         <div className="phv-section__title">Use Darcie&apos;s emotes</div>
         <div className="phv-section__body">
           Use any emote from Darcie&apos;s collection in a channel the bot can see.
-          Earns <strong>{EMOTE_MIN}&ndash;{EMOTE_MAX}</strong> points per use
-          (<strong>{MESSAGE_CD_S}s</strong> message &middot;{' '}
-          <strong>{REACTION_CD_S}s</strong> reaction cooldown).
+          Earns around <strong>{EMOTE_MIN}&ndash;{EMOTE_MAX}</strong> points.
         </div>
       </div>
 
