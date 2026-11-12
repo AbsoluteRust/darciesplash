@@ -14,7 +14,10 @@ import {
   TOTAL_TRACK_COST,
   tierForStardust,
   type LoyaltyTheme,
+  type LoyaltyClaim,
+  type LoyaltyClaims,
   type MergedTier,
+  type RewardKind,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
 
@@ -23,8 +26,6 @@ const START_X = 2400;
 const END_X = 13600;
 const PADDING = 300;
 
-// How many points to sample along the visible portion of each wave.
-// Only the on-screen slice is drawn — no need for full-world density.
 const DECO_POINTS = 100;
 const MAIN_POINTS = 120;
 
@@ -111,18 +112,15 @@ function drawMainWave(
     else ctx.lineTo(x, y);
   }
 
-  // Glow pass — wide and dim
   ctx.strokeStyle = grad;
   ctx.lineWidth = 8;
   ctx.globalAlpha = 0.22;
   ctx.stroke();
 
-  // Mid pass — subtle halo
   ctx.lineWidth = 4;
   ctx.globalAlpha = 0.4;
   ctx.stroke();
 
-  // Core pass — thin and bright
   ctx.lineWidth = 2.5;
   ctx.globalAlpha = 1;
   ctx.stroke();
@@ -348,6 +346,8 @@ function EmotePicker({
 
 /* ---------- edit tier modal ---------- */
 
+type KindType = 'none' | 'pack_points' | 'card' | 'pack' | 'minipack' | 'custom';
+
 function EditTierModal({
   tier,
   emoteData,
@@ -380,6 +380,23 @@ function EditTierModal({
     description: tier.description,
     reward: tier.reward,
   });
+
+  const initialKind: KindType = useMemo(() => {
+    const k = tier.rewardKind?.kind;
+    return k === 'pack_points' || k === 'card' || k === 'pack' || k === 'minipack' || k === 'custom'
+      ? k
+      : 'none';
+  }, [tier.rewardKind]);
+  const [kindType, setKindType] = useState<KindType>(initialKind);
+  const [pointsAmount, setPointsAmount] = useState(
+    tier.rewardKind?.kind === 'pack_points' ? String(tier.rewardKind.amount) : ''
+  );
+  const [cardName, setCardName] = useState(
+    tier.rewardKind?.kind === 'card' ? tier.rewardKind.cardName : ''
+  );
+  const [cardRarity, setCardRarity] = useState(
+    tier.rewardKind?.kind === 'card' ? tier.rewardKind.rarity : ''
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -395,11 +412,33 @@ function EditTierModal({
 
   function handleSave() {
     if (!form.title.trim()) return setError('Title is required');
-    if (!form.reward.trim()) return setError('Reward is required');
+    if (!form.reward.trim()) return setError('Reward display text is required');
     const icon = iconMode === 'emoji' ? emojiValue.trim() : emoteValue.trim();
     if (!icon) return setError('Icon is required');
+
+    let rewardKind: RewardKind | undefined;
+    if (kindType === 'pack_points') {
+      const n = Math.floor(Number(pointsAmount));
+      if (!Number.isFinite(n) || n <= 0) {
+        return setError('Pack points must be a positive whole number');
+      }
+      rewardKind = { kind: 'pack_points', amount: n };
+    } else if (kindType === 'card') {
+      const name = cardName.trim();
+      const rar = cardRarity.trim();
+      if (!name) return setError('Card name is required');
+      if (!rar) return setError('Card rarity is required');
+      rewardKind = { kind: 'card', cardName: name, rarity: rar };
+    } else if (kindType === 'pack') {
+      rewardKind = { kind: 'pack' };
+    } else if (kindType === 'minipack') {
+      rewardKind = { kind: 'minipack' };
+    } else if (kindType === 'custom') {
+      rewardKind = { kind: 'custom' };
+    }
+
     setError(null);
-    onSave({ ...tier, ...form, icon });
+    onSave({ ...tier, ...form, icon, rewardKind });
   }
 
   return (
@@ -479,7 +518,7 @@ function EditTierModal({
             </label>
 
             <label className="loyalty-field loyalty-field--full">
-              <span>Reward</span>
+              <span>Reward display text</span>
               <textarea
                 rows={2}
                 maxLength={300}
@@ -487,6 +526,70 @@ function EditTierModal({
                 onChange={e => setForm(f => ({ ...f, reward: e.target.value }))}
               />
             </label>
+
+            <div className="loyalty-form-group">
+              <div className="loyalty-form-group__title">Auto-grantable reward</div>
+              <p className="loyalty-form-group__hint">
+                When a user claims this tier, the bot grants the reward and posts a receipt to <code>#botlogs</code>.
+                Leave as <em>None</em> if the reward is purely display text (a badge, a title, etc.).
+              </p>
+
+              <label className="loyalty-field loyalty-field--full">
+                <span>Reward kind</span>
+                <select value={kindType} onChange={e => setKindType(e.target.value as KindType)}>
+                  <option value="none">None (display text only)</option>
+                  <option value="pack_points">Pack points</option>
+                  <option value="card">Specific card</option>
+                  <option value="minipack">Minipack</option>
+                  <option value="pack">Pack</option>
+                  <option value="custom">Custom (manual fulfilment)</option>
+                </select>
+              </label>
+
+              {kindType === 'pack_points' && (
+                <label className="loyalty-field loyalty-field--full">
+                  <span>Pack points amount</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={1_000_000}
+                    value={pointsAmount}
+                    onChange={e => setPointsAmount(e.target.value)}
+                  />
+                </label>
+              )}
+
+              {kindType === 'card' && (
+                <>
+                  <label className="loyalty-field loyalty-field--full">
+                    <span>Card name</span>
+                    <input
+                      type="text"
+                      value={cardName}
+                      onChange={e => setCardName(e.target.value)}
+                      placeholder="e.g. Sprout"
+                    />
+                  </label>
+                  <label className="loyalty-field loyalty-field--full">
+                    <span>Card rarity</span>
+                    <input
+                      type="text"
+                      value={cardRarity}
+                      onChange={e => setCardRarity(e.target.value)}
+                      placeholder="e.g. Common"
+                    />
+                  </label>
+                </>
+              )}
+
+              {kindType === 'pack' && (
+                <p className="loyalty-form-group__hint">
+                  ⚠️ Pack grants require manual fulfilment — the admin will be pinged
+                  in <code>#botlogs</code> to add the pack by hand. Users still see
+                  the claim recorded on their account.
+                </p>
+              )}
+            </div>
           </div>
 
           {error && <p className="loyalty-form__error">{error}</p>}
@@ -603,6 +706,7 @@ export default function LoyaltyClient({
   initialOverrides,
   initialTiers,
   initialTheme,
+  initialClaims,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
@@ -612,6 +716,7 @@ export default function LoyaltyClient({
   initialOverrides: TierOverrides;
   initialTiers: MergedTier[];
   initialTheme: LoyaltyTheme;
+  initialClaims: LoyaltyClaims;
 }) {
   const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
   const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
@@ -630,6 +735,9 @@ export default function LoyaltyClient({
   const [adminMode, setAdminMode] = useState(false);
   const [editing, setEditing] = useState<MergedTier | null>(null);
   const [previewStardust, setPreviewStardust] = useState<number | null>(null);
+
+  const [claims, setClaims] = useState<LoyaltyClaims>(initialClaims);
+  const [claimingTier, setClaimingTier] = useState<number | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -796,21 +904,17 @@ export default function LoyaltyClient({
       const pan = panOffsetRef.current;
       const th = themeRef.current;
 
-      // ----- canvas strings -----
       const canvas = canvasRef.current;
       if (canvas && size.width > 0 && size.height > 0) {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const dpr = Math.min(2, window.devicePixelRatio || 1);
 
-          // Reset + clear
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-          // World-space transform: DPR scale + pan translate
           ctx.setTransform(dpr, 0, 0, dpr, -pan * dpr, 0);
 
-          // Only draw the visible slice of the world
           const buf = 80;
           const startX = Math.max(0, pan - buf);
           const endX = Math.min(WORLD_WIDTH, pan + size.width + buf);
@@ -835,8 +939,6 @@ export default function LoyaltyClient({
         }
       }
 
-      // ----- star positions -----
-      // Use transform (composited) instead of top (layout-triggering).
       const list = positionedRef.current;
       for (let i = 0; i < list.length; i++) {
         const m = list[i];
@@ -928,6 +1030,7 @@ export default function LoyaltyClient({
         title: updated.title,
         description: updated.description,
         reward: updated.reward,
+        rewardKind: updated.rewardKind,
       },
     };
     try {
@@ -970,6 +1073,29 @@ export default function LoyaltyClient({
       alert('Failed to save theme: ' + err.message);
     }
   }, []);
+
+  /* ---------- claim ---------- */
+
+  const handleClaim = useCallback(async (tier: MergedTier) => {
+    if (claimingTier !== null) return;
+    setClaimingTier(tier.tier);
+    try {
+      const res = await fetch('/api/loyalty/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: tier.tier }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.claim) {
+        setClaims(prev => ({ ...prev, [String(tier.tier)]: data.claim as LoyaltyClaim }));
+      }
+    } catch (err: any) {
+      alert('Claim failed: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setClaimingTier(null);
+    }
+  }, [claimingTier]);
 
   /* ---------- escape ---------- */
 
@@ -1128,32 +1254,51 @@ export default function LoyaltyClient({
                 <div className="loyalty-modal__reward-label">Reward</div>
                 <div className="loyalty-modal__reward-text">{activeTier.reward}</div>
               </div>
+
               {!trackActive ? (
                 <div className="loyalty-modal__status loyalty-modal__status--signin">
                   Track opens January 1, 2027
                 </div>
-              ) : signedIn ? (
-                activeTier.tier <= effectiveTier ? (
-                  <div className="loyalty-modal__status loyalty-modal__status--unlocked">✓ Unlocked</div>
-                ) : (
-                  <div className="loyalty-modal__status loyalty-modal__status--progress">
-                    <div className="loyalty-modal__progress-text">
-                      {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
-                    </div>
-                    <div className="loyalty-modal__progress-bar">
-                      <div
-                        className="loyalty-modal__progress-fill"
-                        style={{
-                          width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )
-              ) : (
+              ) : !signedIn ? (
                 <div className="loyalty-modal__status loyalty-modal__status--signin">
                   Sign in to track your progress
                 </div>
+              ) : activeTier.tier > effectiveTier ? (
+                <div className="loyalty-modal__status loyalty-modal__status--progress">
+                  <div className="loyalty-modal__progress-text">
+                    {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
+                  </div>
+                  <div className="loyalty-modal__progress-bar">
+                    <div
+                      className="loyalty-modal__progress-fill"
+                      style={{
+                        width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : claims[String(activeTier.tier)] ? (
+                <div className="loyalty-modal__status loyalty-modal__status--unlocked">
+                  ✓ Claimed
+                  {!claims[String(activeTier.tier)].granted && (
+                    <small>pending manual fulfilment by an admin</small>
+                  )}
+                </div>
+              ) : !activeTier.rewardKind ? (
+                <div className="loyalty-modal__status loyalty-modal__status--unlocked">✓ Unlocked</div>
+              ) : (
+                <button
+                  type="button"
+                  className="loyalty-btn loyalty-btn--primary loyalty-btn--full"
+                  disabled={claimingTier === activeTier.tier}
+                  onClick={() => handleClaim(activeTier)}
+                >
+                  {claimingTier === activeTier.tier
+                    ? 'Claiming…'
+                    : activeTier.rewardKind.kind === 'pack'
+                      ? 'Request pack (manual fulfilment)'
+                      : 'Claim reward'}
+                </button>
               )}
             </div>
           </div>

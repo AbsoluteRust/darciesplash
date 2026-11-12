@@ -9,6 +9,30 @@ export type TierContent = {
   reward: string;
 };
 
+/* ---------- reward kinds ---------- */
+
+// A reward that a user can claim once they reach a tier. `custom` is
+// declared for admins who want a reward logged but not granted
+// automatically (e.g. custom art, manual Discord role).
+export type RewardKind =
+  | { kind: 'pack_points'; amount: number }
+  | { kind: 'card'; cardName: string; rarity: string }
+  | { kind: 'pack' }        // manual fulfilment — no grantPack exists yet
+  | { kind: 'minipack' }
+  | { kind: 'custom' };
+
+export type LoyaltyClaim = {
+  tier: number;
+  claimedAt: number;
+  rewardKind: RewardKind;
+  granted: boolean;
+  manual?: boolean;
+  description: string;
+};
+export type LoyaltyClaims = Record<string, LoyaltyClaim>;
+
+/* ---------- tier shapes ---------- */
+
 export type MergedTier = {
   tier: number;
   stardustRequired: number;
@@ -17,9 +41,10 @@ export type MergedTier = {
   title: string;
   description: string;
   reward: string;
+  rewardKind?: RewardKind;
 };
 
-export type TierOverride = Partial<TierContent>;
+export type TierOverride = Partial<TierContent> & { rewardKind?: RewardKind };
 export type TierOverrides = Record<string, TierOverride>;
 
 export const TRACK_START_DATE = "2027-01-01T00:00:00Z";
@@ -122,6 +147,7 @@ export function buildTier(tier: number, overrides: TierOverrides): MergedTier {
     title: o.title || defaults.title,
     description: o.description || defaults.description,
     reward: o.reward || defaults.reward,
+    rewardKind: o.rewardKind,
   };
 }
 

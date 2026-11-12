@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { kv } from "@vercel/kv";
 import { ADMIN_IDS } from "@/lib/admin";
-import type { TierOverride, TierOverrides } from "@/lib/loyalty-milestones";
+import type {
+  RewardKind,
+  TierOverride,
+  TierOverrides,
+} from "@/lib/loyalty-milestones";
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +15,33 @@ const KEY = "loyalty_tiers";
 
 // Longest valid emote markup we accept:
 //   <a:32CharEmoteName:1234567890123456789012345>  =  3 + 32 + 1 + 25 + 1 = 62 chars
-// Round up for safety margin. Emoji are 1–4 chars typical, up to ~11 for ZWJ sequences.
 const MAX_ICON_LENGTH = 80;
+
+function sanitizeRewardKind(raw: unknown): RewardKind | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  switch (r.kind) {
+    case 'pack_points': {
+      const n = Math.floor(Number(r.amount));
+      if (!Number.isFinite(n) || n <= 0 || n > 1_000_000) return undefined;
+      return { kind: 'pack_points', amount: n };
+    }
+    case 'card': {
+      const cardName = typeof r.cardName === 'string' ? r.cardName.trim().slice(0, 120) : '';
+      const rarity = typeof r.rarity === 'string' ? r.rarity.trim().slice(0, 40) : '';
+      if (!cardName || !rarity) return undefined;
+      return { kind: 'card', cardName, rarity };
+    }
+    case 'pack':
+      return { kind: 'pack' };
+    case 'minipack':
+      return { kind: 'minipack' };
+    case 'custom':
+      return { kind: 'custom' };
+    default:
+      return undefined;
+  }
+}
 
 export async function GET() {
   const stored = await kv.get(KEY);
@@ -53,6 +82,8 @@ export async function POST(req: Request) {
     if (typeof t.reward === "string" && t.reward.trim()) {
       entry.reward = t.reward.slice(0, 300);
     }
+    const rewardKind = sanitizeRewardKind(t.rewardKind);
+    if (rewardKind) entry.rewardKind = rewardKind;
 
     if (Object.keys(entry).length > 0) cleaned[String(tier)] = entry;
   }

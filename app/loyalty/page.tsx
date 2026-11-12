@@ -7,8 +7,11 @@ import {
   isTrackActive,
   tierForStardust,
   DEFAULT_THEME,
+  MAJOR_ACTION_VALUE,
   type LoyaltyTheme,
   type TierOverrides,
+  type LoyaltyClaims,
+  type LoyaltyClaim,
 } from '@/lib/loyalty-milestones';
 import LoyaltyClient from './LoyaltyClient';
 import './page.css';
@@ -25,9 +28,12 @@ export default async function LoyaltyPage() {
   const userId = session?.user?.id || null;
   const isAdmin = !!userId && ADMIN_IDS.has(userId);
 
-  const [storedOverrides, storedTheme] = await Promise.all([
+  const [storedOverrides, storedTheme, storedClaims] = await Promise.all([
     kv.get('loyalty_tiers').catch(() => null),
     kv.get('loyalty_theme').catch(() => null),
+    userId
+      ? kv.hgetall(`loyalty_claims:${userId}`).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const overrides: TierOverrides =
@@ -38,6 +44,15 @@ export default async function LoyaltyPage() {
     storedTheme && typeof storedTheme === 'object'
       ? { ...DEFAULT_THEME, ...(storedTheme as Partial<LoyaltyTheme>) }
       : DEFAULT_THEME;
+
+  const claims: LoyaltyClaims = {};
+  if (storedClaims) {
+    for (const [k, v] of Object.entries(storedClaims)) {
+      try {
+        claims[k] = typeof v === 'string' ? JSON.parse(v) : (v as LoyaltyClaim);
+      } catch { /* skip malformed */ }
+    }
+  }
 
   const tiers = buildAllTiers(overrides);
   const trackActive = isTrackActive();
@@ -75,10 +90,11 @@ export default async function LoyaltyPage() {
 
   let currentStardust = 0;
   if (trackActive && profile) {
-    currentStardust = profile.subMonths * 6800
-      + profile.referrals * 6800
-      + profile.gifts * 6800
-      + (profile.isCommissioner ? 6800 : 0);
+    currentStardust =
+      profile.subMonths * MAJOR_ACTION_VALUE +
+      profile.referrals * MAJOR_ACTION_VALUE +
+      profile.gifts * MAJOR_ACTION_VALUE +
+      (profile.isCommissioner ? MAJOR_ACTION_VALUE : 0);
   }
   const currentTier = tierForStardust(currentStardust);
 
@@ -92,6 +108,7 @@ export default async function LoyaltyPage() {
       initialOverrides={overrides}
       initialTiers={tiers}
       initialTheme={theme}
+      initialClaims={claims}
     />
   );
 }
