@@ -114,7 +114,6 @@ export async function GET(
   } catch (err) {}
 
   // 8b. Derive darsubscribbler status for pack point cap
-  // Prefer the KV roles hash if populated; fall back to breakdown entry (bot-verified)
   const isDarsubscribbler =
     !!roles?.darsubscribbler ||
     streakBreakdown.some((s: any) => s.id === 'darsubscribbler');
@@ -170,6 +169,7 @@ export async function GET(
         emoji: a.emoji,
         color: a.color || null,
         unlocked: !!a.unlocked,
+        progress: a.progress || null,
       }));
     } else {
       console.error('[profile] achievements fetch failed:', res.status);

@@ -27,6 +27,12 @@ type StardustWeek = {
   active: boolean;
 };
 
+type AchievementProgress = {
+  current: number;
+  target: number;
+  nextTier: string | null;
+};
+
 type ProfileData = {
   id: string;
   name: string;
@@ -84,6 +90,17 @@ const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 // Pack point caps (mirror config.js)
 const PACK_POINTS_CAP_BASE = 200_000;
 const PACK_POINTS_CAP_PREMIUM = 500_000;
+
+// Rarity colors (mirror config.js RARITY_COLORS)
+const RARITY_COLORS: Record<string, string> = {
+  Common:    '#9ca3af',
+  Uncommon:  '#22c55e',
+  Rare:      '#3b82f6',
+  Epic:      '#a855f7',
+  Legendary: '#eab308',
+  Mythic:    '#ef4444',
+  Contraband:'#000000',
+};
 
 const STARDUST_TIERS = [
   { num: 1, reqPacks: 4,  reqDrops: 0, reqPuzzles: 0, reward: 100, desc: 'Open 4 packs' },
@@ -292,6 +309,34 @@ export default function ProfileClient({ userId }: { userId: string }) {
     data.badgeOverrides?.[ach.id]?.color || ach.color || DEFAULT_HIGHLIGHT;
 
   const featuredColor = featuredAchievement ? getHighlightColor(featuredAchievement) : DEFAULT_HIGHLIGHT;
+
+  // Progress bar block — shared between unlocked and locked cards.
+  // Bar fill uses the color of the tier being worked toward, so a Rare-bound bar
+  // is blue even when the achievement's current tier is Uncommon (green).
+  const renderProgressBar = (ach: any, dim = false) => {
+    const prog: AchievementProgress | null = ach.progress;
+    if (!prog || !prog.nextTier || prog.target === 0) return null;
+    const pct = Math.min(100, (prog.current / prog.target) * 100);
+    const barColor = RARITY_COLORS[prog.nextTier] || DEFAULT_HIGHLIGHT;
+    return (
+      <div className={`mt-3 pt-3 border-t ${dim ? 'border-white/5' : 'border-white/10'}`}>
+        <div className="flex justify-between text-xs mb-1.5">
+          <span className="text-white/60 font-bold tabular-nums">
+            {prog.current} / {prog.target}
+          </span>
+          <span className="font-bold" style={{ color: barColor }}>
+            → {prog.nextTier}
+          </span>
+        </div>
+        <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: barColor, boxShadow: `0 0 8px ${barColor}66` }}
+          />
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-8 w-full">
@@ -717,30 +762,33 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       return (
                         <div
                           key={ach.id}
-                          className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex gap-4 items-center transition-all ${isFeatured ? '' : 'border-white/10'}`}
+                          className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex flex-col transition-all ${isFeatured ? '' : 'border-white/10'}`}
                           style={isFeatured ? { borderColor: highlightColor, boxShadow: `0 0 20px ${highlightColor}33` } : undefined}
                         >
-                          <div
-                            className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center shadow-inner"
-                            style={{
-                              background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
-                              borderColor: `${highlightColor}4d`,
-                            }}
-                          >
-                            <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
-                            <p className="text-xs font-bold" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
-                          </div>
-                          {isOwnProfile && (
-                            <button
-                              onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
-                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                          <div className="flex gap-4 items-center">
+                            <div
+                              className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center shadow-inner"
+                              style={{
+                                background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                                borderColor: `${highlightColor}4d`,
+                              }}
                             >
-                              {isFeatured ? 'Featured' : 'Feature'}
-                            </button>
-                          )}
+                              <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                              <p className="text-xs font-bold" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
+                            </div>
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                              >
+                                {isFeatured ? 'Featured' : 'Feature'}
+                              </button>
+                            )}
+                          </div>
+                          {renderProgressBar(ach)}
                         </div>
                       );
                     })}
@@ -769,22 +817,26 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         {lockedAchievements.map((ach) => {
                           const override = data.badgeOverrides?.[ach.id];
                           const highlightColor = getHighlightColor(ach);
+                          const hasProgress = !!ach.progress && !!ach.progress.nextTier;
                           return (
-                            <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-4 flex gap-4 items-center opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
-                              <div
-                                className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center"
-                                style={{
-                                  background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
-                                  borderColor: `${highlightColor}4d`,
-                                }}
-                              >
-                                <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                            <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-4 flex flex-col opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                              <div className="flex gap-4 items-center">
+                                <div
+                                  className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                                    borderColor: `${highlightColor}4d`,
+                                  }}
+                                >
+                                  <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                                  <p className="text-xs font-bold mb-1" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
+                                  {!hasProgress && <p className="text-xs text-white/30">Locked</p>}
+                                </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
-                                <p className="text-xs font-bold mb-1" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
-                                <p className="text-xs text-white/30">Locked</p>
-                              </div>
+                              {renderProgressBar(ach, true)}
                             </div>
                           );
                         })}
