@@ -5,7 +5,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildAllTiers,
   buildEmoteMarkup,
+  CARD_COLLECTIONS,
   CARD_RARITIES,
+  PACK_RARITIES,
   DEFAULT_THEME,
   THEME_GROUPS,
   themeCssVars,
@@ -15,10 +17,15 @@ import {
   TOTAL_TRACK_COST,
   tierForStardust,
   type CardRarity,
+  type CollectionFilter,
+  type CustomPack,
   type LoyaltyTheme,
   type LoyaltyClaim,
   type LoyaltyClaims,
   type MergedTier,
+  type PackRarity,
+  type PendingLoyaltyPack,
+  type RarityFilter,
   type RewardKind,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
@@ -27,7 +34,6 @@ const WORLD_WIDTH = 16000;
 const START_X = 2400;
 const END_X = 13600;
 const PADDING = 300;
-
 const DECO_POINTS = 100;
 const MAIN_POINTS = 120;
 
@@ -231,35 +237,17 @@ function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
 /* ---------- emote picker ---------- */
 
 type EmoteInfo = {
-  id: string;
-  name: string;
-  animated: boolean;
-  guildName: string;
-  collections: string[];
-  ignored: boolean;
+  id: string; name: string; animated: boolean; guildName: string;
+  collections: string[]; ignored: boolean;
 };
-
 type CollectionInfo = { id: string; label: string };
-
-type EmoteData = {
-  emotes: EmoteInfo[];
-  collections: CollectionInfo[];
-};
+type EmoteData = { emotes: EmoteInfo[]; collections: CollectionInfo[] };
 
 function EmotePicker({
-  emotes,
-  collections,
-  selectedId,
-  loading,
-  onSelect,
-  onClear,
+  emotes, collections, selectedId, loading, onSelect, onClear,
 }: {
-  emotes: EmoteInfo[];
-  collections: CollectionInfo[];
-  selectedId: string | null;
-  loading: boolean;
-  onSelect: (e: EmoteInfo) => void;
-  onClear: () => void;
+  emotes: EmoteInfo[]; collections: CollectionInfo[]; selectedId: string | null;
+  loading: boolean; onSelect: (e: EmoteInfo) => void; onClear: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [showIgnored, setShowIgnored] = useState(false);
@@ -346,6 +334,321 @@ function EmotePicker({
   );
 }
 
+/* ---------- custom pack editor modal ---------- */
+
+function PackEditorModal({
+  pack,
+  onSave,
+  onDelete,
+  onClose,
+  saving,
+}: {
+  pack: CustomPack | null;  // null = new
+  onSave: (draft: Omit<CustomPack, 'id' | 'createdAt' | 'createdBy' | 'updatedAt'>) => Promise<void>;
+  onDelete: (() => Promise<void>) | null;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [name, setName] = useState(pack?.name ?? '');
+  const [cardCount, setCardCount] = useState(pack?.cardCount ?? 5);
+
+  // rarity
+  const initialRarityMode = pack?.rarityFilter.mode ?? 'all';
+  const [rarityMode, setRarityMode] = useState<RarityFilter['mode']>(initialRarityMode);
+  const [raritySingle, setRaritySingle] = useState<PackRarity>(
+    pack?.rarityFilter.mode === 'single' ? pack.rarityFilter.rarity : 'Rare'
+  );
+  const [rarityMin, setRarityMin] = useState<PackRarity>(
+    pack?.rarityFilter.mode === 'range' ? pack.rarityFilter.min : 'Uncommon'
+  );
+  const [rarityMax, setRarityMax] = useState<PackRarity>(
+    pack?.rarityFilter.mode === 'range' ? pack.rarityFilter.max : 'Epic'
+  );
+  const [rarityList, setRarityList] = useState<Set<PackRarity>>(() => {
+    if (pack?.rarityFilter.mode === 'list') return new Set(pack.rarityFilter.rarities);
+    return new Set(['Rare', 'Epic']);
+  });
+
+  // collection
+  const initialCollMode = pack?.collectionFilter.mode ?? 'any';
+  const [collectionMode, setCollectionMode] = useState<CollectionFilter['mode']>(initialCollMode);
+  const [collectionIds, setCollectionIds] = useState<Set<string>>(() => {
+    if (pack?.collectionFilter.mode === 'specific') return new Set(pack.collectionFilter.collections);
+    if (pack?.collectionFilter.mode === 'distinct') return new Set(pack.collectionFilter.collections);
+    return new Set(['darcie', 'tobi']);
+  });
+
+  const [error, setError] = useState<string | null>(null);
+
+  function toggleRarity(r: PackRarity) {
+    const next = new Set(rarityList);
+    if (next.has(r)) next.delete(r); else next.add(r);
+    setRarityList(next);
+  }
+
+  function toggleCollection(id: string) {
+    const next = new Set(collectionIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setCollectionIds(next);
+  }
+
+  async function handleSave() {
+    if (!name.trim()) return setError('Name is required');
+    if (!Number.isFinite(cardCount) || cardCount < 1 || cardCount > 20) {
+      return setError('Card count must be 1–20');
+    }
+
+    let rarityFilter: RarityFilter;
+    if (rarityMode === 'all') rarityFilter = { mode: 'all' };
+    else if (rarityMode === 'single') rarityFilter = { mode: 'single', rarity: raritySingle };
+    else if (rarityMode === 'range') {
+      const minIdx = PACK_RARITIES.indexOf(rarityMin);
+      const maxIdx = PACK_RARITIES.indexOf(rarityMax);
+      if (minIdx > maxIdx) return setError('Range min cannot exceed max');
+      rarityFilter = { mode: 'range', min: rarityMin, max: rarityMax };
+    } else {
+      if (rarityList.size === 0) return setError('Select at least one rarity');
+      rarityFilter = { mode: 'list', rarities: [...rarityList] };
+    }
+
+    let collectionFilter: CollectionFilter;
+    if (collectionMode === 'any') collectionFilter = { mode: 'any' };
+    else {
+      if (collectionIds.size === 0) return setError('Select at least one collection');
+      collectionFilter = { mode: collectionMode, collections: [...collectionIds] };
+    }
+
+    setError(null);
+    await onSave({
+      name: name.trim(),
+      cardCount: Math.floor(cardCount),
+      rarityFilter,
+      collectionFilter,
+    });
+  }
+
+  return (
+    <div className="loyalty-modal-overlay" onClick={onClose}>
+      <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
+        <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
+        <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
+          <div className="loyalty-modal__eyebrow">
+            {pack ? `Custom pack · ${pack.id}` : 'New custom pack'}
+          </div>
+          <h2 className="loyalty-modal__title">{pack ? 'Edit Pack' : 'Create Pack'}</h2>
+
+          <div className="loyalty-form">
+            <label className="loyalty-field loyalty-field--full">
+              <span>Name</span>
+              <input
+                type="text"
+                maxLength={100}
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="e.g. Starter Pack"
+              />
+            </label>
+
+            <label className="loyalty-field loyalty-field--full">
+              <span>Card count (1–20)</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={cardCount}
+                onChange={e => setCardCount(Number(e.target.value) || 1)}
+              />
+            </label>
+
+            <div className="loyalty-form-group">
+              <div className="loyalty-form-group__title">Rarity filter</div>
+              <p className="loyalty-form-group__hint">
+                Excluded rarities roll their chance into the lowest selected rarity. A Rare+Epic
+                pack rolls at ~99.4% Rare and 0.6% Epic.
+              </p>
+              <label className="loyalty-field loyalty-field--full">
+                <span>Mode</span>
+                <select value={rarityMode} onChange={e => setRarityMode(e.target.value as any)}>
+                  <option value="all">Any rarity (all tiers)</option>
+                  <option value="single">Single rarity</option>
+                  <option value="range">Range</option>
+                  <option value="list">Specific list</option>
+                </select>
+              </label>
+
+              {rarityMode === 'single' && (
+                <label className="loyalty-field loyalty-field--full">
+                  <span>Rarity</span>
+                  <select value={raritySingle} onChange={e => setRaritySingle(e.target.value as PackRarity)}>
+                    {PACK_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </label>
+              )}
+
+              {rarityMode === 'range' && (
+                <div className="loyalty-pack-editor__inline">
+                  <label className="loyalty-field">
+                    <span>Min</span>
+                    <select value={rarityMin} onChange={e => setRarityMin(e.target.value as PackRarity)}>
+                      {PACK_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </label>
+                  <label className="loyalty-field">
+                    <span>Max</span>
+                    <select value={rarityMax} onChange={e => setRarityMax(e.target.value as PackRarity)}>
+                      {PACK_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </label>
+                </div>
+              )}
+
+              {rarityMode === 'list' && (
+                <div className="loyalty-pack-editor__inline">
+                  {PACK_RARITIES.map(r => (
+                    <label key={r} className="loyalty-emote-picker__toggle">
+                      <input
+                        type="checkbox"
+                        checked={rarityList.has(r)}
+                        onChange={() => toggleRarity(r)}
+                      />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="loyalty-form-group">
+              <div className="loyalty-form-group__title">Collection filter</div>
+              <label className="loyalty-field loyalty-field--full">
+                <span>Mode</span>
+                <select value={collectionMode} onChange={e => setCollectionMode(e.target.value as any)}>
+                  <option value="any">Any collection</option>
+                  <option value="specific">Specific collection(s) — random each slot</option>
+                  <option value="distinct">Distinct — one card from each collection</option>
+                </select>
+              </label>
+
+              {(collectionMode === 'specific' || collectionMode === 'distinct') && (
+                <div className="loyalty-pack-editor__inline">
+                  {CARD_COLLECTIONS.map(c => (
+                    <label key={c.id} className="loyalty-emote-picker__toggle">
+                      <input
+                        type="checkbox"
+                        checked={collectionIds.has(c.id)}
+                        onChange={() => toggleCollection(c.id)}
+                      />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {collectionMode === 'distinct' && (
+                <p className="loyalty-form-group__hint">
+                  Slot <em>i</em> uses collection <code>i mod n</code>. With 5 slots and 5
+                  collections, each collection gets exactly one card.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {error && <p className="loyalty-form__error">{error}</p>}
+
+          <div className="loyalty-form__actions">
+            {onDelete && (
+              <button
+                type="button"
+                className="loyalty-btn"
+                onClick={() => { if (confirm('Delete this pack? Tiers using it will lose their reward config.')) onDelete(); }}
+                disabled={saving}
+                style={{ marginRight: 'auto' }}
+              >
+                Delete
+              </button>
+            )}
+            <button type="button" className="loyalty-btn" onClick={onClose} disabled={saving}>Cancel</button>
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- custom packs list modal ---------- */
+
+function PackManagerModal({
+  packs,
+  loading,
+  onRefresh,
+  onCreate,
+  onEdit,
+  onClose,
+}: {
+  packs: CustomPack[];
+  loading: boolean;
+  onRefresh: () => void;
+  onCreate: () => void;
+  onEdit: (p: CustomPack) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="loyalty-modal-overlay" onClick={onClose}>
+      <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
+        <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
+        <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
+          <div className="loyalty-modal__eyebrow">Admin · Custom packs</div>
+          <h2 className="loyalty-modal__title">Manage Packs</h2>
+          <p className="loyalty-modal__description" style={{ marginBottom: '1rem' }}>
+            Presets available as rewards when editing tiers. Shared across all admins.
+          </p>
+
+          {loading ? (
+            <div className="loyalty-emote-picker__empty">Loading packs…</div>
+          ) : packs.length === 0 ? (
+            <div className="loyalty-emote-picker__empty">
+              No packs yet. Create one to assign it to a tier.
+            </div>
+          ) : (
+            <div className="loyalty-packs-list">
+              {packs.map(p => (
+                <div key={p.id} className="loyalty-pack-item" onClick={() => onEdit(p)}>
+                  <div className="loyalty-pack-item__info">
+                    <div className="loyalty-pack-item__name">{p.name}</div>
+                    <div className="loyalty-pack-item__meta">
+                      {p.cardCount} card{p.cardCount === 1 ? '' : 's'} ·{' '}
+                      {p.rarityFilter.mode === 'all' && 'any rarity'}
+                      {p.rarityFilter.mode === 'single' && p.rarityFilter.rarity}
+                      {p.rarityFilter.mode === 'range' && `${p.rarityFilter.min}–${p.rarityFilter.max}`}
+                      {p.rarityFilter.mode === 'list' && p.rarityFilter.rarities.join(', ')}
+                      {' · '}
+                      {p.collectionFilter.mode === 'any' && 'any collection'}
+                      {p.collectionFilter.mode === 'specific' && `from ${p.collectionFilter.collections.join(', ')}`}
+                      {p.collectionFilter.mode === 'distinct' && `1 from each of ${p.collectionFilter.collections.join(', ')}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="loyalty-form__actions">
+            <button type="button" className="loyalty-btn" onClick={onRefresh}>Refresh</button>
+            <div style={{ flex: 1 }} />
+            <button type="button" className="loyalty-btn" onClick={onClose}>Close</button>
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={onCreate}>
+              New pack
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- edit tier modal ---------- */
 
 type KindType = 'none' | 'pack_points' | 'card' | 'pack' | 'minipack' | 'custom';
@@ -355,6 +658,10 @@ function EditTierModal({
   emoteData,
   loadingEmotes,
   onRequestEmotes,
+  customPacks,
+  customPacksLoaded,
+  onRequestCustomPacks,
+  onOpenPackManager,
   onSave,
   onClose,
 }: {
@@ -362,6 +669,10 @@ function EditTierModal({
   emoteData: EmoteData | null;
   loadingEmotes: boolean;
   onRequestEmotes: () => void;
+  customPacks: CustomPack[];
+  customPacksLoaded: boolean;
+  onRequestCustomPacks: () => void;
+  onOpenPackManager: () => void;
   onSave: (updated: MergedTier) => void;
   onClose: () => void;
 }) {
@@ -399,11 +710,18 @@ function EditTierModal({
   const [cardRarity, setCardRarity] = useState<CardRarity | ''>(
     tier.rewardKind?.kind === 'card' ? tier.rewardKind.rarity : ''
   );
+  const [packId, setPackId] = useState<string>(
+    tier.rewardKind?.kind === 'pack' ? tier.rewardKind.packId : ''
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (iconMode === 'emote') onRequestEmotes();
   }, [iconMode, onRequestEmotes]);
+
+  useEffect(() => {
+    if (kindType === 'pack') onRequestCustomPacks();
+  }, [kindType, onRequestCustomPacks]);
 
   const selectedEmoteId = useMemo(() => {
     const p = parseTierIcon(emoteValue);
@@ -431,7 +749,10 @@ function EditTierModal({
       if (!cardRarity) return setError('Card rarity is required');
       rewardKind = { kind: 'card', cardName: name, rarity: cardRarity };
     } else if (kindType === 'pack') {
-      rewardKind = { kind: 'pack' };
+      if (!packId) return setError('Select a pack');
+      const exists = customPacks.some(p => p.id === packId);
+      if (!exists) return setError('Selected pack no longer exists — pick another');
+      rewardKind = { kind: 'pack', packId };
     } else if (kindType === 'minipack') {
       rewardKind = { kind: 'minipack' };
     } else if (kindType === 'custom') {
@@ -464,16 +785,12 @@ function EditTierModal({
                     type="button"
                     className={`loyalty-icon-tab${iconMode === 'emoji' ? ' is-active' : ''}`}
                     onClick={() => setIconMode('emoji')}
-                  >
-                    Emoji
-                  </button>
+                  >Emoji</button>
                   <button
                     type="button"
                     className={`loyalty-icon-tab${iconMode === 'emote' ? ' is-active' : ''}`}
                     onClick={() => setIconMode('emote')}
-                  >
-                    Emote
-                  </button>
+                  >Emote</button>
                 </div>
               </div>
 
@@ -532,7 +849,7 @@ function EditTierModal({
               <div className="loyalty-form-group__title">Auto-grantable reward</div>
               <p className="loyalty-form-group__hint">
                 When a user claims this tier, the bot grants the reward and posts a receipt to <code>#botlogs</code>.
-                Leave as <em>None</em> if the reward is purely display text (a badge, a title, etc.).
+                Leave as <em>None</em> if the reward is purely display text.
               </p>
 
               <label className="loyalty-field loyalty-field--full">
@@ -542,7 +859,7 @@ function EditTierModal({
                   <option value="pack_points">Pack points</option>
                   <option value="card">Specific card</option>
                   <option value="minipack">Minipack</option>
-                  <option value="pack">Pack</option>
+                  <option value="pack">Custom pack</option>
                   <option value="custom">Custom (manual fulfilment)</option>
                 </select>
               </label>
@@ -583,19 +900,34 @@ function EditTierModal({
                       ))}
                     </select>
                   </label>
-                  <p className="loyalty-form-group__hint">
-                    Rarity must match the catalogue exactly. Mismatches fall back to manual
-                    fulfilment with a log entry in <code>#botlogs</code>.
-                  </p>
                 </>
               )}
 
               {kindType === 'pack' && (
-                <p className="loyalty-form-group__hint">
-                  ⚠️ Pack grants require manual fulfilment — the admin will be pinged
-                  in <code>#botlogs</code> to add the pack by hand. Users still see
-                  the claim recorded on their account.
-                </p>
+                <>
+                  <label className="loyalty-field loyalty-field--full">
+                    <span>Custom pack</span>
+                    <select value={packId} onChange={e => setPackId(e.target.value)}>
+                      <option value="">— Select a pack —</option>
+                      {customPacks.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {customPacksLoaded && customPacks.length === 0 && (
+                    <p className="loyalty-form-group__hint">
+                      No packs yet. Create one to use it here.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="loyalty-btn"
+                    onClick={onOpenPackManager}
+                    style={{ alignSelf: 'flex-start' }}
+                  >
+                    📦 Manage packs
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -615,10 +947,7 @@ function EditTierModal({
 /* ---------- edit theme modal ---------- */
 
 function EditThemeModal({
-  theme,
-  onPreview,
-  onSave,
-  onClose,
+  theme, onPreview, onSave, onClose,
 }: {
   theme: LoyaltyTheme;
   onPreview: (t: LoyaltyTheme) => void;
@@ -703,6 +1032,51 @@ function EditThemeModal({
   );
 }
 
+/* ---------- card reveal modal ---------- */
+
+function CardRevealModal({
+  packName,
+  cards,
+  onClose,
+}: {
+  packName: string;
+  cards: { name: string; rarity: string; image?: string }[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="loyalty-modal-overlay" onClick={onClose}>
+      <div className="loyalty-modal loyalty-modal--theme" onClick={e => e.stopPropagation()}>
+        <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
+        <div className="loyalty-modal__body">
+          <div className="loyalty-modal__eyebrow">Pack opened</div>
+          <h2 className="loyalty-modal__title">{packName}</h2>
+          <p className="loyalty-modal__description" style={{ marginBottom: '1rem' }}>
+            Your cards have been added to your collection and posted to Discord.
+          </p>
+
+          <div className="loyalty-reveal-grid">
+            {cards.map((c, i) => (
+              <div key={`${c.name}-${i}`} className="loyalty-reveal-card">
+                {c.image ? (
+                  <img className="loyalty-reveal-card__img" src={c.image} alt={c.name} />
+                ) : (
+                  <div className="loyalty-reveal-card__img" />
+                )}
+                <div className="loyalty-reveal-card__name">{c.name}</div>
+                <div className="loyalty-reveal-card__rarity">{c.rarity}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="loyalty-form__actions">
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- main component ---------- */
 
 export default function LoyaltyClient({
@@ -715,6 +1089,7 @@ export default function LoyaltyClient({
   initialTiers,
   initialTheme,
   initialClaims,
+  initialPendingPacks,
 }: {
   signedIn: boolean;
   isAdmin: boolean;
@@ -725,6 +1100,7 @@ export default function LoyaltyClient({
   initialTiers: MergedTier[];
   initialTheme: LoyaltyTheme;
   initialClaims: LoyaltyClaims;
+  initialPendingPacks: Record<string, PendingLoyaltyPack>;
 }) {
   const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
   const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
@@ -737,6 +1113,13 @@ export default function LoyaltyClient({
   const [loadingEmotes, setLoadingEmotes] = useState(false);
   const emotePromiseRef = useRef<Promise<EmoteData> | null>(null);
 
+  const [customPacks, setCustomPacks] = useState<CustomPack[]>([]);
+  const [customPacksLoaded, setCustomPacksLoaded] = useState(false);
+  const customPacksPromiseRef = useRef<Promise<CustomPack[]> | null>(null);
+  const [packsManagerOpen, setPacksManagerOpen] = useState(false);
+  const [packEditorPack, setPackEditorPack] = useState<CustomPack | null | 'new'>(null);
+  const [savingPack, setSavingPack] = useState(false);
+
   const [panOffset, setPanOffset] = useState(6000);
   const [viewportSize, setViewportSize] = useState({ width: 1200, height: 600 });
   const [activeTier, setActiveTier] = useState<MergedTier | null>(null);
@@ -746,6 +1129,9 @@ export default function LoyaltyClient({
 
   const [claims, setClaims] = useState<LoyaltyClaims>(initialClaims);
   const [claimingTier, setClaimingTier] = useState<number | null>(null);
+  const [pendingPacks, setPendingPacks] = useState<Record<string, PendingLoyaltyPack>>(initialPendingPacks);
+  const [openingPackId, setOpeningPackId] = useState<string | null>(null);
+  const [revealedPack, setRevealedPack] = useState<{ packName: string; cards: any[] } | null>(null);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -758,7 +1144,6 @@ export default function LoyaltyClient({
   const editingRef = useRef<MergedTier | null>(null);
 
   const nodeRefs = useRef<Map<number, HTMLButtonElement>>(new Map());
-  const lastMainTRef = useRef(0);
 
   const cssVars = useMemo(() => themeCssVars(theme) as React.CSSProperties, [theme]);
 
@@ -841,10 +1226,8 @@ export default function LoyaltyClient({
 
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
-  const effectiveTierRef = useRef(effectiveTier);
-  useEffect(() => { effectiveTierRef.current = effectiveTier; }, [effectiveTier]);
 
-  /* ---------- emote loading ---------- */
+  /* ---------- data loading ---------- */
 
   const loadEmotes = useCallback((): Promise<EmoteData> => {
     if (emoteData) return Promise.resolve(emoteData);
@@ -888,6 +1271,33 @@ export default function LoyaltyClient({
     loadEmotes().catch(() => {});
   }, [loadEmotes]);
 
+  const loadCustomPacks = useCallback((): Promise<CustomPack[]> => {
+    if (customPacksPromiseRef.current) return customPacksPromiseRef.current;
+
+    const promise = fetch('/api/loyalty/custom-packs', { cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((data: any) => {
+        const packs: CustomPack[] = Array.isArray(data.packs) ? data.packs : [];
+        setCustomPacks(packs);
+        setCustomPacksLoaded(true);
+        return packs;
+      })
+      .catch(() => {
+        setCustomPacksLoaded(true);
+        return [] as CustomPack[];
+      })
+      .finally(() => {
+        customPacksPromiseRef.current = null;
+      });
+
+    customPacksPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  const requestCustomPacks = useCallback(() => {
+    loadCustomPacks().catch(() => {});
+  }, [loadCustomPacks]);
+
   /* ---------- main render loop ---------- */
 
   useEffect(() => {
@@ -905,7 +1315,6 @@ export default function LoyaltyClient({
         activeTierRef.current !== null ||
         editingRef.current !== null;
       if (!isFrozen) mainT += dt;
-      lastMainTRef.current = mainT;
 
       const decoT = (now - startTime) / 1000;
       const size = viewportSizeRef.current;
@@ -917,7 +1326,6 @@ export default function LoyaltyClient({
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const dpr = Math.min(2, window.devicePixelRatio || 1);
-
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.setTransform(dpr, 0, 0, dpr, -pan * dpr, 0);
@@ -928,21 +1336,9 @@ export default function LoyaltyClient({
 
           const decoColors = [th.deco1, th.deco2, th.deco3, th.deco4, th.deco5];
           for (let i = 0; i < 5; i++) {
-            drawDecoWave(
-              ctx,
-              decoColors[i],
-              (x) => decoPathY(x, i, decoT, size.height),
-              startX, endX, DECO_POINTS,
-            );
+            drawDecoWave(ctx, decoColors[i], (x) => decoPathY(x, i, decoT, size.height), startX, endX, DECO_POINTS);
           }
-
-          drawMainWave(
-            ctx,
-            th.accent,
-            th.stringMid,
-            (x) => mainStringY(x, mainT, size.height),
-            startX, endX, MAIN_POINTS,
-          );
+          drawMainWave(ctx, th.accent, th.stringMid, (x) => mainStringY(x, mainT, size.height), startX, endX, MAIN_POINTS);
         }
       }
 
@@ -971,9 +1367,7 @@ export default function LoyaltyClient({
       if (!dragRef.current.dragging) return;
       const dx = ev.clientX - dragRef.current.startX;
       dragRef.current.moved = Math.max(dragRef.current.moved, Math.abs(dx));
-      if (dragRef.current.moved > 5) {
-        setPanOffset(clampOffset(dragRef.current.startOffset - dx));
-      }
+      if (dragRef.current.moved > 5) setPanOffset(clampOffset(dragRef.current.startOffset - dx));
     };
     const onUp = () => {
       dragRef.current.dragging = false;
@@ -1081,7 +1475,55 @@ export default function LoyaltyClient({
     }
   }, []);
 
-  /* ---------- claim ---------- */
+  /* ---------- pack manager ---------- */
+
+  const handleOpenPackManager = useCallback(() => {
+    setPacksManagerOpen(true);
+    loadCustomPacks().catch(() => {});
+  }, [loadCustomPacks]);
+
+  const handlePackSave = useCallback(async (draft: any) => {
+    setSavingPack(true);
+    try {
+      const body = packEditorPack && packEditorPack !== 'new'
+        ? { ...draft, id: packEditorPack.id }
+        : draft;
+      const res = await fetch('/api/loyalty/custom-packs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      // refresh list
+      await loadCustomPacks();
+      setPackEditorPack(null);
+    } catch (err: any) {
+      alert('Failed to save pack: ' + err.message);
+    } finally {
+      setSavingPack(false);
+    }
+  }, [packEditorPack, loadCustomPacks]);
+
+  const handlePackDelete = useCallback(async () => {
+    if (!packEditorPack || packEditorPack === 'new') return;
+    setSavingPack(true);
+    try {
+      const res = await fetch(`/api/loyalty/custom-packs?id=${encodeURIComponent(packEditorPack.id)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      await loadCustomPacks();
+      setPackEditorPack(null);
+    } catch (err: any) {
+      alert('Failed to delete pack: ' + err.message);
+    } finally {
+      setSavingPack(false);
+    }
+  }, [packEditorPack, loadCustomPacks]);
+
+  /* ---------- claim + open ---------- */
 
   const handleClaim = useCallback(async (tier: MergedTier) => {
     if (claimingTier !== null) return;
@@ -1096,6 +1538,19 @@ export default function LoyaltyClient({
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.claim) {
         setClaims(prev => ({ ...prev, [String(tier.tier)]: data.claim as LoyaltyClaim }));
+        if (data.claim.pendingPackId) {
+          // Optimistically register the pending pack so the modal shows
+          // "Open pack" right away, even before a refresh.
+          const pending: PendingLoyaltyPack = {
+            id: data.claim.pendingPackId,
+            packId: (data.claim.rewardKind as any).packId,
+            packName: data.claim.description.replace(/^Custom pack \*\*(.*?)\*\*.*$/, '$1'),
+            tier: tier.tier,
+            cards: [],
+            createdAt: Date.now(),
+          };
+          setPendingPacks(prev => ({ ...prev, [pending.id]: pending }));
+        }
       }
     } catch (err: any) {
       alert('Claim failed: ' + (err?.message || 'Unknown error'));
@@ -1104,18 +1559,54 @@ export default function LoyaltyClient({
     }
   }, [claimingTier]);
 
+  const handleOpenPack = useCallback(async (pending: PendingLoyaltyPack) => {
+    if (openingPackId) return;
+    setOpeningPackId(pending.id);
+    try {
+      const res = await fetch('/api/loyalty/open-pack', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pendingId: pending.id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setRevealedPack({ packName: data.packName || pending.packName, cards: data.cards || [] });
+      setPendingPacks(prev => {
+        const next = { ...prev };
+        delete next[pending.id];
+        return next;
+      });
+    } catch (err: any) {
+      alert('Failed to open pack: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setOpeningPackId(null);
+    }
+  }, [openingPackId]);
+
   /* ---------- escape ---------- */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (packEditorPack) { setPackEditorPack(null); return; }
+      if (packsManagerOpen) { setPacksManagerOpen(false); return; }
+      if (revealedPack) { setRevealedPack(null); return; }
       if (themeOpen) { handleThemeCancel(); return; }
       if (editing) setEditing(null);
       else if (activeTier) setActiveTier(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [activeTier, editing, themeOpen, handleThemeCancel]);
+  }, [activeTier, editing, themeOpen, handleThemeCancel, packsManagerOpen, packEditorPack, revealedPack]);
+
+  /* ---------- helper: pending pack for a tier ---------- */
+
+  const pendingForTier = useCallback((tierNum: number): PendingLoyaltyPack | null => {
+    for (const p of Object.values(pendingPacks)) {
+      if (p.tier === tierNum) return p;
+    }
+    return null;
+  }, [pendingPacks]);
 
   /* ---------- render ---------- */
 
@@ -1168,6 +1659,9 @@ export default function LoyaltyClient({
             >
               {adminMode ? '✕ Exit edit mode' : '⚙️ Edit tiers'}
             </button>
+            <button type="button" className="loyalty-admin-toggle" onClick={handleOpenPackManager}>
+              📦 Manage packs
+            </button>
             <div className="loyalty-admin-preview">
               <label htmlFor="preview-stardust">Preview stardust</label>
               <input
@@ -1187,9 +1681,7 @@ export default function LoyaltyClient({
                 className="loyalty-admin-reset"
                 onClick={() => setPreviewStardust(null)}
                 disabled={previewStardust === null}
-              >
-                Reset
-              </button>
+              >Reset</button>
             </div>
           </div>
         )}
@@ -1243,74 +1735,80 @@ export default function LoyaltyClient({
         </div>
       </div>
 
-      {activeTier && !adminMode && (
-        <div className="loyalty-modal-overlay" onClick={() => setActiveTier(null)}>
-          <div className="loyalty-modal" onClick={e => e.stopPropagation()}>
-            <button className="loyalty-modal__close" onClick={() => setActiveTier(null)} aria-label="Close">×</button>
-            <div className="loyalty-modal__star-big">
-              <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} theme={theme} />
-              <TierIcon icon={activeTier.icon} starSize={120} />
-            </div>
-            <div className="loyalty-modal__body">
-              <div className="loyalty-modal__eyebrow">
-                Tier {activeTier.tier} · {activeTier.stardustRequired.toLocaleString()} stardust
+      {activeTier && !adminMode && (() => {
+        const pending = pendingForTier(activeTier.tier);
+        return (
+          <div className="loyalty-modal-overlay" onClick={() => setActiveTier(null)}>
+            <div className="loyalty-modal" onClick={e => e.stopPropagation()}>
+              <button className="loyalty-modal__close" onClick={() => setActiveTier(null)} aria-label="Close">×</button>
+              <div className="loyalty-modal__star-big">
+                <StarSVG tier={activeTier.tier} size={120} unlocked={activeTier.tier <= effectiveTier} theme={theme} />
+                <TierIcon icon={activeTier.icon} starSize={120} />
               </div>
-              <h2 className="loyalty-modal__title">{activeTier.title}</h2>
-              <p className="loyalty-modal__description">{activeTier.description}</p>
-              <div className="loyalty-modal__reward">
-                <div className="loyalty-modal__reward-label">Reward</div>
-                <div className="loyalty-modal__reward-text">{activeTier.reward}</div>
-              </div>
+              <div className="loyalty-modal__body">
+                <div className="loyalty-modal__eyebrow">
+                  Tier {activeTier.tier} · {activeTier.stardustRequired.toLocaleString()} stardust
+                </div>
+                <h2 className="loyalty-modal__title">{activeTier.title}</h2>
+                <p className="loyalty-modal__description">{activeTier.description}</p>
+                <div className="loyalty-modal__reward">
+                  <div className="loyalty-modal__reward-label">Reward</div>
+                  <div className="loyalty-modal__reward-text">{activeTier.reward}</div>
+                </div>
 
-              {!trackActive ? (
-                <div className="loyalty-modal__status loyalty-modal__status--signin">
-                  Track opens January 1, 2027
-                </div>
-              ) : !signedIn ? (
-                <div className="loyalty-modal__status loyalty-modal__status--signin">
-                  Sign in to track your progress
-                </div>
-              ) : activeTier.tier > effectiveTier ? (
-                <div className="loyalty-modal__status loyalty-modal__status--progress">
-                  <div className="loyalty-modal__progress-text">
-                    {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
+                {!trackActive ? (
+                  <div className="loyalty-modal__status loyalty-modal__status--signin">
+                    Track opens January 1, 2027
                   </div>
-                  <div className="loyalty-modal__progress-bar">
-                    <div
-                      className="loyalty-modal__progress-fill"
-                      style={{
-                        width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%`,
-                      }}
-                    />
+                ) : !signedIn ? (
+                  <div className="loyalty-modal__status loyalty-modal__status--signin">
+                    Sign in to track your progress
                   </div>
-                </div>
-              ) : claims[String(activeTier.tier)] ? (
-                <div className="loyalty-modal__status loyalty-modal__status--unlocked">
-                  ✓ Claimed
-                  {!claims[String(activeTier.tier)].granted && (
-                    <small>pending manual fulfilment by an admin</small>
-                  )}
-                </div>
-              ) : !activeTier.rewardKind ? (
-                <div className="loyalty-modal__status loyalty-modal__status--unlocked">✓ Unlocked</div>
-              ) : (
-                <button
-                  type="button"
-                  className="loyalty-btn loyalty-btn--primary loyalty-btn--full"
-                  disabled={claimingTier === activeTier.tier}
-                  onClick={() => handleClaim(activeTier)}
-                >
-                  {claimingTier === activeTier.tier
-                    ? 'Claiming…'
-                    : activeTier.rewardKind.kind === 'pack'
-                      ? 'Request pack (manual fulfilment)'
-                      : 'Claim reward'}
-                </button>
-              )}
+                ) : activeTier.tier > effectiveTier ? (
+                  <div className="loyalty-modal__status loyalty-modal__status--progress">
+                    <div className="loyalty-modal__progress-text">
+                      {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
+                    </div>
+                    <div className="loyalty-modal__progress-bar">
+                      <div
+                        className="loyalty-modal__progress-fill"
+                        style={{ width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ) : pending ? (
+                  <button
+                    type="button"
+                    className="loyalty-btn loyalty-btn--primary loyalty-btn--full"
+                    disabled={openingPackId === pending.id}
+                    onClick={() => handleOpenPack(pending)}
+                  >
+                    {openingPackId === pending.id ? 'Opening…' : `Open ${pending.packName}`}
+                  </button>
+                ) : claims[String(activeTier.tier)] ? (
+                  <div className="loyalty-modal__status loyalty-modal__status--unlocked">
+                    ✓ Claimed
+                    {!claims[String(activeTier.tier)].granted && (
+                      <small>pending manual fulfilment by an admin</small>
+                    )}
+                  </div>
+                ) : !activeTier.rewardKind ? (
+                  <div className="loyalty-modal__status loyalty-modal__status--unlocked">✓ Unlocked</div>
+                ) : (
+                  <button
+                    type="button"
+                    className="loyalty-btn loyalty-btn--primary loyalty-btn--full"
+                    disabled={claimingTier === activeTier.tier}
+                    onClick={() => handleClaim(activeTier)}
+                  >
+                    {claimingTier === activeTier.tier ? 'Claiming…' : 'Claim reward'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {editing && (
         <EditTierModal
@@ -1318,6 +1816,10 @@ export default function LoyaltyClient({
           emoteData={emoteData}
           loadingEmotes={loadingEmotes}
           onRequestEmotes={requestEmotes}
+          customPacks={customPacks}
+          customPacksLoaded={customPacksLoaded}
+          onRequestCustomPacks={requestCustomPacks}
+          onOpenPackManager={handleOpenPackManager}
           onSave={handleEditSave}
           onClose={() => setEditing(null)}
         />
@@ -1329,6 +1831,35 @@ export default function LoyaltyClient({
           onPreview={handleThemePreview}
           onSave={handleThemeSave}
           onClose={handleThemeCancel}
+        />
+      )}
+
+      {packsManagerOpen && (
+        <PackManagerModal
+          packs={customPacks}
+          loading={!customPacksLoaded}
+          onRefresh={() => loadCustomPacks()}
+          onCreate={() => setPackEditorPack('new')}
+          onEdit={(p) => setPackEditorPack(p)}
+          onClose={() => setPacksManagerOpen(false)}
+        />
+      )}
+
+      {packEditorPack !== null && (
+        <PackEditorModal
+          pack={packEditorPack === 'new' ? null : packEditorPack}
+          saving={savingPack}
+          onSave={handlePackSave}
+          onDelete={packEditorPack === 'new' ? null : handlePackDelete}
+          onClose={() => setPackEditorPack(null)}
+        />
+      )}
+
+      {revealedPack && (
+        <CardRevealModal
+          packName={revealedPack.packName}
+          cards={revealedPack.cards}
+          onClose={() => setRevealedPack(null)}
         />
       )}
     </div>

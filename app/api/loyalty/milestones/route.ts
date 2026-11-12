@@ -14,11 +14,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 const KEY = "loyalty_tiers";
-
-// Longest valid emote markup we accept:
-//   <a:32CharEmoteName:1234567890123456789012345>  =  3 + 32 + 1 + 25 + 1 = 62 chars
 const MAX_ICON_LENGTH = 80;
-
 const RARITY_SET = new Set<string>(CARD_RARITIES);
 
 function sanitizeRewardKind(raw: unknown): RewardKind | undefined {
@@ -36,8 +32,11 @@ function sanitizeRewardKind(raw: unknown): RewardKind | undefined {
       if (!cardName || !rarity || !RARITY_SET.has(rarity)) return undefined;
       return { kind: 'card', cardName, rarity: rarity as CardRarity };
     }
-    case 'pack':
-      return { kind: 'pack' };
+    case 'pack': {
+      const packId = typeof r.packId === 'string' ? r.packId.trim().slice(0, 100) : '';
+      if (!packId) return undefined;
+      return { kind: 'pack', packId };
+    }
     case 'minipack':
       return { kind: 'minipack' };
     case 'custom':
@@ -66,6 +65,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing overrides object" }, { status: 400 });
   }
 
+  // Pre-load existing pack IDs so a tier can only reference a real preset.
+  const packRaw = await kv.hgetall('loyalty_custom_packs').catch(() => null);
+  const existingPackIds = new Set<string>(
+    packRaw ? Object.keys(packRaw) : []
+  );
+
   const cleaned: TierOverrides = {};
   for (const [tierKey, val] of Object.entries(incoming)) {
     const tier = Number(tierKey);
@@ -87,7 +92,15 @@ export async function POST(req: Request) {
       entry.reward = t.reward.slice(0, 300);
     }
     const rewardKind = sanitizeRewardKind(t.rewardKind);
-    if (rewardKind) entry.rewardKind = rewardKind;
+    if (rewardKind) {
+      // Extra guard: `pack` rewards must reference an existing preset.
+      if (rewardKind.kind === 'pack' && !existingPackIds.has(rewardKind.packId)) {
+        // Drop the rewardKind, keep the display text. Admin will see
+        // the pack choice isn't persisted next time they open the editor.
+      } else {
+        entry.rewardKind = rewardKind;
+      }
+    }
 
     if (Object.keys(entry).length > 0) cleaned[String(tier)] = entry;
   }

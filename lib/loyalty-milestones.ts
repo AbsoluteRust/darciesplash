@@ -9,10 +9,8 @@ export type TierContent = {
   reward: string;
 };
 
-/* ---------- card rarities ---------- */
+/* ---------- card rarities (from bot config.js ALL_TIERS) ---------- */
 
-// Must match RARITY_ORDER in the bot's config.js. Used both to validate
-// `card` reward kinds server-side and to power the admin rarity dropdown.
 export const CARD_RARITIES = [
   'Common',
   'Uncommon',
@@ -24,15 +22,70 @@ export const CARD_RARITIES = [
 ] as const;
 export type CardRarity = typeof CARD_RARITIES[number];
 
+// Subset that can actually be rolled inside a pack — matches
+// PER_CARD_TIERS in the bot's config.js (Mythic and Contraband are
+// perCard: false and are only ever granted via specific-card rewards).
+export const PACK_RARITIES = [
+  'Common',
+  'Uncommon',
+  'Rare',
+  'Epic',
+  'Legendary',
+] as const;
+export type PackRarity = typeof PACK_RARITIES[number];
+
+/* ---------- collections (from bot config.js COLLECTION_CHOICES) ---------- */
+
+export const CARD_COLLECTIONS = [
+  { id: 'darcie',    label: 'Darcie' },
+  { id: 'tobi',      label: 'Tobi' },
+  { id: 'madolche',  label: 'Madolche' },
+  { id: 'celestial', label: 'Celestial' },
+  { id: 'lunalux',   label: 'LunaLux' },
+  { id: 'halo',      label: 'Halo' },
+] as const;
+
+export type CollectionId = typeof CARD_COLLECTIONS[number]['id'];
+
+/* ---------- custom packs ---------- */
+
+export type RarityFilter =
+  | { mode: 'all' }
+  | { mode: 'single'; rarity: PackRarity }
+  | { mode: 'range'; min: PackRarity; max: PackRarity }
+  | { mode: 'list'; rarities: PackRarity[] };
+
+export type CollectionFilter =
+  | { mode: 'any' }
+  | { mode: 'specific'; collections: string[] }   // each card: random from union
+  | { mode: 'distinct'; collections: string[] };  // card[i]: collections[i % n]
+
+export type CustomPack = {
+  id: string;
+  name: string;
+  cardCount: number;
+  rarityFilter: RarityFilter;
+  collectionFilter: CollectionFilter;
+  createdAt: number;
+  createdBy: string;
+  updatedAt?: number;
+};
+
+export type PendingLoyaltyPack = {
+  id: string;
+  packId: string;
+  packName: string;
+  tier: number;
+  cards: { name: string; rarity: string; collection: string }[];
+  createdAt: number;
+};
+
 /* ---------- reward kinds ---------- */
 
-// A reward a user can claim once they reach a tier. `custom` and `pack`
-// are declared so admins can log intent, but they still fall through to
-// manual fulfilment in the bot (see lib/loyalty-rewards.js).
 export type RewardKind =
   | { kind: 'pack_points'; amount: number }
   | { kind: 'card'; cardName: string; rarity: CardRarity }
-  | { kind: 'pack' }
+  | { kind: 'pack'; packId: string }
   | { kind: 'minipack' }
   | { kind: 'custom' };
 
@@ -43,6 +96,7 @@ export type LoyaltyClaim = {
   granted: boolean;
   manual?: boolean;
   description: string;
+  pendingPackId?: string;
 };
 export type LoyaltyClaims = Record<string, LoyaltyClaim>;
 

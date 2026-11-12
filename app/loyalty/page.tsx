@@ -11,6 +11,7 @@ import {
   type TierOverrides,
   type LoyaltyClaims,
   type LoyaltyClaim,
+  type PendingLoyaltyPack,
 } from '@/lib/loyalty-milestones';
 import LoyaltyClient from './LoyaltyClient';
 import './page.css';
@@ -27,15 +28,12 @@ export default async function LoyaltyPage() {
   const userId = session?.user?.id || null;
   const isAdmin = !!userId && ADMIN_IDS.has(userId);
 
-  const [storedOverrides, storedTheme, storedClaims, stardustRaw] = await Promise.all([
+  const [storedOverrides, storedTheme, storedClaims, stardustRaw, pendingRaw] = await Promise.all([
     kv.get('loyalty_tiers').catch(() => null),
     kv.get('loyalty_theme').catch(() => null),
-    userId
-      ? kv.hgetall(`loyalty_claims:${userId}`).catch(() => null)
-      : Promise.resolve(null),
-    userId
-      ? kv.hget('user_stardust', userId).catch(() => null)
-      : Promise.resolve(null),
+    userId ? kv.hgetall(`loyalty_claims:${userId}`).catch(() => null) : Promise.resolve(null),
+    userId ? kv.hget('user_stardust', userId).catch(() => null) : Promise.resolve(null),
+    userId ? kv.hgetall(`user_loyalty_packs:${userId}`).catch(() => null) : Promise.resolve(null),
   ]);
 
   const overrides: TierOverrides =
@@ -50,19 +48,22 @@ export default async function LoyaltyPage() {
   const claims: LoyaltyClaims = {};
   if (storedClaims) {
     for (const [k, v] of Object.entries(storedClaims)) {
-      try {
-        claims[k] = typeof v === 'string' ? JSON.parse(v) : (v as LoyaltyClaim);
-      } catch { /* skip malformed */ }
+      try { claims[k] = typeof v === 'string' ? JSON.parse(v) : (v as LoyaltyClaim); }
+      catch { /* skip */ }
+    }
+  }
+
+  const pendingPacks: Record<string, PendingLoyaltyPack> = {};
+  if (pendingRaw) {
+    for (const [k, v] of Object.entries(pendingRaw)) {
+      try { pendingPacks[k] = typeof v === 'string' ? JSON.parse(v) : (v as PendingLoyaltyPack); }
+      catch { /* skip */ }
     }
   }
 
   const tiers = buildAllTiers(overrides);
   const trackActive = isTrackActive();
 
-  // Read directly from the bot's stardust balance — lib/stardust.js writes
-  // to `user_stardust` and that's the canonical number. Recomputing from
-  // badges here (as a previous version of this page did) drops the weekly
-  // pack-tier bonuses and over-authorises claims.
   const currentStardust = trackActive ? (Number(stardustRaw) || 0) : 0;
   const currentTier = tierForStardust(currentStardust);
 
@@ -77,6 +78,7 @@ export default async function LoyaltyPage() {
       initialTiers={tiers}
       initialTheme={theme}
       initialClaims={claims}
+      initialPendingPacks={pendingPacks}
     />
   );
 }
