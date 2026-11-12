@@ -22,9 +22,8 @@ export const CARD_RARITIES = [
 ] as const;
 export type CardRarity = typeof CARD_RARITIES[number];
 
-// Subset that can actually be rolled inside a pack — matches
-// PER_CARD_TIERS in the bot's config.js (Mythic and Contraband are
-// perCard: false and are only ever granted via specific-card rewards).
+// Rarities that can be rolled in a pack — mirrors PER_CARD_TIERS in
+// the bot's config.js. Mythic and Contraband are perCard: false.
 export const PACK_RARITIES = [
   'Common',
   'Uncommon',
@@ -47,7 +46,7 @@ export const CARD_COLLECTIONS = [
 
 export type CollectionId = typeof CARD_COLLECTIONS[number]['id'];
 
-/* ---------- custom packs ---------- */
+/* ---------- custom packs (definitions) ---------- */
 
 export type RarityFilter =
   | { mode: 'all' }
@@ -57,8 +56,8 @@ export type RarityFilter =
 
 export type CollectionFilter =
   | { mode: 'any' }
-  | { mode: 'specific'; collections: string[] }   // each card: random from union
-  | { mode: 'distinct'; collections: string[] };  // card[i]: collections[i % n]
+  | { mode: 'specific'; collections: string[] }
+  | { mode: 'distinct'; collections: string[] };
 
 export type CustomPack = {
   id: string;
@@ -71,12 +70,19 @@ export type CustomPack = {
   updatedAt?: number;
 };
 
+/* ---------- pending loyalty packs (client view) ----------
+ *
+ * The bot stores the full generated card list under
+ * `user_loyalty_packs:<discordId>` in KV. That record is server-side
+ * only. The client view below intentionally omits `cards` — the user
+ * must call /api/loyalty/open-pack to find out what's inside.
+ */
+
 export type PendingLoyaltyPack = {
   id: string;
   packId: string;
   packName: string;
   tier: number;
-  cards: { name: string; rarity: string; collection: string }[];
   createdAt: number;
 };
 

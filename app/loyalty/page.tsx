@@ -27,13 +27,15 @@ export default async function LoyaltyPage() {
   const session = await auth();
   const userId = session?.user?.id || null;
   const isAdmin = !!userId && ADMIN_IDS.has(userId);
+  const botUrl = (process.env.PI_BOT_URL || '').replace(/\/$/, '');
 
-  const [storedOverrides, storedTheme, storedClaims, stardustRaw, pendingRaw] = await Promise.all([
+  // Tier overrides + theme are public/admin data. Pending packs and
+  // stardust come from the bot — the website never reads card data
+  // from KV directly.
+  const [storedOverrides, storedTheme, storedClaims] = await Promise.all([
     kv.get('loyalty_tiers').catch(() => null),
     kv.get('loyalty_theme').catch(() => null),
     userId ? kv.hgetall(`loyalty_claims:${userId}`).catch(() => null) : Promise.resolve(null),
-    userId ? kv.hget('user_stardust', userId).catch(() => null) : Promise.resolve(null),
-    userId ? kv.hgetall(`user_loyalty_packs:${userId}`).catch(() => null) : Promise.resolve(null),
   ]);
 
   const overrides: TierOverrides =
@@ -53,18 +55,34 @@ export default async function LoyaltyPage() {
     }
   }
 
-  const pendingPacks: Record<string, PendingLoyaltyPack> = {};
-  if (pendingRaw) {
-    for (const [k, v] of Object.entries(pendingRaw)) {
-      try { pendingPacks[k] = typeof v === 'string' ? JSON.parse(v) : (v as PendingLoyaltyPack); }
-      catch { /* skip */ }
+  let pendingPacks: PendingLoyaltyPack[] = [];
+  let currentStardust = 0;
+
+  if (userId && botUrl) {
+    const auth = { Authorization: `Bearer ${process.env.PI_BOT_SECRET}` };
+    const [pendingRes, stardustRes] = await Promise.allSettled([
+      fetch(`${botUrl}/api/loyalty/pending-packs?userId=${userId}`, { headers: auth, cache: 'no-store' }),
+      fetch(`${botUrl}/api/user/stardust?userId=${userId}`, { headers: auth, cache: 'no-store' }),
+    ]);
+
+    if (pendingRes.status === 'fulfilled' && pendingRes.value.ok) {
+      const data = await pendingRes.value.json().catch(() => ({}));
+      if (Array.isArray(data?.packs)) {
+        pendingPacks = data.packs.filter((p: any) =>
+          p && typeof p.id === 'string' && typeof p.packName === 'string'
+        );
+      }
     }
+
+    // Stardust: read directly from KV — bot writes to `user_stardust`.
+    // (This is fine; stardust is not secret, it's just the balance.)
+    const stardustRaw = await kv.hget('user_stardust', userId).catch(() => null);
+    currentStardust = Number(stardustRaw) || 0;
   }
 
   const tiers = buildAllTiers(overrides);
   const trackActive = isTrackActive();
-
-  const currentStardust = trackActive ? (Number(stardustRaw) || 0) : 0;
+  if (!trackActive) currentStardust = 0;
   const currentTier = tierForStardust(currentStardust);
 
   return (

@@ -65,12 +65,8 @@ function decoPathY(x: number, idx: number, t: number, height: number): number {
 /* ---------- canvas helpers ---------- */
 
 function drawDecoWave(
-  ctx: CanvasRenderingContext2D,
-  color: string,
-  waveFn: (x: number) => number,
-  startX: number,
-  endX: number,
-  points: number,
+  ctx: CanvasRenderingContext2D, color: string,
+  waveFn: (x: number) => number, startX: number, endX: number, points: number,
 ) {
   const grad = ctx.createLinearGradient(0, 0, WORLD_WIDTH, 0);
   grad.addColorStop(0,    hexToRgba(color, 0));
@@ -78,7 +74,6 @@ function drawDecoWave(
   grad.addColorStop(0.5,  hexToRgba(color, 0.28));
   grad.addColorStop(0.85, hexToRgba(color, 0.14));
   grad.addColorStop(1,    hexToRgba(color, 0));
-
   ctx.strokeStyle = grad;
   ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
@@ -87,20 +82,14 @@ function drawDecoWave(
   for (let i = 0; i <= points; i++) {
     const x = startX + (i / points) * (endX - startX);
     const y = waveFn(x);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   ctx.stroke();
 }
 
 function drawMainWave(
-  ctx: CanvasRenderingContext2D,
-  accent: string,
-  core: string,
-  waveFn: (x: number) => number,
-  startX: number,
-  endX: number,
-  points: number,
+  ctx: CanvasRenderingContext2D, accent: string, core: string,
+  waveFn: (x: number) => number, startX: number, endX: number, points: number,
 ) {
   const grad = ctx.createLinearGradient(0, 0, WORLD_WIDTH, 0);
   grad.addColorStop(0,    hexToRgba(accent, 0));
@@ -108,30 +97,18 @@ function drawMainWave(
   grad.addColorStop(0.50, hexToRgba(core,   0.9));
   grad.addColorStop(0.90, hexToRgba(accent, 0.35));
   grad.addColorStop(1,    hexToRgba(accent, 0));
-
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
   ctx.beginPath();
   for (let i = 0; i <= points; i++) {
     const x = startX + (i / points) * (endX - startX);
     const y = waveFn(x);
-    if (i === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
-
   ctx.strokeStyle = grad;
-  ctx.lineWidth = 8;
-  ctx.globalAlpha = 0.22;
-  ctx.stroke();
-
-  ctx.lineWidth = 4;
-  ctx.globalAlpha = 0.4;
-  ctx.stroke();
-
-  ctx.lineWidth = 2.5;
-  ctx.globalAlpha = 1;
-  ctx.stroke();
+  ctx.lineWidth = 8; ctx.globalAlpha = 0.22; ctx.stroke();
+  ctx.lineWidth = 4; ctx.globalAlpha = 0.4; ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.globalAlpha = 1; ctx.stroke();
 }
 
 /* ---------- star tier helpers ---------- */
@@ -151,13 +128,11 @@ function starSize(tier: number): number {
 }
 
 function starPalette(tier: number, unlocked: boolean, theme: LoyaltyTheme) {
-  if (!unlocked) {
-    return {
-      stroke: hexToRgba(theme.starLocked, 0.45),
-      fill: hexToRgba(theme.starLocked, 0.15),
-      halo: 'transparent',
-    };
-  }
+  if (!unlocked) return {
+    stroke: hexToRgba(theme.starLocked, 0.45),
+    fill: hexToRgba(theme.starLocked, 0.15),
+    halo: 'transparent',
+  };
   if (tier === 100) return {
     stroke: hexToRgba(theme.starFinal, 0.98),
     fill: hexToRgba(theme.starFinal, 0.4),
@@ -194,16 +169,11 @@ function StarSVG({ tier, size, unlocked, theme }: {
       {unlocked && <circle cx="50" cy="50" r="48" fill={pal.halo} />}
       <polygon
         points="50,8 62,40 96,40 68,60 79,93 50,74 21,93 32,60 4,40 38,40"
-        fill={pal.fill}
-        stroke={pal.stroke}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
+        fill={pal.fill} stroke={pal.stroke} strokeWidth="1.5" strokeLinejoin="round"
       />
     </svg>
   );
 }
-
-/* ---------- tier icon ---------- */
 
 function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
   const parsed = useMemo(() => parseTierIcon(icon), [icon]);
@@ -211,35 +181,18 @@ function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
     const ext = parsed.animated ? 'gif' : 'webp';
     const url = `https://cdn.discordapp.com/emojis/${parsed.id}.${ext}?size=96`;
     const size = Math.round(starSize * 0.55);
-    return (
-      <img
-        src={url}
-        alt={parsed.name}
-        className="loyalty-tier-icon-emote"
-        style={{ width: size, height: size }}
-        draggable={false}
-        loading="lazy"
-        decoding="async"
-      />
-    );
+    return <img src={url} alt={parsed.name} className="loyalty-tier-icon-emote" style={{ width: size, height: size }} draggable={false} loading="lazy" decoding="async" />;
   }
   if (parsed.type === 'emoji') {
     const size = Math.round(starSize * 0.32);
-    return (
-      <span className="loyalty-tier-icon-emoji" style={{ fontSize: `${size}px` }}>
-        {parsed.value}
-      </span>
-    );
+    return <span className="loyalty-tier-icon-emoji" style={{ fontSize: `${size}px` }}>{parsed.value}</span>;
   }
   return null;
 }
 
 /* ---------- emote picker ---------- */
 
-type EmoteInfo = {
-  id: string; name: string; animated: boolean; guildName: string;
-  collections: string[]; ignored: boolean;
-};
+type EmoteInfo = { id: string; name: string; animated: boolean; guildName: string; collections: string[]; ignored: boolean };
 type CollectionInfo = { id: string; label: string };
 type EmoteData = { emotes: EmoteInfo[]; collections: CollectionInfo[] };
 
@@ -260,9 +213,7 @@ function EmotePicker({
       if (collectionFilter !== 'all') {
         if (collectionFilter === 'unassigned') {
           if (e.collections.length > 0) return false;
-        } else {
-          if (!e.collections.includes(collectionFilter)) return false;
-        }
+        } else if (!e.collections.includes(collectionFilter)) return false;
       }
       if (q && !e.name.toLowerCase().includes(q)) return false;
       return true;
@@ -272,35 +223,20 @@ function EmotePicker({
   return (
     <div className="loyalty-emote-picker">
       <div className="loyalty-emote-picker__toolbar">
-        <input
-          type="text"
-          placeholder="Search emotes…"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="loyalty-emote-picker__search"
-        />
-        <select
-          value={collectionFilter}
-          onChange={e => setCollectionFilter(e.target.value)}
-          className="loyalty-emote-picker__filter"
-        >
+        <input type="text" placeholder="Search emotes…" value={search} onChange={e => setSearch(e.target.value)} className="loyalty-emote-picker__search" />
+        <select value={collectionFilter} onChange={e => setCollectionFilter(e.target.value)} className="loyalty-emote-picker__filter">
           <option value="all">All collections</option>
           <option value="unassigned">Unassigned</option>
-          {collections.map(c => (
-            <option key={c.id} value={c.id}>{c.label}</option>
-          ))}
+          {collections.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
         <label className="loyalty-emote-picker__toggle">
           <input type="checkbox" checked={showIgnored} onChange={e => setShowIgnored(e.target.checked)} />
           Ignored
         </label>
         {selectedId && (
-          <button type="button" className="loyalty-emote-picker__clear" onClick={onClear}>
-            Clear
-          </button>
+          <button type="button" className="loyalty-emote-picker__clear" onClick={onClear}>Clear</button>
         )}
       </div>
-
       {loading ? (
         <div className="loyalty-emote-picker__empty">Loading emotes…</div>
       ) : filtered.length === 0 ? (
@@ -325,7 +261,6 @@ function EmotePicker({
           })}
         </div>
       )}
-
       <div className="loyalty-emote-picker__status">
         {filtered.length} emote{filtered.length === 1 ? '' : 's'}
         {selectedId && ' · 1 selected'}
@@ -334,16 +269,12 @@ function EmotePicker({
   );
 }
 
-/* ---------- custom pack editor modal ---------- */
+/* ---------- pack editor modal ---------- */
 
 function PackEditorModal({
-  pack,
-  onSave,
-  onDelete,
-  onClose,
-  saving,
+  pack, onSave, onDelete, onClose, saving,
 }: {
-  pack: CustomPack | null;  // null = new
+  pack: CustomPack | null;
   onSave: (draft: Omit<CustomPack, 'id' | 'createdAt' | 'createdBy' | 'updatedAt'>) => Promise<void>;
   onDelete: (() => Promise<void>) | null;
   onClose: () => void;
@@ -351,8 +282,6 @@ function PackEditorModal({
 }) {
   const [name, setName] = useState(pack?.name ?? '');
   const [cardCount, setCardCount] = useState(pack?.cardCount ?? 5);
-
-  // rarity
   const initialRarityMode = pack?.rarityFilter.mode ?? 'all';
   const [rarityMode, setRarityMode] = useState<RarityFilter['mode']>(initialRarityMode);
   const [raritySingle, setRaritySingle] = useState<PackRarity>(
@@ -368,8 +297,6 @@ function PackEditorModal({
     if (pack?.rarityFilter.mode === 'list') return new Set(pack.rarityFilter.rarities);
     return new Set(['Rare', 'Epic']);
   });
-
-  // collection
   const initialCollMode = pack?.collectionFilter.mode ?? 'any';
   const [collectionMode, setCollectionMode] = useState<CollectionFilter['mode']>(initialCollMode);
   const [collectionIds, setCollectionIds] = useState<Set<string>>(() => {
@@ -377,7 +304,6 @@ function PackEditorModal({
     if (pack?.collectionFilter.mode === 'distinct') return new Set(pack.collectionFilter.collections);
     return new Set(['darcie', 'tobi']);
   });
-
   const [error, setError] = useState<string | null>(null);
 
   function toggleRarity(r: PackRarity) {
@@ -385,7 +311,6 @@ function PackEditorModal({
     if (next.has(r)) next.delete(r); else next.add(r);
     setRarityList(next);
   }
-
   function toggleCollection(id: string) {
     const next = new Set(collectionIds);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -394,9 +319,7 @@ function PackEditorModal({
 
   async function handleSave() {
     if (!name.trim()) return setError('Name is required');
-    if (!Number.isFinite(cardCount) || cardCount < 1 || cardCount > 20) {
-      return setError('Card count must be 1–20');
-    }
+    if (!Number.isFinite(cardCount) || cardCount < 1 || cardCount > 20) return setError('Card count must be 1–20');
 
     let rarityFilter: RarityFilter;
     if (rarityMode === 'all') rarityFilter = { mode: 'all' };
@@ -419,12 +342,7 @@ function PackEditorModal({
     }
 
     setError(null);
-    await onSave({
-      name: name.trim(),
-      cardCount: Math.floor(cardCount),
-      rarityFilter,
-      collectionFilter,
-    });
+    await onSave({ name: name.trim(), cardCount: Math.floor(cardCount), rarityFilter, collectionFilter });
   }
 
   return (
@@ -432,39 +350,23 @@ function PackEditorModal({
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
-          <div className="loyalty-modal__eyebrow">
-            {pack ? `Custom pack · ${pack.id}` : 'New custom pack'}
-          </div>
+          <div className="loyalty-modal__eyebrow">{pack ? `Custom pack · ${pack.id}` : 'New custom pack'}</div>
           <h2 className="loyalty-modal__title">{pack ? 'Edit Pack' : 'Create Pack'}</h2>
 
           <div className="loyalty-form">
             <label className="loyalty-field loyalty-field--full">
               <span>Name</span>
-              <input
-                type="text"
-                maxLength={100}
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Starter Pack"
-              />
+              <input type="text" maxLength={100} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Starter Pack" />
             </label>
-
             <label className="loyalty-field loyalty-field--full">
               <span>Card count (1–20)</span>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={cardCount}
-                onChange={e => setCardCount(Number(e.target.value) || 1)}
-              />
+              <input type="number" min={1} max={20} value={cardCount} onChange={e => setCardCount(Number(e.target.value) || 1)} />
             </label>
 
             <div className="loyalty-form-group">
               <div className="loyalty-form-group__title">Rarity filter</div>
               <p className="loyalty-form-group__hint">
-                Excluded rarities roll their chance into the lowest selected rarity. A Rare+Epic
-                pack rolls at ~99.4% Rare and 0.6% Epic.
+                Excluded rarities roll their chance into the lowest selected rarity.
               </p>
               <label className="loyalty-field loyalty-field--full">
                 <span>Mode</span>
@@ -475,7 +377,6 @@ function PackEditorModal({
                   <option value="list">Specific list</option>
                 </select>
               </label>
-
               {rarityMode === 'single' && (
                 <label className="loyalty-field loyalty-field--full">
                   <span>Rarity</span>
@@ -484,7 +385,6 @@ function PackEditorModal({
                   </select>
                 </label>
               )}
-
               {rarityMode === 'range' && (
                 <div className="loyalty-pack-editor__inline">
                   <label className="loyalty-field">
@@ -501,16 +401,11 @@ function PackEditorModal({
                   </label>
                 </div>
               )}
-
               {rarityMode === 'list' && (
                 <div className="loyalty-pack-editor__inline">
                   {PACK_RARITIES.map(r => (
                     <label key={r} className="loyalty-emote-picker__toggle">
-                      <input
-                        type="checkbox"
-                        checked={rarityList.has(r)}
-                        onChange={() => toggleRarity(r)}
-                      />
+                      <input type="checkbox" checked={rarityList.has(r)} onChange={() => toggleRarity(r)} />
                       {r}
                     </label>
                   ))}
@@ -528,26 +423,19 @@ function PackEditorModal({
                   <option value="distinct">Distinct — one card from each collection</option>
                 </select>
               </label>
-
               {(collectionMode === 'specific' || collectionMode === 'distinct') && (
                 <div className="loyalty-pack-editor__inline">
                   {CARD_COLLECTIONS.map(c => (
                     <label key={c.id} className="loyalty-emote-picker__toggle">
-                      <input
-                        type="checkbox"
-                        checked={collectionIds.has(c.id)}
-                        onChange={() => toggleCollection(c.id)}
-                      />
+                      <input type="checkbox" checked={collectionIds.has(c.id)} onChange={() => toggleCollection(c.id)} />
                       {c.label}
                     </label>
                   ))}
                 </div>
               )}
-
               {collectionMode === 'distinct' && (
                 <p className="loyalty-form-group__hint">
-                  Slot <em>i</em> uses collection <code>i mod n</code>. With 5 slots and 5
-                  collections, each collection gets exactly one card.
+                  Slot <em>i</em> uses collection <code>i mod n</code>. With 5 slots and 5 collections, each collection gets exactly one card.
                 </p>
               )}
             </div>
@@ -558,14 +446,10 @@ function PackEditorModal({
           <div className="loyalty-form__actions">
             {onDelete && (
               <button
-                type="button"
-                className="loyalty-btn"
+                type="button" className="loyalty-btn"
                 onClick={() => { if (confirm('Delete this pack? Tiers using it will lose their reward config.')) onDelete(); }}
-                disabled={saving}
-                style={{ marginRight: 'auto' }}
-              >
-                Delete
-              </button>
+                disabled={saving} style={{ marginRight: 'auto' }}
+              >Delete</button>
             )}
             <button type="button" className="loyalty-btn" onClick={onClose} disabled={saving}>Cancel</button>
             <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={handleSave} disabled={saving}>
@@ -578,22 +462,13 @@ function PackEditorModal({
   );
 }
 
-/* ---------- custom packs list modal ---------- */
+/* ---------- pack manager modal ---------- */
 
 function PackManagerModal({
-  packs,
-  loading,
-  onRefresh,
-  onCreate,
-  onEdit,
-  onClose,
+  packs, loading, onRefresh, onCreate, onEdit, onClose,
 }: {
-  packs: CustomPack[];
-  loading: boolean;
-  onRefresh: () => void;
-  onCreate: () => void;
-  onEdit: (p: CustomPack) => void;
-  onClose: () => void;
+  packs: CustomPack[]; loading: boolean; onRefresh: () => void;
+  onCreate: () => void; onEdit: (p: CustomPack) => void; onClose: () => void;
 }) {
   return (
     <div className="loyalty-modal-overlay" onClick={onClose}>
@@ -609,9 +484,7 @@ function PackManagerModal({
           {loading ? (
             <div className="loyalty-emote-picker__empty">Loading packs…</div>
           ) : packs.length === 0 ? (
-            <div className="loyalty-emote-picker__empty">
-              No packs yet. Create one to assign it to a tier.
-            </div>
+            <div className="loyalty-emote-picker__empty">No packs yet. Create one to assign it to a tier.</div>
           ) : (
             <div className="loyalty-packs-list">
               {packs.map(p => (
@@ -639,9 +512,7 @@ function PackManagerModal({
             <button type="button" className="loyalty-btn" onClick={onRefresh}>Refresh</button>
             <div style={{ flex: 1 }} />
             <button type="button" className="loyalty-btn" onClick={onClose}>Close</button>
-            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={onCreate}>
-              New pack
-            </button>
+            <button type="button" className="loyalty-btn loyalty-btn--primary" onClick={onCreate}>New pack</button>
           </div>
         </div>
       </div>
@@ -654,16 +525,9 @@ function PackManagerModal({
 type KindType = 'none' | 'pack_points' | 'card' | 'pack' | 'minipack' | 'custom';
 
 function EditTierModal({
-  tier,
-  emoteData,
-  loadingEmotes,
-  onRequestEmotes,
-  customPacks,
-  customPacksLoaded,
-  onRequestCustomPacks,
-  onOpenPackManager,
-  onSave,
-  onClose,
+  tier, emoteData, loadingEmotes, onRequestEmotes,
+  customPacks, customPacksLoaded, onRequestCustomPacks, onOpenPackManager,
+  onSave, onClose,
 }: {
   tier: MergedTier;
   emoteData: EmoteData | null;
@@ -677,57 +541,33 @@ function EditTierModal({
   onClose: () => void;
 }) {
   const initial = useMemo(() => parseTierIcon(tier.icon), [tier.icon]);
-  const [iconMode, setIconMode] = useState<'emoji' | 'emote'>(
-    initial.type === 'emote' ? 'emote' : 'emoji'
-  );
-  const [emojiValue, setEmojiValue] = useState(
-    initial.type === 'emoji' ? initial.value : '⭐'
-  );
+  const [iconMode, setIconMode] = useState<'emoji' | 'emote'>(initial.type === 'emote' ? 'emote' : 'emoji');
+  const [emojiValue, setEmojiValue] = useState(initial.type === 'emoji' ? initial.value : '⭐');
   const [emoteValue, setEmoteValue] = useState(
-    initial.type === 'emote'
-      ? buildEmoteMarkup(initial.id, initial.name, initial.animated)
-      : ''
+    initial.type === 'emote' ? buildEmoteMarkup(initial.id, initial.name, initial.animated) : ''
   );
-  const [form, setForm] = useState({
-    title: tier.title,
-    description: tier.description,
-    reward: tier.reward,
-  });
+  const [form, setForm] = useState({ title: tier.title, description: tier.description, reward: tier.reward });
 
   const initialKind: KindType = useMemo(() => {
     const k = tier.rewardKind?.kind;
-    return k === 'pack_points' || k === 'card' || k === 'pack' || k === 'minipack' || k === 'custom'
-      ? k
-      : 'none';
+    return k === 'pack_points' || k === 'card' || k === 'pack' || k === 'minipack' || k === 'custom' ? k : 'none';
   }, [tier.rewardKind]);
   const [kindType, setKindType] = useState<KindType>(initialKind);
   const [pointsAmount, setPointsAmount] = useState(
     tier.rewardKind?.kind === 'pack_points' ? String(tier.rewardKind.amount) : ''
   );
-  const [cardName, setCardName] = useState(
-    tier.rewardKind?.kind === 'card' ? tier.rewardKind.cardName : ''
-  );
-  const [cardRarity, setCardRarity] = useState<CardRarity | ''>(
-    tier.rewardKind?.kind === 'card' ? tier.rewardKind.rarity : ''
-  );
-  const [packId, setPackId] = useState<string>(
-    tier.rewardKind?.kind === 'pack' ? tier.rewardKind.packId : ''
-  );
+  const [cardName, setCardName] = useState(tier.rewardKind?.kind === 'card' ? tier.rewardKind.cardName : '');
+  const [cardRarity, setCardRarity] = useState<CardRarity | ''>(tier.rewardKind?.kind === 'card' ? tier.rewardKind.rarity : '');
+  const [packId, setPackId] = useState<string>(tier.rewardKind?.kind === 'pack' ? tier.rewardKind.packId : '');
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (iconMode === 'emote') onRequestEmotes();
-  }, [iconMode, onRequestEmotes]);
-
-  useEffect(() => {
-    if (kindType === 'pack') onRequestCustomPacks();
-  }, [kindType, onRequestCustomPacks]);
+  useEffect(() => { if (iconMode === 'emote') onRequestEmotes(); }, [iconMode, onRequestEmotes]);
+  useEffect(() => { if (kindType === 'pack') onRequestCustomPacks(); }, [kindType, onRequestCustomPacks]);
 
   const selectedEmoteId = useMemo(() => {
     const p = parseTierIcon(emoteValue);
     return p.type === 'emote' ? p.id : null;
   }, [emoteValue]);
-
   const previewIcon = iconMode === 'emoji' ? emojiValue : emoteValue;
 
   function handleSave() {
@@ -739,9 +579,7 @@ function EditTierModal({
     let rewardKind: RewardKind | undefined;
     if (kindType === 'pack_points') {
       const n = Math.floor(Number(pointsAmount));
-      if (!Number.isFinite(n) || n <= 0) {
-        return setError('Pack points must be a positive whole number');
-      }
+      if (!Number.isFinite(n) || n <= 0) return setError('Pack points must be a positive whole number');
       rewardKind = { kind: 'pack_points', amount: n };
     } else if (kindType === 'card') {
       const name = cardName.trim();
@@ -750,8 +588,7 @@ function EditTierModal({
       rewardKind = { kind: 'card', cardName: name, rarity: cardRarity };
     } else if (kindType === 'pack') {
       if (!packId) return setError('Select a pack');
-      const exists = customPacks.some(p => p.id === packId);
-      if (!exists) return setError('Selected pack no longer exists — pick another');
+      if (!customPacks.some(p => p.id === packId)) return setError('Selected pack no longer exists — pick another');
       rewardKind = { kind: 'pack', packId };
     } else if (kindType === 'minipack') {
       rewardKind = { kind: 'minipack' };
@@ -768,9 +605,7 @@ function EditTierModal({
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
-          <div className="loyalty-modal__eyebrow">
-            Tier {tier.tier} · {tier.stardustRequired.toLocaleString()} stardust
-          </div>
+          <div className="loyalty-modal__eyebrow">Tier {tier.tier} · {tier.stardustRequired.toLocaleString()} stardust</div>
           <h2 className="loyalty-modal__title">Edit Tier {tier.tier}</h2>
 
           <div className="loyalty-form">
@@ -781,28 +616,12 @@ function EditTierModal({
                   {previewIcon ? <TierIcon icon={previewIcon} starSize={56} /> : null}
                 </div>
                 <div className="loyalty-icon-section__tabs">
-                  <button
-                    type="button"
-                    className={`loyalty-icon-tab${iconMode === 'emoji' ? ' is-active' : ''}`}
-                    onClick={() => setIconMode('emoji')}
-                  >Emoji</button>
-                  <button
-                    type="button"
-                    className={`loyalty-icon-tab${iconMode === 'emote' ? ' is-active' : ''}`}
-                    onClick={() => setIconMode('emote')}
-                  >Emote</button>
+                  <button type="button" className={`loyalty-icon-tab${iconMode === 'emoji' ? ' is-active' : ''}`} onClick={() => setIconMode('emoji')}>Emoji</button>
+                  <button type="button" className={`loyalty-icon-tab${iconMode === 'emote' ? ' is-active' : ''}`} onClick={() => setIconMode('emote')}>Emote</button>
                 </div>
               </div>
-
               {iconMode === 'emoji' ? (
-                <input
-                  type="text"
-                  maxLength={32}
-                  value={emojiValue}
-                  onChange={e => setEmojiValue(e.target.value)}
-                  className="loyalty-field__icon loyalty-icon-section__input"
-                  placeholder="⭐"
-                />
+                <input type="text" maxLength={32} value={emojiValue} onChange={e => setEmojiValue(e.target.value)} className="loyalty-field__icon loyalty-icon-section__input" placeholder="⭐" />
               ) : (
                 <EmotePicker
                   emotes={emoteData?.emotes || []}
@@ -817,32 +636,15 @@ function EditTierModal({
 
             <label className="loyalty-field loyalty-field--full">
               <span>Title</span>
-              <input
-                type="text"
-                maxLength={100}
-                value={form.title}
-                onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-              />
+              <input type="text" maxLength={100} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
             </label>
-
             <label className="loyalty-field loyalty-field--full">
               <span>Description</span>
-              <textarea
-                rows={2}
-                maxLength={500}
-                value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              />
+              <textarea rows={2} maxLength={500} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </label>
-
             <label className="loyalty-field loyalty-field--full">
               <span>Reward display text</span>
-              <textarea
-                rows={2}
-                maxLength={300}
-                value={form.reward}
-                onChange={e => setForm(f => ({ ...f, reward: e.target.value }))}
-              />
+              <textarea rows={2} maxLength={300} value={form.reward} onChange={e => setForm(f => ({ ...f, reward: e.target.value }))} />
             </label>
 
             <div className="loyalty-form-group">
@@ -867,13 +669,7 @@ function EditTierModal({
               {kindType === 'pack_points' && (
                 <label className="loyalty-field loyalty-field--full">
                   <span>Pack points amount</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={1_000_000}
-                    value={pointsAmount}
-                    onChange={e => setPointsAmount(e.target.value)}
-                  />
+                  <input type="number" min={1} max={1_000_000} value={pointsAmount} onChange={e => setPointsAmount(e.target.value)} />
                 </label>
               )}
 
@@ -881,23 +677,13 @@ function EditTierModal({
                 <>
                   <label className="loyalty-field loyalty-field--full">
                     <span>Card name (exact match against catalogue)</span>
-                    <input
-                      type="text"
-                      value={cardName}
-                      onChange={e => setCardName(e.target.value)}
-                      placeholder="e.g. Sprout"
-                    />
+                    <input type="text" value={cardName} onChange={e => setCardName(e.target.value)} placeholder="e.g. Sprout" />
                   </label>
                   <label className="loyalty-field loyalty-field--full">
                     <span>Card rarity</span>
-                    <select
-                      value={cardRarity}
-                      onChange={e => setCardRarity(e.target.value as CardRarity | '')}
-                    >
+                    <select value={cardRarity} onChange={e => setCardRarity(e.target.value as CardRarity | '')}>
                       <option value="">— Select rarity —</option>
-                      {CARD_RARITIES.map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
+                      {CARD_RARITIES.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </label>
                 </>
@@ -909,22 +695,13 @@ function EditTierModal({
                     <span>Custom pack</span>
                     <select value={packId} onChange={e => setPackId(e.target.value)}>
                       <option value="">— Select a pack —</option>
-                      {customPacks.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      {customPacks.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </label>
                   {customPacksLoaded && customPacks.length === 0 && (
-                    <p className="loyalty-form-group__hint">
-                      No packs yet. Create one to use it here.
-                    </p>
+                    <p className="loyalty-form-group__hint">No packs yet. Create one to use it here.</p>
                   )}
-                  <button
-                    type="button"
-                    className="loyalty-btn"
-                    onClick={onOpenPackManager}
-                    style={{ alignSelf: 'flex-start' }}
-                  >
+                  <button type="button" className="loyalty-btn" onClick={onOpenPackManager} style={{ alignSelf: 'flex-start' }}>
                     📦 Manage packs
                   </button>
                 </>
@@ -944,7 +721,7 @@ function EditTierModal({
   );
 }
 
-/* ---------- edit theme modal ---------- */
+/* ---------- theme modal ---------- */
 
 function EditThemeModal({
   theme, onPreview, onSave, onClose,
@@ -960,21 +737,12 @@ function EditThemeModal({
   function update<K extends keyof LoyaltyTheme>(key: K, val: string) {
     const next = { ...draft, [key]: val };
     setDraft(next);
-    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) {
-      onPreview(next);
-    }
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) onPreview(next);
   }
-
-  function handleReset() {
-    setDraft(DEFAULT_THEME);
-    onPreview(DEFAULT_THEME);
-  }
-
+  function handleReset() { setDraft(DEFAULT_THEME); onPreview(DEFAULT_THEME); }
   function handleSave() {
     for (const [k, v] of Object.entries(draft)) {
-      if (!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) {
-        return setError(`Invalid hex for "${k}"`);
-      }
+      if (!/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(v)) return setError(`Invalid hex for "${k}"`);
     }
     setError(null);
     onSave(draft);
@@ -999,19 +767,8 @@ function EditThemeModal({
                   <label key={c.key} className="loyalty-theme-row">
                     <span className="loyalty-theme-row__label">{c.label}</span>
                     <span className="loyalty-theme-row__swatch" style={{ background: draft[c.key] }} />
-                    <input
-                      type="color"
-                      value={draft[c.key]}
-                      onChange={e => update(c.key, e.target.value)}
-                      className="loyalty-theme-row__picker"
-                    />
-                    <input
-                      type="text"
-                      value={draft[c.key]}
-                      onChange={e => update(c.key, e.target.value)}
-                      maxLength={7}
-                      className="loyalty-theme-row__hex"
-                    />
+                    <input type="color" value={draft[c.key]} onChange={e => update(c.key, e.target.value)} className="loyalty-theme-row__picker" />
+                    <input type="text" value={draft[c.key]} onChange={e => update(c.key, e.target.value)} maxLength={7} className="loyalty-theme-row__hex" />
                   </label>
                 ))}
               </div>
@@ -1035,9 +792,7 @@ function EditThemeModal({
 /* ---------- card reveal modal ---------- */
 
 function CardRevealModal({
-  packName,
-  cards,
-  onClose,
+  packName, cards, onClose,
 }: {
   packName: string;
   cards: { name: string; rarity: string; image?: string }[];
@@ -1059,9 +814,7 @@ function CardRevealModal({
               <div key={`${c.name}-${i}`} className="loyalty-reveal-card">
                 {c.image ? (
                   <img className="loyalty-reveal-card__img" src={c.image} alt={c.name} />
-                ) : (
-                  <div className="loyalty-reveal-card__img" />
-                )}
+                ) : <div className="loyalty-reveal-card__img" />}
                 <div className="loyalty-reveal-card__name">{c.name}</div>
                 <div className="loyalty-reveal-card__rarity">{c.rarity}</div>
               </div>
@@ -1080,27 +833,16 @@ function CardRevealModal({
 /* ---------- main component ---------- */
 
 export default function LoyaltyClient({
-  signedIn,
-  isAdmin,
-  trackActive,
-  currentStardust,
-  currentTier,
-  initialOverrides,
-  initialTiers,
-  initialTheme,
-  initialClaims,
-  initialPendingPacks,
+  signedIn, isAdmin, trackActive, currentStardust, currentTier,
+  initialOverrides, initialTiers, initialTheme, initialClaims, initialPendingPacks,
 }: {
-  signedIn: boolean;
-  isAdmin: boolean;
-  trackActive: boolean;
-  currentStardust: number;
-  currentTier: number;
+  signedIn: boolean; isAdmin: boolean; trackActive: boolean;
+  currentStardust: number; currentTier: number;
   initialOverrides: TierOverrides;
   initialTiers: MergedTier[];
   initialTheme: LoyaltyTheme;
   initialClaims: LoyaltyClaims;
-  initialPendingPacks: Record<string, PendingLoyaltyPack>;
+  initialPendingPacks: PendingLoyaltyPack[];
 }) {
   const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
   const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
@@ -1129,7 +871,7 @@ export default function LoyaltyClient({
 
   const [claims, setClaims] = useState<LoyaltyClaims>(initialClaims);
   const [claimingTier, setClaimingTier] = useState<number | null>(null);
-  const [pendingPacks, setPendingPacks] = useState<Record<string, PendingLoyaltyPack>>(initialPendingPacks);
+  const [pendingPacks, setPendingPacks] = useState<PendingLoyaltyPack[]>(initialPendingPacks);
   const [openingPackId, setOpeningPackId] = useState<string | null>(null);
   const [revealedPack, setRevealedPack] = useState<{ packName: string; cards: any[] } | null>(null);
 
@@ -1159,13 +901,10 @@ export default function LoyaltyClient({
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverflow = document.documentElement.style.overflow;
     const prevBodyPaddingRight = document.body.style.paddingRight;
-
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     if (scrollbarWidth > 0) document.body.style.paddingRight = `${scrollbarWidth}px`;
-
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
-
     return () => {
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overflow = prevHtmlOverflow;
@@ -1173,7 +912,7 @@ export default function LoyaltyClient({
     };
   }, []);
 
-  /* ---------- viewport tracking ---------- */
+  /* ---------- viewport + canvas ---------- */
 
   useEffect(() => {
     const el = viewportRef.current;
@@ -1188,8 +927,6 @@ export default function LoyaltyClient({
     return () => ro.disconnect();
   }, []);
 
-  /* ---------- canvas size ---------- */
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -1200,15 +937,10 @@ export default function LoyaltyClient({
     if (canvas.height !== h) canvas.height = h;
   }, [viewportSize.width, viewportSize.height]);
 
-  /* ---------- positions ---------- */
-
-  const positioned = useMemo(() => {
-    return tiers.map((t, i) => {
-      const ratio = TOTAL_TIERS > 1 ? i / (TOTAL_TIERS - 1) : 0.5;
-      return { ...t, x: START_X + ratio * (END_X - START_X) };
-    });
-  }, [tiers]);
-
+  const positioned = useMemo(() => tiers.map((t, i) => {
+    const ratio = TOTAL_TIERS > 1 ? i / (TOTAL_TIERS - 1) : 0.5;
+    return { ...t, x: START_X + ratio * (END_X - START_X) };
+  }), [tiers]);
   const positionedRef = useRef(positioned);
   useEffect(() => { positionedRef.current = positioned; }, [positioned]);
 
@@ -1232,22 +964,18 @@ export default function LoyaltyClient({
   const loadEmotes = useCallback((): Promise<EmoteData> => {
     if (emoteData) return Promise.resolve(emoteData);
     if (emotePromiseRef.current) return emotePromiseRef.current;
-
     setLoadingEmotes(true);
     const promise = fetch('/api/admin/emotes', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: any) => {
         const emotes: EmoteInfo[] = (data.emotes || []).map((e: any) => ({
-          id: String(e.id),
-          name: String(e.name),
-          animated: !!e.animated,
+          id: String(e.id), name: String(e.name), animated: !!e.animated,
           guildName: String(e.guildName || ''),
           collections: Array.isArray(e.assignment?.collections) ? e.assignment.collections.map(String) : [],
           ignored: !!e.assignment?.ignored,
         }));
         const collections: CollectionInfo[] = (data.collections || []).map((c: any) => ({
-          id: String(c.id),
-          label: String(c.label || c.id),
+          id: String(c.id), label: String(c.label || c.id),
         }));
         const result = { emotes, collections };
         setEmoteData(result);
@@ -1258,22 +986,15 @@ export default function LoyaltyClient({
         setEmoteData(result);
         return result;
       })
-      .finally(() => {
-        setLoadingEmotes(false);
-        emotePromiseRef.current = null;
-      });
-
+      .finally(() => { setLoadingEmotes(false); emotePromiseRef.current = null; });
     emotePromiseRef.current = promise;
     return promise;
   }, [emoteData]);
 
-  const requestEmotes = useCallback(() => {
-    loadEmotes().catch(() => {});
-  }, [loadEmotes]);
+  const requestEmotes = useCallback(() => { loadEmotes().catch(() => {}); }, [loadEmotes]);
 
   const loadCustomPacks = useCallback((): Promise<CustomPack[]> => {
     if (customPacksPromiseRef.current) return customPacksPromiseRef.current;
-
     const promise = fetch('/api/loyalty/custom-packs', { cache: 'no-store' })
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: any) => {
@@ -1282,21 +1003,26 @@ export default function LoyaltyClient({
         setCustomPacksLoaded(true);
         return packs;
       })
-      .catch(() => {
-        setCustomPacksLoaded(true);
-        return [] as CustomPack[];
-      })
-      .finally(() => {
-        customPacksPromiseRef.current = null;
-      });
-
+      .catch(() => { setCustomPacksLoaded(true); return [] as CustomPack[]; })
+      .finally(() => { customPacksPromiseRef.current = null; });
     customPacksPromiseRef.current = promise;
     return promise;
   }, []);
 
-  const requestCustomPacks = useCallback(() => {
-    loadCustomPacks().catch(() => {});
-  }, [loadCustomPacks]);
+  const requestCustomPacks = useCallback(() => { loadCustomPacks().catch(() => {}); }, [loadCustomPacks]);
+
+  const fetchPendingPacks = useCallback(async (): Promise<PendingLoyaltyPack[]> => {
+    try {
+      const res = await fetch('/api/loyalty/pending-packs', { cache: 'no-store' });
+      if (!res.ok) return pendingPacks;
+      const data = await res.json().catch(() => ({}));
+      const packs = Array.isArray(data?.packs) ? data.packs : [];
+      setPendingPacks(packs);
+      return packs;
+    } catch {
+      return pendingPacks;
+    }
+  }, [pendingPacks]);
 
   /* ---------- main render loop ---------- */
 
@@ -1310,10 +1036,7 @@ export default function LoyaltyClient({
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      const isFrozen =
-        frozenRef.current ||
-        activeTierRef.current !== null ||
-        editingRef.current !== null;
+      const isFrozen = frozenRef.current || activeTierRef.current !== null || editingRef.current !== null;
       if (!isFrozen) mainT += dt;
 
       const decoT = (now - startTime) / 1000;
@@ -1329,11 +1052,9 @@ export default function LoyaltyClient({
           ctx.setTransform(1, 0, 0, 1, 0, 0);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.setTransform(dpr, 0, 0, dpr, -pan * dpr, 0);
-
           const buf = 80;
           const startX = Math.max(0, pan - buf);
           const endX = Math.min(WORLD_WIDTH, pan + size.width + buf);
-
           const decoColors = [th.deco1, th.deco2, th.deco3, th.deco4, th.deco5];
           for (let i = 0; i < 5; i++) {
             drawDecoWave(ctx, decoColors[i], (x) => decoPathY(x, i, decoT, size.height), startX, endX, DECO_POINTS);
@@ -1350,10 +1071,8 @@ export default function LoyaltyClient({
         const y = mainStringY(m.x, mainT, size.height);
         el.style.transform = `translate(-50%, calc(-50% + ${y}px))`;
       }
-
       rafId = requestAnimationFrame(tick);
     };
-
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
   }, []);
@@ -1399,20 +1118,15 @@ export default function LoyaltyClient({
 
   const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
-    if (adminMode) {
-      setEditing(t);
-      loadEmotes().catch(() => {});
-    } else {
-      setActiveTier(t);
-    }
+    if (adminMode) { setEditing(t); loadEmotes().catch(() => {}); }
+    else setActiveTier(t);
   }, [adminMode, loadEmotes]);
 
   /* ---------- admin saves ---------- */
 
   const saveOverrides = useCallback(async (next: TierOverrides) => {
     const res = await fetch('/api/loyalty/milestones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ overrides: next }),
     });
     if (!res.ok) {
@@ -1427,39 +1141,25 @@ export default function LoyaltyClient({
     const next: TierOverrides = {
       ...overrides,
       [String(updated.tier)]: {
-        icon: updated.icon,
-        title: updated.title,
-        description: updated.description,
-        reward: updated.reward,
-        rewardKind: updated.rewardKind,
+        icon: updated.icon, title: updated.title, description: updated.description,
+        reward: updated.reward, rewardKind: updated.rewardKind,
       },
     };
-    try {
-      await saveOverrides(next);
-      setEditing(null);
-    } catch (err: any) {
-      alert('Failed to save: ' + err.message);
-    }
+    try { await saveOverrides(next); setEditing(null); }
+    catch (err: any) { alert('Failed to save: ' + err.message); }
   }, [overrides, saveOverrides]);
 
   const handleThemePreview = useCallback((next: LoyaltyTheme) => setTheme(next), []);
-
-  const handleThemeOpen = useCallback(() => {
-    setThemeSnapshot(theme);
-    setThemeOpen(true);
-  }, [theme]);
-
+  const handleThemeOpen = useCallback(() => { setThemeSnapshot(theme); setThemeOpen(true); }, [theme]);
   const handleThemeCancel = useCallback(() => {
     if (themeSnapshot) setTheme(themeSnapshot);
-    setThemeSnapshot(null);
-    setThemeOpen(false);
+    setThemeSnapshot(null); setThemeOpen(false);
   }, [themeSnapshot]);
 
   const handleThemeSave = useCallback(async (next: LoyaltyTheme) => {
     try {
       const res = await fetch('/api/loyalty/theme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ theme: next }),
       });
       if (!res.ok) {
@@ -1467,12 +1167,8 @@ export default function LoyaltyClient({
         throw new Error(data.error || `HTTP ${res.status}`);
       }
       const data = await res.json();
-      setTheme(data.theme);
-      setThemeSnapshot(null);
-      setThemeOpen(false);
-    } catch (err: any) {
-      alert('Failed to save theme: ' + err.message);
-    }
+      setTheme(data.theme); setThemeSnapshot(null); setThemeOpen(false);
+    } catch (err: any) { alert('Failed to save theme: ' + err.message); }
   }, []);
 
   /* ---------- pack manager ---------- */
@@ -1485,42 +1181,30 @@ export default function LoyaltyClient({
   const handlePackSave = useCallback(async (draft: any) => {
     setSavingPack(true);
     try {
-      const body = packEditorPack && packEditorPack !== 'new'
-        ? { ...draft, id: packEditorPack.id }
-        : draft;
+      const body = packEditorPack && packEditorPack !== 'new' ? { ...draft, id: packEditorPack.id } : draft;
       const res = await fetch('/api/loyalty/custom-packs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      // refresh list
       await loadCustomPacks();
       setPackEditorPack(null);
-    } catch (err: any) {
-      alert('Failed to save pack: ' + err.message);
-    } finally {
-      setSavingPack(false);
-    }
+    } catch (err: any) { alert('Failed to save pack: ' + err.message); }
+    finally { setSavingPack(false); }
   }, [packEditorPack, loadCustomPacks]);
 
   const handlePackDelete = useCallback(async () => {
     if (!packEditorPack || packEditorPack === 'new') return;
     setSavingPack(true);
     try {
-      const res = await fetch(`/api/loyalty/custom-packs?id=${encodeURIComponent(packEditorPack.id)}`, {
-        method: 'DELETE',
-      });
+      const res = await fetch(`/api/loyalty/custom-packs?id=${encodeURIComponent(packEditorPack.id)}`, { method: 'DELETE' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       await loadCustomPacks();
       setPackEditorPack(null);
-    } catch (err: any) {
-      alert('Failed to delete pack: ' + err.message);
-    } finally {
-      setSavingPack(false);
-    }
+    } catch (err: any) { alert('Failed to delete pack: ' + err.message); }
+    finally { setSavingPack(false); }
   }, [packEditorPack, loadCustomPacks]);
 
   /* ---------- claim + open ---------- */
@@ -1530,60 +1214,42 @@ export default function LoyaltyClient({
     setClaimingTier(tier.tier);
     try {
       const res = await fetch('/api/loyalty/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tier: tier.tier }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.claim) {
         setClaims(prev => ({ ...prev, [String(tier.tier)]: data.claim as LoyaltyClaim }));
-        if (data.claim.pendingPackId) {
-          // Optimistically register the pending pack so the modal shows
-          // "Open pack" right away, even before a refresh.
-          const pending: PendingLoyaltyPack = {
-            id: data.claim.pendingPackId,
-            packId: (data.claim.rewardKind as any).packId,
-            packName: data.claim.description.replace(/^Custom pack \*\*(.*?)\*\*.*$/, '$1'),
-            tier: tier.tier,
-            cards: [],
-            createdAt: Date.now(),
-          };
-          setPendingPacks(prev => ({ ...prev, [pending.id]: pending }));
-        }
+        // Pull the fresh pending pack metadata from the bot — no cards
+        // are included, so nothing sensitive crosses the wire.
+        await fetchPendingPacks();
       }
     } catch (err: any) {
       alert('Claim failed: ' + (err?.message || 'Unknown error'));
     } finally {
       setClaimingTier(null);
     }
-  }, [claimingTier]);
+  }, [claimingTier, fetchPendingPacks]);
 
   const handleOpenPack = useCallback(async (pending: PendingLoyaltyPack) => {
     if (openingPackId) return;
     setOpeningPackId(pending.id);
     try {
       const res = await fetch('/api/loyalty/open-pack', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pendingId: pending.id }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setRevealedPack({ packName: data.packName || pending.packName, cards: data.cards || [] });
-      setPendingPacks(prev => {
-        const next = { ...prev };
-        delete next[pending.id];
-        return next;
-      });
+      setPendingPacks(prev => prev.filter(p => p.id !== pending.id));
     } catch (err: any) {
       alert('Failed to open pack: ' + (err?.message || 'Unknown error'));
     } finally {
       setOpeningPackId(null);
     }
   }, [openingPackId]);
-
-  /* ---------- escape ---------- */
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1599,13 +1265,8 @@ export default function LoyaltyClient({
     return () => window.removeEventListener('keydown', onKey);
   }, [activeTier, editing, themeOpen, handleThemeCancel, packsManagerOpen, packEditorPack, revealedPack]);
 
-  /* ---------- helper: pending pack for a tier ---------- */
-
   const pendingForTier = useCallback((tierNum: number): PendingLoyaltyPack | null => {
-    for (const p of Object.values(pendingPacks)) {
-      if (p.tier === tierNum) return p;
-    }
-    return null;
+    return pendingPacks.find(p => p.tier === tierNum) || null;
   }, [pendingPacks]);
 
   /* ---------- render ---------- */
@@ -1634,24 +1295,17 @@ export default function LoyaltyClient({
               <span className="loyalty-progress-bar__value">
                 {effectiveStardust.toLocaleString()} / {TOTAL_TRACK_COST.toLocaleString()}
               </span>
-              <span className="loyalty-progress-bar__tier">
-                Tier {effectiveTier} / {TOTAL_TIERS}
-              </span>
+              <span className="loyalty-progress-bar__tier">Tier {effectiveTier} / {TOTAL_TIERS}</span>
             </div>
             <div className="loyalty-progress-bar__track">
-              <div
-                className="loyalty-progress-bar__fill"
-                style={{ width: `${Math.min(100, (effectiveStardust / TOTAL_TRACK_COST) * 100)}%` }}
-              />
+              <div className="loyalty-progress-bar__fill" style={{ width: `${Math.min(100, (effectiveStardust / TOTAL_TRACK_COST) * 100)}%` }} />
             </div>
           </div>
         )}
 
         {isAdmin && (
           <div className="loyalty-admin-bar">
-            <button type="button" className="loyalty-admin-toggle" onClick={handleThemeOpen}>
-              🎨 Edit theme
-            </button>
+            <button type="button" className="loyalty-admin-toggle" onClick={handleThemeOpen}>🎨 Edit theme</button>
             <button
               type="button"
               className={`loyalty-admin-toggle ${adminMode ? 'is-on' : ''}`}
@@ -1659,16 +1313,11 @@ export default function LoyaltyClient({
             >
               {adminMode ? '✕ Exit edit mode' : '⚙️ Edit tiers'}
             </button>
-            <button type="button" className="loyalty-admin-toggle" onClick={handleOpenPackManager}>
-              📦 Manage packs
-            </button>
+            <button type="button" className="loyalty-admin-toggle" onClick={handleOpenPackManager}>📦 Manage packs</button>
             <div className="loyalty-admin-preview">
               <label htmlFor="preview-stardust">Preview stardust</label>
               <input
-                id="preview-stardust"
-                type="number"
-                min={0}
-                max={TOTAL_TRACK_COST}
+                id="preview-stardust" type="number" min={0} max={TOTAL_TRACK_COST}
                 placeholder={trackActive ? String(currentStardust) : '0'}
                 value={previewStardust ?? ''}
                 onChange={e => {
@@ -1676,12 +1325,7 @@ export default function LoyaltyClient({
                   setPreviewStardust(v === '' ? null : Math.max(0, Math.min(TOTAL_TRACK_COST, Number(v) || 0)));
                 }}
               />
-              <button
-                type="button"
-                className="loyalty-admin-reset"
-                onClick={() => setPreviewStardust(null)}
-                disabled={previewStardust === null}
-              >Reset</button>
+              <button type="button" className="loyalty-admin-reset" onClick={() => setPreviewStardust(null)} disabled={previewStardust === null}>Reset</button>
             </div>
           </div>
         )}
@@ -1691,9 +1335,7 @@ export default function LoyaltyClient({
           className={`loyalty-viewport ${adminMode ? 'is-editing' : ''}`}
           onPointerDown={handlePointerDown}
           onKeyDown={handleKeyDown}
-          tabIndex={0}
-          role="region"
-          aria-label="Loyalty tier track"
+          tabIndex={0} role="region" aria-label="Loyalty tier track"
         >
           <canvas ref={canvasRef} className="loyalty-canvas" />
           <div className="loyalty-world" style={{ transform: `translateX(${-panOffset}px)` }}>
@@ -1707,10 +1349,7 @@ export default function LoyaltyClient({
                   type="button"
                   className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
                   style={{ left: m.x, top: 0, transform: 'translate(-50%, -50%)' }}
-                  ref={el => {
-                    if (el) nodeRefs.current.set(m.tier, el);
-                    else nodeRefs.current.delete(m.tier);
-                  }}
+                  ref={el => { if (el) nodeRefs.current.set(m.tier, el); else nodeRefs.current.delete(m.tier); }}
                   onPointerEnter={() => { frozenRef.current = true; }}
                   onPointerLeave={() => { frozenRef.current = false; }}
                   onClick={() => handleNodeClick(m)}
@@ -1757,23 +1396,16 @@ export default function LoyaltyClient({
                 </div>
 
                 {!trackActive ? (
-                  <div className="loyalty-modal__status loyalty-modal__status--signin">
-                    Track opens January 1, 2027
-                  </div>
+                  <div className="loyalty-modal__status loyalty-modal__status--signin">Track opens January 1, 2027</div>
                 ) : !signedIn ? (
-                  <div className="loyalty-modal__status loyalty-modal__status--signin">
-                    Sign in to track your progress
-                  </div>
+                  <div className="loyalty-modal__status loyalty-modal__status--signin">Sign in to track your progress</div>
                 ) : activeTier.tier > effectiveTier ? (
                   <div className="loyalty-modal__status loyalty-modal__status--progress">
                     <div className="loyalty-modal__progress-text">
                       {effectiveStardust.toLocaleString()} / {activeTier.stardustRequired.toLocaleString()} stardust
                     </div>
                     <div className="loyalty-modal__progress-bar">
-                      <div
-                        className="loyalty-modal__progress-fill"
-                        style={{ width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%` }}
-                      />
+                      <div className="loyalty-modal__progress-fill" style={{ width: `${Math.min(100, (effectiveStardust / activeTier.stardustRequired) * 100)}%` }} />
                     </div>
                   </div>
                 ) : pending ? (
