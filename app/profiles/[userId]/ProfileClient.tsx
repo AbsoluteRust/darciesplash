@@ -100,7 +100,6 @@ const RARITY_COLORS: Record<string, string> = {
   Contraband:'#000000',
 };
 
-// Mirrors the admin manager defaults so bars render even for untouched badges.
 const BADGE_TIER_UNITS: Record<string, { singular: string; plural: string }> = {
   heart:  { singular: 'month',    plural: 'months' },
   banana: { singular: 'referral', plural: 'referrals' },
@@ -183,8 +182,6 @@ function resolveTierList(
         .sort((a, b) => a.threshold - b.threshold);
     }
 
-    // Legacy: `tiers: [{ iconUrl }]` from before thresholds existed. Seed
-    // thresholds from the badge's defaults so the bar still works.
     const defaults = DEFAULT_BADGE_THRESHOLDS[badgeKey] || [];
     return custom.tiers
       .map((t: any, i: number) => ({
@@ -194,7 +191,6 @@ function resolveTierList(
       .sort((a, b) => a.threshold - b.threshold);
   }
 
-  // Nothing customized yet — use the admin defaults.
   return (DEFAULT_BADGE_THRESHOLDS[badgeKey] || []).map((n) => ({
     threshold: n,
     iconUrl: '',
@@ -808,16 +804,88 @@ export default function ProfileClient({ userId }: { userId: string }) {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
-                    {payoutSources.length ? payoutSources.map((source) => (
-                      <div
-                        key={source.id}
-                        title={source.description}
-                        className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl transition-colors hover:bg-white/[0.06] hover:border-white/10 cursor-help"
-                      >
-                        <div className="flex items-center gap-2"><span className="text-sm font-bold text-white/90">{source.label}</span></div>
-                        <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
-                      </div>
-                    )) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
+                    {payoutSources.length ? payoutSources.map((source) => {
+                      // Community servers: custom rich tooltip with per-server join
+                      // links. When the profile owner isn't in any servers, render
+                      // the row as an "opportunity" (dimmed, CTA instead of "+0 pp").
+                      if (source.id === 'community' && Array.isArray(source.servers) && source.servers.length > 0) {
+                        const joinedCount = source.servers.filter(s => s.joined).length;
+                        const isOpportunity = source.points === 0;
+                        return (
+                          <div key={source.id} className="group relative">
+                            <div
+                              className={`flex items-center justify-between p-3 rounded-xl transition-all cursor-help ${
+                                isOpportunity
+                                  ? 'bg-white/[0.02] border border-white/5 opacity-70 hover:opacity-100 hover:bg-white/[0.05] hover:border-white/10'
+                                  : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold ${isOpportunity ? 'text-white/70' : 'text-white/90'}`}>
+                                  {source.label}
+                                </span>
+                                <span className="text-[10px] font-bold text-white/40 tabular-nums">
+                                  {joinedCount}/{source.servers.length}
+                                </span>
+                              </div>
+                              {isOpportunity ? (
+                                <span className="text-xs font-bold text-indigo-400">Join to earn →</span>
+                              ) : (
+                                <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
+                              )}
+                            </div>
+
+                            <div className="absolute z-50 left-0 right-0 top-full pt-1.5 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150">
+                              <div className="bg-[#0a0a14] border border-white/15 rounded-xl p-3 shadow-2xl">
+                                <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">
+                                  Community Servers
+                                </p>
+                                <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                                  {source.servers.map((srv) => (
+                                    <div key={srv.id} className="flex items-center gap-2">
+                                      <img
+                                        src={srv.icon}
+                                        alt=""
+                                        className="w-6 h-6 rounded-full border border-white/10 shrink-0"
+                                        draggable={false}
+                                      />
+                                      <span className={`text-xs font-bold flex-1 truncate ${srv.joined ? 'text-white/90' : 'text-white/50'}`}>
+                                        {srv.name}
+                                      </span>
+                                      {srv.joined ? (
+                                        <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider shrink-0">
+                                          ✓ Joined
+                                        </span>
+                                      ) : (
+                                        <a
+                                          href={srv.inviteUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-wider underline underline-offset-2 shrink-0"
+                                        >
+                                          Join →
+                                        </a>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={source.id}
+                          title={source.description}
+                          className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl transition-colors hover:bg-white/[0.06] hover:border-white/10 cursor-help"
+                        >
+                          <div className="flex items-center gap-2"><span className="text-sm font-bold text-white/90">{source.label}</span></div>
+                          <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
+                        </div>
+                      );
+                    }) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
                   </div>
                 </div>
 
