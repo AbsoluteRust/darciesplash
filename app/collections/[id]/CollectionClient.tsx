@@ -14,6 +14,7 @@ import { useRarityMode } from "@/components/RarityModeContext";
 import { useCollectionFilter } from "@/components/CollectionFilterContext";
 import { canEditCollectionOrder, isCollectionOwner, type AccountRoles } from "@/lib/collection-owners";
 import DarsubscriberLock from "@/components/DarsubscriberLock";
+import { usePreviewMode } from "@/components/PreviewModeContext";
 import {
   DndContext,
   closestCenter,
@@ -259,16 +260,26 @@ export default function CollectionClient({
     return () => { cancelled = true; };
   }, []);
 
+  const { effectiveIsDarsubscriber } = usePreviewMode();
+
   const effectiveUserId = serverRoles?.userId ?? userId;
   const effectiveRoles: AccountRoles | null = serverRoles
     ? { darsubscribbler: serverRoles.darsubscribbler, commissioner: serverRoles.commissioner }
     : roles;
 
+  // Build the roles object passed to the ownership check using the
+  // preview-aware subscriber status, so toggling "Subscribbler view"
+  // in the navbar flips the FAB between locked and active for owners.
+  const effectiveRolesForEdit: AccountRoles = {
+    darsubscribbler: effectiveIsDarsubscriber,
+    commissioner: effectiveRoles?.commissioner ?? false,
+  };
+
   const canEdit = useMemo(
-    () => canEditCollectionOrder(effectiveUserId, id, effectiveRoles),
-    [effectiveUserId, id, effectiveRoles]
+    () => canEditCollectionOrder(effectiveUserId, id, effectiveRolesForEdit),
+    [effectiveUserId, id, effectiveRolesForEdit]
   );
-  const canCopyEmotes = effectiveRoles?.darsubscribbler === true;
+  const canCopyEmotes = effectiveIsDarsubscriber;
 
   // True when the current user is one of the designated owners of this
   // collection, regardless of darsubscriber status. Used to show the edit
