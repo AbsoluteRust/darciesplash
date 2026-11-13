@@ -926,3 +926,15 @@
 .pc-card.is-wallpaper .pc-colour-reveal img {
   object-position: 50% 27%;
 }
+
+.pc-copy-emote--locked {
+  cursor: pointer;
+  opacity: 0.85;
+  filter: saturate(0.4);
+}
+
+.pc-copy-emote--locked:hover {
+  opacity: 1;
+  filter: saturate(0.7);
+  background: rgba(255, 80, 140, 0.15);
+}

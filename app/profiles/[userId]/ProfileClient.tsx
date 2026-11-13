@@ -5,6 +5,7 @@ import { useCollectionFilter } from '@/components/CollectionFilterContext';
 import { motion, AnimatePresence } from 'motion/react';
 import ProfileCard from '@/components/ProfileCard';
 import PointsHelpTooltip from '@/components/PointsHelpTooltip';
+import DarsubscriberLock from '@/components/DarsubscriberLock';
 
 type StreakSource = {
   id: string;
@@ -384,7 +385,10 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
 
   const isOwnProfile = currentUserId === userId;
-  const canEdit = isOwnProfile && roles?.darsubscribbler;
+  const isDarsubscriber = !!roles?.darsubscribbler;
+  // canEdit is only meaningful when viewing your own profile; the lock
+  // wrappers below gate the actual features on isDarsubscriber.
+  const canEdit = isOwnProfile && isDarsubscriber;
 
   useEffect(() => { const int = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(int); }, []);
 
@@ -435,8 +439,8 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const currentProgress = streakScore % 1000;
 
   const isCommissioner = data.badges?.isCommissioner ?? false;
-  const isDarsubscribbler = data.isDarsubscribbler ?? false;
-  const hasIncreasedCap = isCommissioner || isDarsubscribbler;
+  const isProfileDarsubscriber = data.isDarsubscribbler ?? false;
+  const hasIncreasedCap = isCommissioner || isProfileDarsubscriber;
   const packPointsCap = hasIncreasedCap ? PACK_POINTS_CAP_PREMIUM : PACK_POINTS_CAP_BASE;
   const currentPackPoints = data.stats?.packPoints ?? 0;
   const overCap = currentPackPoints > packPointsCap;
@@ -532,10 +536,17 @@ export default function ProfileClient({ userId }: { userId: string }) {
               ) : (
                 <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-white/60">{data.name}</h1>
               )}
-              {canEdit && (
-                <button onClick={() => setIsColorModalOpen(true)} className="text-white/30 hover:text-white/80 transition-colors p-2" title="Edit Name Color">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
-                </button>
+              {isOwnProfile && (
+                <DarsubscriberLock
+                  unlocked={isDarsubscriber}
+                  variant="inline"
+                  feature="Custom name colour"
+                  description="Darsubscribblers can choose any colour for their name. It becomes a matching Discord role and shows across the site."
+                >
+                  <button onClick={() => setIsColorModalOpen(true)} className="text-white/30 hover:text-white/80 transition-colors p-2" title="Edit Name Color">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+                  </button>
+                </DarsubscriberLock>
               )}
             </div>
             
@@ -590,10 +601,19 @@ export default function ProfileClient({ userId }: { userId: string }) {
             <div>
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-white">Showcase</h2>
-                {canEdit && <button onClick={() => { setTempFavorites(new Set(data.favorites || [])); setIsEditingFavorites(true); }} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-bold transition">Edit Showcase</button>}
+                {isOwnProfile && (
+                  <DarsubscriberLock
+                    unlocked={isDarsubscriber}
+                    variant="inline"
+                    feature="Editable showcase"
+                    description="Darsubscribblers can curate up to eight commissions to display on their profile."
+                  >
+                    <button onClick={() => { setTempFavorites(new Set(data.favorites || [])); setIsEditingFavorites(true); }} className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-bold transition">Edit Showcase</button>
+                  </DarsubscriberLock>
+                )}
               </div>
               {(!data.favorites || data.favorites.length === 0) ? (
-                <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">{canEdit ? "You haven't showcased any commissions yet." : "No commissions showcased."}</div>
+                <div className="text-center py-20 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">{isOwnProfile ? "You haven't showcased any commissions yet." : "No commissions showcased."}</div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
                   {allCards.filter(c => data.favorites?.includes(c.name)).map((card) => (
@@ -619,11 +639,22 @@ export default function ProfileClient({ userId }: { userId: string }) {
                 </PointsHelpTooltip>
               </div>
               <div className={`bg-[#0a0a14]/80 border rounded-3xl p-6 flex flex-col justify-between ${overCap ? 'border-amber-500/40' : 'border-white/10'}`}>
-                <div className="flex justify-between items-start mb-2">
+                <div className="flex justify-between items-start mb-2 gap-2">
                   <p className="text-white/40 uppercase tracking-widest text-xs font-bold">Pack Points</p>
-                  <span className={`text-[10px] font-bold uppercase tracking-wider ${hasIncreasedCap ? 'text-indigo-400/80' : 'text-white/30'}`}>
-                    {hasIncreasedCap ? '500K cap' : '200K cap'}
-                  </span>
+                  {hasIncreasedCap ? (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400/80 whitespace-nowrap">500K cap</span>
+                  ) : (
+                    <DarsubscriberLock
+                      unlocked={false}
+                      variant="inline"
+                      feature="Higher pack-point cap"
+                      description="Darsubscribblers can bank up to 500,000 pack points instead of the base 200,000 — daily awards never overflow."
+                    >
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white/30 whitespace-nowrap flex items-center gap-1">
+                        <span aria-hidden>🔒</span> 200K cap
+                      </span>
+                    </DarsubscriberLock>
+                  )}
                 </div>
                 <div>
                   <PointsHelpTooltip kind="pack-points">
@@ -810,9 +841,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
                     {payoutSources.length ? payoutSources.map((source) => {
-                      // Community servers: custom rich tooltip with per-server join
-                      // links. When the profile owner isn't in any servers, render
-                      // the row as an "opportunity" (dimmed, CTA instead of "+0 pp").
                       if (source.id === 'community' && Array.isArray(source.servers) && source.servers.length > 0) {
                         const joinedCount = source.servers.filter(s => s.joined).length;
                         const isOpportunity = source.points === 0;
@@ -892,6 +920,24 @@ export default function ProfileClient({ userId }: { userId: string }) {
                       );
                     }) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
                   </div>
+
+                  {!payoutSources.some(s => s.id === 'darsubscribbler') && (
+                    <div className="mt-4">
+                      <DarsubscriberLock
+                        unlocked={false}
+                        variant="inline"
+                        feature="Daily Darsubscriber bonus"
+                        description="Every day’s payout includes an extra Darsubscriber-only bonus on top of your streaks, guild bonus, and community servers."
+                      >
+                        <div className="flex items-center justify-between p-3 bg-purple-500/[0.04] border border-purple-500/20 rounded-xl">
+                          <span className="text-sm font-bold text-white/60">Daily Darsubscriber bonus</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40 flex items-center gap-1">
+                            <span aria-hidden>🔒</span> Subscribers only
+                          </span>
+                        </div>
+                      </DarsubscriberLock>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">

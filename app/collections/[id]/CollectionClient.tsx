@@ -12,7 +12,8 @@ import Silk from "@/components/Silk";
 import { useSearchParams } from "next/navigation";
 import { useRarityMode } from "@/components/RarityModeContext";
 import { useCollectionFilter } from "@/components/CollectionFilterContext";
-import { canEditCollectionOrder, type AccountRoles } from "@/lib/collection-owners";
+import { canEditCollectionOrder, isCollectionOwner, type AccountRoles } from "@/lib/collection-owners";
+import DarsubscriberLock from "@/components/DarsubscriberLock";
 import {
   DndContext,
   closestCenter,
@@ -243,8 +244,6 @@ export default function CollectionClient({
 
   const myMeta = collectionMeta.find(m => m.internalSlug === id);
 
-  // Fetch fresh roles from the server on mount. Bypasses any caching in
-  // useCollectionFilter, which can go stale when a role is granted after login.
   const [serverRoles, setServerRoles] = useState<{
     userId: string | null;
     darsubscribbler: boolean;
@@ -270,6 +269,14 @@ export default function CollectionClient({
     [effectiveUserId, id, effectiveRoles]
   );
   const canCopyEmotes = effectiveRoles?.darsubscribbler === true;
+
+  // True when the current user is one of the designated owners of this
+  // collection, regardless of darsubscriber status. Used to show the edit
+  // FAB in a locked state to owners whose subscription has lapsed.
+  const isOwner = useMemo(
+    () => isCollectionOwner(effectiveUserId, id),
+    [effectiveUserId, id]
+  );
 
   const publicSlugFor = useCallback(
     (internal: string) => {
@@ -433,6 +440,7 @@ export default function CollectionClient({
   }, [displayCards, layout, editMode]);
 
   const enterEditMode = useCallback(() => {
+    if (!canEdit) return;
     setShowMine(false);
     const initialOrder = applySavedOrder(mergedCards, layout.manualOrder || []);
     setEditLayout({
@@ -441,7 +449,7 @@ export default function CollectionClient({
     });
     setEditOrder(initialOrder);
     setEditMode(true);
-  }, [layout, mergedCards, setShowMine]);
+  }, [layout, mergedCards, setShowMine, canEdit]);
 
   const cancelEdit = useCallback(() => {
     setEditMode(false);
@@ -596,7 +604,6 @@ export default function CollectionClient({
       const currentY = e.touches[0].clientY;
       const delta = touchStartY - currentY;
 
-      // If pulling down at the top, or up at the bottom, prevent the browser's native pull-to-refresh
       if ((atTop && delta < 0) || (atBottom && delta > 0)) {
         if (e.cancelable) e.preventDefault();
       }
@@ -1068,13 +1075,15 @@ export default function CollectionClient({
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
-    let copyEmote: { name: string; url: string } | null = null;
-    if (canCopyEmotes && piece.type === "Emote" && piece.image) {
+    // `copyEmote.locked` is only meaningful once StandardCard is updated
+    // to render a locked variant — see the note at the bottom of this file.
+    let copyEmote: { name: string; url: string; locked?: boolean } | null = null;
+    if (piece.type === "Emote" && piece.image) {
       const origin = typeof window !== "undefined" ? window.location.origin : null;
       if (origin) {
         const isAbsolute = /^https?:\/\//i.test(piece.image);
         const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
-        copyEmote = { name: piece.name, url };
+        copyEmote = { name: piece.name, url, locked: !canCopyEmotes };
       }
     }
 
@@ -1124,7 +1133,7 @@ export default function CollectionClient({
               key={activeEmote.name}
               name={activeEmote.name}
               title={activeEmote.type || 'Emote'}
-              type={activeEmote.type}   
+              type={activeEmote.type}
               image={activeEmote.image}
               thumbUrl={activeEmote.thumbUrl}
               rarity={activeEmote.rarity}
@@ -1229,7 +1238,7 @@ export default function CollectionClient({
       )}
 
       {editMode && editLayout && (
-  <div className="collection-edit-toolbar" style={{ position: "relative", zIndex: 50 }}>
+        <div className="collection-edit-toolbar" style={{ position: "relative", zIndex: 50 }}>
           <div className="toolbar-row">
             <label className="toolbar-label">Layout</label>
             <div className="toolbar-tabs">
@@ -1437,15 +1446,40 @@ export default function CollectionClient({
         )}
       </div>
 
-      {canEdit && !editMode && (
-        <button
-          type="button"
-          className="collection-edit-fab"
-          onClick={enterEditMode}
-          title="Edit card order"
-        >
-          ✏️ Edit order
-        </button>
+      {/* Edit FAB: shown to collection owners regardless of subscription.
+          When they are not a Darsubscriber, it renders locked with a
+          tooltip explaining the feature and how to unlock it. Non-owners
+          never see this FAB, because subscription alone doesn't grant
+          ownership — only the fixed COLLECTION_OWNERS list does. */}
+      {isOwner && !editMode && (
+        canEdit ? (
+          <button
+            type="button"
+            className="collection-edit-fab"
+            onClick={enterEditMode}
+            title="Edit card order"
+          >
+            ✏️ Edit order
+          </button>
+        ) : (
+          <div style={{ position: "fixed", bottom: "2rem", right: "2rem", zIndex: 100 }}>
+            <DarsubscriberLock
+              unlocked={false}
+              variant="inline"
+              tooltipPlacement="above"
+              feature="Collection editing"
+              description="Darsubscribblers who own a collection can reorder its cards, set a custom sort, and rename the collection."
+            >
+              <button
+                type="button"
+                className="collection-edit-fab"
+                style={{ position: "relative", bottom: "auto", right: "auto" }}
+              >
+                🔒 Edit order
+              </button>
+            </DarsubscriberLock>
+          </div>
+        )
       )}
 
       {hintProgress > 0 && hintDirection && !leaving && !editMode && (

@@ -1,3 +1,4 @@
+// lib/collection-owners.ts
 export const COLLECTION_OWNERS: Record<string, string[]> = {
   celestial: ["164429062238896129"],
   darcie:    ["665898420447215647"],
@@ -11,6 +12,21 @@ export type AccountRoles = {
   darsubscribbler: boolean;
 };
 
+/**
+ * Whether the given user is one of the designated owners of this collection,
+ * regardless of darsubscriber status. Useful for showing "you'd be able to
+ * edit this if you were a Darsubscriber" states.
+ */
+export function isCollectionOwner(
+  userId: string | null | undefined,
+  collection: string
+): boolean {
+  if (!userId) return false;
+  const owners = COLLECTION_OWNERS[collection];
+  if (!owners) return false;
+  return owners.includes(userId);
+}
+
 export function canEditCollectionOrder(
   userId: string | null | undefined,
   collection: string,
@@ -18,7 +34,5 @@ export function canEditCollectionOrder(
 ): boolean {
   if (!userId) return false;
   if (!roles || !roles.darsubscribbler) return false;
-  const owners = COLLECTION_OWNERS[collection];
-  if (!owners) return false;
-  return owners.includes(userId);
+  return isCollectionOwner(userId, collection);
 }

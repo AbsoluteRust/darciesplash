@@ -172,6 +172,18 @@ const ProfileCardComponent = ({
     }
   }, [copyEmote]);
 
+  // Locked copy button navigates the user to the Darsubscriber page
+  // where they can see every perk and subscribe on Ko-fi.
+  const handleLockedCopyEmote = useCallback((e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof window !== 'undefined') {
+      window.location.href = '/darsubscribbler';
+    }
+  }, []);
+
   useEffect(() => {
     return () => {
       if (copiedTimerRef.current) window.clearTimeout(copiedTimerRef.current);
@@ -532,16 +544,29 @@ const ProfileCardComponent = ({
         </section>
 
         {copyEmote && (
-          <button
-            type="button"
-            className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
-            onClick={handleCopyEmote}
-            title={copied ? 'Copied!' : `Copy :${copyEmote.name}:`}
-            aria-label={`Copy emote ${copyEmote.name}`}
-            style={{ pointerEvents: 'auto' }}
-          >
-            {copied ? '✓' : '📋'}
-          </button>
+          copyEmote.locked ? (
+            <button
+              type="button"
+              className="pc-copy-emote pc-copy-emote--locked"
+              onClick={handleLockedCopyEmote}
+              title="Copying emote URLs is a Darsubscriber feature — click to see how to subscribe."
+              aria-label="Darsubscriber feature — subscribe on Ko-fi to unlock"
+              style={{ pointerEvents: 'auto' }}
+            >
+              🔒
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
+              onClick={handleCopyEmote}
+              title={copied ? 'Copied!' : `Copy :${copyEmote.name}:`}
+              aria-label={`Copy emote ${copyEmote.name}`}
+              style={{ pointerEvents: 'auto' }}
+            >
+              {copied ? '✓' : '📋'}
+            </button>
+          )
         )}
 
         {SHOW_BADGE && (
