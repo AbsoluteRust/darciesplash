@@ -46,19 +46,26 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
     }
   };
   
-  // New state to prevent the modal from re-opening
+  // Dismissed "Session Ended!" panel. Persisted in localStorage so it
+  // survives refresh — once closed, the same finishedAt never re-shows.
   const [dismissedResult, setDismissedResult] = useState<number | null>(null);
 
   const [webRevealPack, setWebRevealPack] = useState<any>(null);
   const [closedRevealShortIds, setClosedRevealShortIds] = useState<string[]>([]);
   const [revealHistoryLoaded, setRevealHistoryLoaded] = useState(false);
 
+  // Load persisted dismissals + closed reveal shortIds on mount.
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem('folly:group-reveals');
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      const storedReveals = window.localStorage.getItem('folly:group-reveals');
+      if (storedReveals) {
+        const parsed = JSON.parse(storedReveals);
         if (Array.isArray(parsed)) setClosedRevealShortIds(parsed.filter((id): id is string => typeof id === 'string'));
+      }
+      const storedDismissed = window.localStorage.getItem('folly:group-dismissed');
+      if (storedDismissed) {
+        const parsed = Number(storedDismissed);
+        if (!Number.isNaN(parsed)) setDismissedResult(parsed);
       }
     } catch {
       // Ignore unavailable or malformed client storage.
@@ -66,6 +73,15 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
       setRevealHistoryLoaded(true);
     }
   }, []);
+
+  const dismissResult = (finishedAt: number) => {
+    setDismissedResult(finishedAt);
+    try {
+      window.localStorage.setItem('folly:group-dismissed', String(finishedAt));
+    } catch {
+      // Ignore unavailable client storage; current session stays dismissed.
+    }
+  };
 
   useEffect(() => {
     if (!signedIn || !revealHistoryLoaded) return;
@@ -82,7 +98,10 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
           
           if (groupData.active) {
             setTimeLeft(Math.max(0, Math.ceil((groupData.endsAt - Date.now()) / 1000)));
-            if (dismissedResult) setDismissedResult(null);
+            if (dismissedResult !== null) {
+              setDismissedResult(null);
+              try { window.localStorage.removeItem('folly:group-dismissed'); } catch {}
+            }
           } else if (groupData.results && !webRevealPack) {
             const myPack = groupData.results.packs?.find((p: any) => p.userId === userId);
             if (myPack && !closedRevealShortIds.includes(myPack.shortId)) {
@@ -136,6 +155,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
       const res = await fetch('/api/games/group/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -148,6 +168,11 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
 
   const isInGroup = groupLobby?.participants?.some((p: any) => p.id === userId) && groupLobby.participants.length > 0;
   const groupActive = groupLobby?.active && isInGroup;
+
+  // Use results.participants instead of the top-level participants array —
+  // the server clears the latter on resolution, but keeps a copy inside
+  // results for exactly this purpose.
+  const wasInLastSession = !!groupLobby?.results?.participants?.some((p: any) => p.id === userId);
 
   const panelClass = (id: string) => `
     transition-all duration-500 ease-in-out relative bg-[#0a0a14]/80 border border-white/10 rounded-3xl
@@ -291,7 +316,11 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
               </div>
             )}
 
-            {groupLobby?.results && isInGroup && !groupActive && groupLobby.results.finishedAt !== dismissedResult && (
+            {groupLobby?.results
+              && !groupActive
+              && groupLobby.results.finishedAt !== dismissedResult
+              && wasInLastSession
+              && (
               <div className="mt-6 flex flex-col items-center bg-[#181820] border border-green-500/30 rounded-2xl p-6 w-full max-w-md shadow-[0_0_30px_rgba(34,197,94,0.15)]">
                 <p className="text-xl font-bold text-green-400 mb-4">Session Ended!</p>
                 
@@ -322,7 +351,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
                   )}
                 </div>
 
-                <button onClick={() => setDismissedResult(groupLobby.results.finishedAt)} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition">
+                <button onClick={() => dismissResult(groupLobby.results.finishedAt)} className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-bold transition">
                   Close
                 </button>
               </div>
