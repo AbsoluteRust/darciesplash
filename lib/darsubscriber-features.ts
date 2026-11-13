@@ -5,6 +5,7 @@ export type DarsubscriberFeature = {
   icon: string;
   title: string;
   description: string;
+  /** Short hint of where in the app the feature lives. Informational only. */
   location?: string;
 };
 
@@ -14,7 +15,7 @@ export const DARSUBSCRIBBLER_FEATURES: DarsubscriberFeature[] = [
     icon: '✨',
     title: 'Animated card pulls',
     description:
-      'Pull and collect cards with animated GIF artwork, and see them animate on every reveal. Non-subscribers can only pull static versions.',
+      'Pull and collect cards with animated GIF artwork, and see them animate on every reveal. Non-subscribers can only pull the static version of each card.',
     location: '/play',
   },
   {
@@ -30,15 +31,15 @@ export const DARSUBSCRIBBLER_FEATURES: DarsubscriberFeature[] = [
     icon: '🖼️',
     title: 'Editable showcase',
     description:
-      'Pick up to eight commissions to display on your profile. Subscribers can edit their showcase at any time.',
-    location: 'Your profile → Commissions tab',
+      'Curate up to eight commissions to display at the top of your profile, showcasing your favourite pieces to anyone who visits.',
+    location: 'Your profile → Commissions tab → Edit Showcase',
   },
   {
     id: 'pack-cap',
     icon: '📈',
     title: 'Higher pack-point cap',
     description:
-      'Your pack point balance can reach 500,000 instead of the base 200,000 cap — so daily awards never overflow and you never miss out.',
+      'Bank up to 500,000 pack points instead of the base 200,000 cap. Daily awards, streak bonuses, and pack drops keep landing even when you’re already near the ceiling.',
     location: 'Profile → Pack points',
   },
   {
@@ -54,15 +55,15 @@ export const DARSUBSCRIBBLER_FEATURES: DarsubscriberFeature[] = [
     icon: '📋',
     title: 'Copy collection emotes',
     description:
-      'Copy every emote from a collection to your clipboard in one click — ready to paste into Discord as usable emotes.',
-    location: 'Collections → any collection page',
+      'Copy any emote from a collection to your clipboard as Discord-ready markdown, in one click — no more rehosting or reuploading.',
+    location: 'Collections → any emote card → 📋',
   },
   {
     id: 'collection-ownership',
     icon: '🏷️',
-    title: 'Collection ownership',
+    title: 'Collection editing',
     description:
-      'Claim ownership of a collection and rename it, so it shows under your chosen title everywhere the collection appears.',
-    location: 'Collections → any collection page',
+      'If you own a collection, you can reorder its cards, set a custom sort, group them into sections, and rename the collection itself.',
+    location: 'Collections you own → ✏️ Edit order',
   },
 ];

@@ -1075,15 +1075,16 @@ export default function CollectionClient({
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
-    // `copyEmote.locked` is only meaningful once StandardCard is updated
-    // to render a locked variant — see the note at the bottom of this file.
-    let copyEmote: { name: string; url: string; locked?: boolean } | null = null;
-    if (piece.type === "Emote" && piece.image) {
+    // Copy-emote is a Darsubscriber-only feature and is hidden entirely
+    // from non-subscribers. No locked affordance — the button is simply
+    // absent for users who can't use it.
+    let copyEmote: { name: string; url: string } | null = null;
+    if (canCopyEmotes && piece.type === "Emote" && piece.image) {
       const origin = typeof window !== "undefined" ? window.location.origin : null;
       if (origin) {
         const isAbsolute = /^https?:\/\//i.test(piece.image);
         const url = isAbsolute ? piece.image : `${origin}${piece.image}`;
-        copyEmote = { name: piece.name, url, locked: !canCopyEmotes };
+        copyEmote = { name: piece.name, url };
       }
     }
 

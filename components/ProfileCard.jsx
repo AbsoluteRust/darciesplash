@@ -7,7 +7,7 @@ const OPTIMIZE_WIDTHS = [256, 384, 640, 828, 1080, 1200];
 // Helper function that returns raw URLs for GIFs to keep them animated.
 function optimizedUrl(url, width) {
   if (!url) return url;
-  
+
   // Do not run Next.js image optimization on GIFs (it turns them into static WebPs)
   if (url.toLowerCase().endsWith('.gif') || url.toLowerCase().includes('.gif?')) {
     return url;
@@ -138,7 +138,6 @@ const ProfileCardComponent = ({
     ? `pc-card-wrapper--rarity-${rarity.toLowerCase()}`
     : '';
   const SHOW_BADGE = rarity && rarity !== 'Common';
-  const isEmoteLike = title !== 'Mobile Wallpaper' && title !== 'Splash Art';
 
   useEffect(() => {
     const shell = shellRef.current;
@@ -171,18 +170,6 @@ const ProfileCardComponent = ({
       console.error('[copy emote] failed:', err);
     }
   }, [copyEmote]);
-
-  // Locked copy button navigates the user to the Darsubscriber page
-  // where they can see every perk and subscribe on Ko-fi.
-  const handleLockedCopyEmote = useCallback((e) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    if (typeof window !== 'undefined') {
-      window.location.href = '/darsubscribbler';
-    }
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -544,29 +531,16 @@ const ProfileCardComponent = ({
         </section>
 
         {copyEmote && (
-          copyEmote.locked ? (
-            <button
-              type="button"
-              className="pc-copy-emote pc-copy-emote--locked"
-              onClick={handleLockedCopyEmote}
-              title="Copying emote URLs is a Darsubscriber feature — click to see how to subscribe."
-              aria-label="Darsubscriber feature — subscribe on Ko-fi to unlock"
-              style={{ pointerEvents: 'auto' }}
-            >
-              🔒
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
-              onClick={handleCopyEmote}
-              title={copied ? 'Copied!' : `Copy :${copyEmote.name}:`}
-              aria-label={`Copy emote ${copyEmote.name}`}
-              style={{ pointerEvents: 'auto' }}
-            >
-              {copied ? '✓' : '📋'}
-            </button>
-          )
+          <button
+            type="button"
+            className={`pc-copy-emote${copied ? ' is-copied' : ''}`}
+            onClick={handleCopyEmote}
+            title={copied ? 'Copied!' : `Copy :${copyEmote.name}:`}
+            aria-label={`Copy emote ${copyEmote.name}`}
+            style={{ pointerEvents: 'auto' }}
+          >
+            {copied ? '✓' : '📋'}
+          </button>
         )}
 
         {SHOW_BADGE && (

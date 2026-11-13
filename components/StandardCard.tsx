@@ -50,7 +50,7 @@ export default function StandardCard({
   isModal?: boolean;
   onClick?: () => void;
   enableTilt?: boolean;
-  copyEmote?: { name: string; url: string; locked?: boolean } | null;
+  copyEmote?: { name: string; url: string } | null;
 }) {
   const { mode: rarityMode } = useRarityMode();
 
