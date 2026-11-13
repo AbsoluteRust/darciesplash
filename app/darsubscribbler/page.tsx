@@ -1,8 +1,4 @@
 // app/darsubscribbler/page.tsx
-import { auth } from '@/auth';
-import { kv } from '@vercel/kv';
-import { DARSUBSCRIBBLER_FEATURES } from '@/lib/darsubscriber-features';
-import DarsubscriberStatus from './DarsubscriberStatus';
 import './page.css';
 
 export const dynamic = 'force-dynamic';
@@ -12,76 +8,16 @@ export const metadata = {
   description: 'Everything you get as a Darsubscriber on Folly of Flora.',
 };
 
-const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
-
-export default async function DarsubscriberPage() {
-  const session = await auth();
-  const userId = session?.user?.id ?? null;
-
-  let isDarsubscriber = false;
-  if (userId) {
-    const roles = await kv.get(`account_roles:${userId}`).catch(() => null);
-    isDarsubscriber = !!(roles as any)?.darsubscribbler;
-  }
-
+export default function DarsubscriberPage() {
   return (
     <main className="ds-page">
       <section className="ds-hero">
         <div className="ds-hero__inner">
-          <p className="ds-hero__eyebrow">Support the studio</p>
+          <p className="ds-hero__eyebrow">Diagnostic</p>
           <h1 className="ds-hero__title">Darsubscriber</h1>
           <p className="ds-hero__subtitle">
-            Every perk below is unlocked automatically the moment your
-            Ko-fi subscription becomes active. No codes, no waiting, no
-            extra signup.
+            If you can read this, page.tsx itself is fine.
           </p>
-
-          <DarsubscriberStatus
-            signedIn={!!userId}
-            isDarsubscriber={isDarsubscriber}
-            kofiUrl={KOFI_TIERS_URL}
-          />
-        </div>
-      </section>
-
-      <section className="ds-features">
-        <h2 className="ds-section-title">What you get</h2>
-        <div className="ds-features__grid">
-          {DARSUBSCRIBBLER_FEATURES.map(feature => (
-            <article key={feature.id} className="ds-feature">
-              <div className="ds-feature__icon" aria-hidden="true">
-                {feature.icon}
-              </div>
-              <h3 className="ds-feature__title">{feature.title}</h3>
-              <p className="ds-feature__body">{feature.description}</p>
-              {feature.location && (
-                <p className="ds-feature__location">{feature.location}</p>
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="ds-cta">
-        <div className="ds-cta__inner">
-          <h2 className="ds-cta__title">
-            {isDarsubscriber ? 'You’re all set.' : 'Ready to unlock everything?'}
-          </h2>
-          <p className="ds-cta__subtitle">
-            {isDarsubscriber
-              ? 'Every perk above is active on your account right now. Thank you for supporting the studio.'
-              : 'Subscriptions are managed through Ko-fi. Cancel any time — your perks stay active until your billing period ends.'}
-          </p>
-          {!isDarsubscriber && (
-            <a
-              className="ds-cta__button"
-              href={KOFI_TIERS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Subscribe on Ko-fi →
-            </a>
-          )}
         </div>
       </section>
     </main>
