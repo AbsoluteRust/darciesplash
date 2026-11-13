@@ -382,11 +382,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [showLockedAchievements, setShowLockedAchievements] = useState(false);
   
   const { userId: currentUserId, roles } = useCollectionFilter();
-  const {
-    ready: previewReady,
-    isRealAdmin,
-    effectiveIsDarsubscriber,
-  } = usePreviewMode();
+  const { effectiveIsDarsubscriber } = usePreviewMode();
 
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState('#ffffff');
@@ -397,9 +393,6 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const [isSavingFavorites, setIsSavingFavorites] = useState(false);
 
   const isOwnProfile = currentUserId === userId;
-  // `canEdit` gates the visible edit controls. Uses effective subscriber
-  // status so the admin preview toggles apply, but always requires the
-  // user to be viewing their own profile.
   const canEdit = isOwnProfile && effectiveIsDarsubscriber;
 
   useEffect(() => { const int = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(int); }, []);
@@ -421,9 +414,49 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
   useEffect(() => { fetchProfile(); const int = setInterval(fetchProfile, 30000); return () => clearInterval(int); }, [userId]);
 
-  const handleSaveColor = async () => { setSavingColor(true); try { const res = await fetch('/api/profiles/color', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ colorHex: selectedColor }) }); if (res.ok) { setIsColorModalOpen(false); fetchProfile(); } else { const errData = await res.json(); alert(`Failed to save color: ${errData.error || 'Unknown error'}`); } } finally { setSavingColor(false); } };
-  const handleSaveFavorites = async () => { setIsSavingFavorites(true); const newFavs = Array.from(tempFavorites); try { const res = await fetch('/api/favorites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cardNames: newFavs }) }); if (!res.ok) throw new Error(`HTTP error ${res.status}`); setData(prev => prev ? { ...prev, favorites: newFavs } : prev); setIsEditingFavorites(false); } catch (err: any) { alert(`Failed to save showcase: ${err.message}`); } finally { setIsSavingFavorites(false); } };
-  const toggleFavorite = (cardName: string) => { setTempFavorites(prev => { const next = new Set(prev); if (next.has(cardName)) next.delete(cardName); else { if (next.size >= 8) { alert("You can only select up to 8 cards."); return prev; } next.add(cardName); } return next; }); };
+  const handleSaveColor = async () => {
+    setSavingColor(true);
+    try {
+      const res = await fetch('/api/profiles/color', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ colorHex: selectedColor }),
+      });
+      if (res.ok) { setIsColorModalOpen(false); fetchProfile(); }
+      else {
+        const errData = await res.json();
+        alert(`Failed to save color: ${errData.error || 'Unknown error'}`);
+      }
+    } finally { setSavingColor(false); }
+  };
+
+  const handleSaveFavorites = async () => {
+    setIsSavingFavorites(true);
+    const newFavs = Array.from(tempFavorites);
+    try {
+      const res = await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardNames: newFavs }),
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      setData(prev => prev ? { ...prev, favorites: newFavs } : prev);
+      setIsEditingFavorites(false);
+    } catch (err: any) { alert(`Failed to save showcase: ${err.message}`); }
+    finally { setIsSavingFavorites(false); }
+  };
+
+  const toggleFavorite = (cardName: string) => {
+    setTempFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(cardName)) next.delete(cardName);
+      else {
+        if (next.size >= 8) { alert("You can only select up to 8 cards."); return prev; }
+        next.add(cardName);
+      }
+      return next;
+    });
+  };
 
   const handleSetFeaturedBadge = async (badgeId: string | null) => {
     try {
@@ -432,31 +465,29 @@ export default function ProfileClient({ userId }: { userId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ badgeId }),
       });
-      if (res.ok) {
-        setData(prev => prev ? { ...prev, featuredBadgeId: badgeId } : prev);
-      } else {
-        alert('Failed to feature badge.');
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (res.ok) setData(prev => prev ? { ...prev, featuredBadgeId: badgeId } : prev);
+      else alert('Failed to feature badge.');
+    } catch (err) { console.error(err); }
   };
 
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  // Filter the raw streakBreakdown into display rows. When preview toggles
-  // are active and the admin is previewing as non-subscriber, hide the
-  // darsubscribbler row. When previewing as subscriber while not actually
-  // being one, synthesize the row so the feature can be seen.
-  const rawBreakdown = data.stats?.streakBreakdown || [];
-  const payoutSources: StreakSource[] = rawBreakdown
-    .filter(s => ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id))
-    .filter(s => {
-      if (s.id === 'darsubscribbler' && !effectiveIsDarsubscriber) return false;
-      return true;
-    });
-  if (isRealAdmin && effectiveIsDarsubscriber && !payoutSources.some(s => s.id === 'darsubscribbler')) {
+  // What cap / bonus display should reflect:
+  //   Your own profile → preview toggle (so admins can see subscriber view)
+  //   Someone else's → their real status
+  const displayAsSubscriber = isOwnProfile ? effectiveIsDarsubscriber : (data.isDarsubscribbler ?? false);
+
+  // Payout rows: hide darsubscribbler row unless we're displaying subscriber
+  // state. Synthesize it when previewing subscriber view on a non-subscriber.
+  const rawPayoutSources = data.stats?.streakBreakdown?.filter(s =>
+    ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id)
+  ) || [];
+  const payoutSources = rawPayoutSources.filter(s => {
+    if (s.id === 'darsubscribbler' && !displayAsSubscriber) return false;
+    return true;
+  });
+  if (displayAsSubscriber && !payoutSources.some(s => s.id === 'darsubscribbler')) {
     payoutSources.push({
       id: 'darsubscribbler',
       label: 'Darsubscribbler',
@@ -473,7 +504,7 @@ export default function ProfileClient({ userId }: { userId: string }) {
   const currentProgress = streakScore % 1000;
 
   const isCommissioner = data.badges?.isCommissioner ?? false;
-  const hasIncreasedCap = isCommissioner || effectiveIsDarsubscriber;
+  const hasIncreasedCap = isCommissioner || displayAsSubscriber;
   const packPointsCap = hasIncreasedCap ? PACK_POINTS_CAP_PREMIUM : PACK_POINTS_CAP_BASE;
   const currentPackPoints = data.stats?.packPoints ?? 0;
   const overCap = currentPackPoints > packPointsCap;
@@ -715,4 +746,509 @@ export default function ProfileClient({ userId }: { userId: string }) {
                         <span className="text-lg">⏳</span>
                         <span className="text-xs font-bold uppercase tracking-widest text-indigo-300">Feature unlocks in</span>
                       </div>
-                      <div className="text
+                      <div className="text-3xl md:text-4xl font-black font-mono tabular-nums text-indigo-400">
+                        {formatCountdown(featureStartsAt - now)}
+                      </div>
+                      <p className="text-xs text-white/50 mt-1">
+                        Starting January 1, 2027 (UTC), stardust becomes earnable through both methods below.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <div className="mb-3">
+                        <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Weekly Pack Tiers</p>
+                        {stardustActive ? (
+                          <p className="text-lg font-black text-white">
+                            This week: <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">+{weekEarned.toLocaleString()}</span>
+                            <span className="text-xs font-normal text-white/50 ml-2">✨ · resets Monday 00:00 UTC</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-white/40">One-time per week — cumulative toward a 660 ✨ weekly cap.</p>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                        {STARDUST_TIERS.map((t) => {
+                          const reached = stardustActive && currentStardustTier >= t.num;
+                          const isNext = stardustActive && currentStardustTier === t.num - 1;
+                          const reqParts: string[] = [];
+                          if (t.reqPacks > 0) {
+                            reqParts.push(isNext ? `${weekPacks} / ${t.reqPacks} packs` : `${t.reqPacks} packs`);
+                          }
+                          if (t.reqDrops > 0) {
+                            reqParts.push(isNext ? `${weekDrops} / ${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}` : `${t.reqDrops} drop${t.reqDrops === 1 ? '' : 's'}`);
+                          }
+                          if (t.reqPuzzles > 0) {
+                            reqParts.push(isNext ? `${weekPuzzles} / ${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}` : `${t.reqPuzzles} puzzle${t.reqPuzzles === 1 ? '' : 's'}`);
+                          }
+
+                          const ratios: number[] = [Math.min(weekPacks / t.reqPacks, 1)];
+                          if (t.reqDrops > 0) ratios.push(Math.min(weekDrops / t.reqDrops, 1));
+                          if (t.reqPuzzles > 0) ratios.push(Math.min(weekPuzzles / t.reqPuzzles, 1));
+                          const progressPct = Math.min(...ratios) * 100;
+
+                          if (reached) {
+                            return (
+                              <div key={t.num} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">✓</div>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-bold text-green-400">Tier {t.num}</span>
+                                    <span className="text-xs text-green-400/70">{t.desc}</span>
+                                  </div>
+                                </div>
+                                <span className="text-sm font-black text-green-400">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
+                              </div>
+                            );
+                          }
+
+                          if (isNext) {
+                            return (
+                              <div key={t.num} className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{t.num}</div>
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-bold text-indigo-400">Tier {t.num}</span>
+                                      <span className="text-xs text-white/50">{reqParts.join(' · ')}</span>
+                                    </div>
+                                  </div>
+                                  <span className="text-sm font-black text-indigo-400">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
+                                </div>
+                                <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                                  <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${progressPct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div key={t.num} className="relative flex items-center justify-between p-4 bg-white/[0.02] border border-white/5 rounded-xl opacity-60">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white/40 text-sm">🔒</div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-bold text-white/60">Tier {t.num}</span>
+                                  <span className="text-xs text-white/40">{t.desc}</span>
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-white/40">+{t.reward.toLocaleString()}/{STARDUST_WEEK_MAX} ✨</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className={`mb-3 ${stardustActive ? '' : 'opacity-60'}`}>
+                        <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Major Actions</p>
+                        <p className="text-lg font-black text-white">
+                          +{MAJOR_ACTION_STARDUST.toLocaleString()} <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">✨</span>
+                          <span className="text-xs font-normal text-white/50 ml-2">per action</span>
+                        </p>
+                      </div>
+
+                      <div className={`flex flex-col gap-3 ${stardustActive ? '' : 'opacity-50'}`}>
+                        {MAJOR_ACTIONS.map((action) => {
+                          const baseClass = 'relative flex items-center justify-between p-4 bg-purple-500/10 border border-purple-500/25 rounded-xl';
+                          const inner = (
+                            <>
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-base shrink-0">
+                                  {action.icon}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-bold text-white">{action.label}</span>
+                                  <span className="text-xs text-white/40">{action.subtitle}</span>
+                                  {action.href && (
+                                    <span className="text-xs text-indigo-400 group-hover:text-indigo-300 underline underline-offset-2 mt-1">
+                                      {action.hrefLabel} →
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <span className="text-sm font-black text-purple-400 shrink-0 ml-2">+{MAJOR_ACTION_STARDUST.toLocaleString()} ✨</span>
+                            </>
+                          );
+
+                          if (action.href) {
+                            return (
+                              <a
+                                key={action.id}
+                                href={action.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`${baseClass} group ${stardustActive ? 'hover:border-purple-500/50 hover:bg-purple-500/15' : 'hover:opacity-100'} transition`}
+                              >
+                                {inner}
+                              </a>
+                            );
+                          }
+                          return (
+                            <div key={action.id} className={baseClass}>
+                              {inner}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
+                  <div className="flex justify-between items-end mb-4">
+                    <div>
+                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Pack points streaks</p>
+                      <p className="text-2xl font-black text-white">Total: <span className="text-green-400">+{data.stats?.streakTotal?.toLocaleString() || 0}</span> <span className="text-sm font-normal text-white/50">pp/day</span></p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
+                    {payoutSources.length ? payoutSources.map((source) => {
+                      if (source.id === 'community' && Array.isArray(source.servers) && source.servers.length > 0) {
+                        const joinedCount = source.servers.filter(s => s.joined).length;
+                        const isOpportunity = source.points === 0;
+                        return (
+                          <div key={source.id} className="group relative">
+                            <div
+                              className={`flex items-center justify-between p-3 rounded-xl transition-all cursor-help ${
+                                isOpportunity
+                                  ? 'bg-white/[0.02] border border-white/5 opacity-70 hover:opacity-100 hover:bg-white/[0.05] hover:border-white/10'
+                                  : 'bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-bold ${isOpportunity ? 'text-white/70' : 'text-white/90'}`}>
+                                  {source.label}
+                                </span>
+                                <span className="text-[10px] font-bold text-white/40 tabular-nums">
+                                  {joinedCount}/{source.servers.length}
+                                </span>
+                              </div>
+                              {isOpportunity ? (
+                                <span className="text-xs font-bold text-indigo-400">Join to earn →</span>
+                              ) : (
+                                <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
+                              )}
+                            </div>
+
+                            <div className="absolute z-50 left-0 right-0 top-full pt-1.5 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-opacity duration-150">
+                              <div className="bg-[#0a0a14] border border-white/15 rounded-xl p-3 shadow-2xl">
+                                <p className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2">
+                                  Community Servers
+                                </p>
+                                <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto custom-scrollbar">
+                                  {source.servers.map((srv) => (
+                                    <div key={srv.id} className="flex items-center gap-2">
+                                      <img
+                                        src={srv.icon}
+                                        alt=""
+                                        className="w-6 h-6 rounded-full border border-white/10 shrink-0"
+                                        draggable={false}
+                                      />
+                                      <span className={`text-xs font-bold flex-1 truncate ${srv.joined ? 'text-white/90' : 'text-white/50'}`}>
+                                        {srv.name}
+                                      </span>
+                                      {srv.joined ? (
+                                        <span className="text-[10px] font-bold text-green-400 uppercase tracking-wider shrink-0">
+                                          ✓ Joined
+                                        </span>
+                                      ) : (
+                                        <a
+                                          href={srv.inviteUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 uppercase tracking-wider underline underline-offset-2 shrink-0"
+                                        >
+                                          Join →
+                                        </a>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={source.id}
+                          title={source.description}
+                          className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl transition-colors hover:bg-white/[0.06] hover:border-white/10 cursor-help"
+                        >
+                          <div className="flex items-center gap-2"><span className="text-sm font-bold text-white/90">{source.label}</span></div>
+                          <span className="text-sm font-black text-green-400">+{source.points.toLocaleString()} pp</span>
+                        </div>
+                      );
+                    }) : <span className="text-white/30 italic text-sm col-span-2">No active payouts found.</span>}
+                  </div>
+                </div>
+
+                <div className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6">
+                  <div className="flex justify-between items-end mb-6">
+                    <div>
+                      <p className="text-white/40 uppercase tracking-widest text-xs font-bold mb-1">Streak Score</p>
+                      <p className="text-2xl font-black text-white">Total: <span className="text-indigo-400">{streakScore.toLocaleString()}</span> <span className="text-sm font-normal text-white/50">score</span></p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 mt-4">
+                    {Array.from({ length: tierCount }).map((_, i) => (
+                      <div key={`tier-${i}`} className="relative flex items-center justify-between p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400 font-bold">✓</div>
+                          <span className="text-sm font-bold text-green-400">Tier {i + 1} Lifetime Bonus</span>
+                        </div>
+                        <span className="text-sm font-black text-green-400">+100 pp / day</span>
+                      </div>
+                    ))}
+                    <div className="relative flex flex-col gap-2 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold">{tierCount + 1}</div>
+                          <span className="text-sm font-bold text-indigo-400">Tier {tierCount + 1} Lifetime Bonus</span>
+                        </div>
+                        <span className="text-sm font-black text-indigo-400">{currentProgress.toLocaleString()} / 1,000</span>
+                      </div>
+                      <div className="w-full bg-black/50 rounded-full h-2 mt-2">
+                        <div className="bg-indigo-500 h-2 rounded-full transition-all duration-500" style={{ width: `${(currentProgress / 1000) * 100}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'badges' && (
+            <div className="flex flex-col gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {earnedBadges.map((badge) => (
+                  <div key={`badge-tab-${badge.key}`} className="bg-[#0a0a14]/80 border border-white/10 rounded-3xl p-6 flex flex-col">
+                    <div className="flex gap-4 items-center">
+                      <div className="w-20 h-20 shrink-0 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center">
+                        <CustomBadgeIcon badgeKey={badge.key} progress={badge.progress} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                        <p className="text-sm text-white/50">{badge.title}</p>
+                        <p className="text-xs text-green-400 font-bold mt-2">Unlocked</p>
+                      </div>
+                    </div>
+                    <BadgeProgress
+                      badgeKey={badge.key}
+                      count={badge.progress}
+                      overrides={data.badgeOverrides}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <button 
+                  onClick={() => setShowLockedBadges(!showLockedBadges)}
+                  className="flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition mb-4"
+                >
+                  <span className={`transform transition-transform ${showLockedBadges ? 'rotate-90' : ''}`}>▶</span>
+                  Not yet unlocked ({lockedBadges.length})
+                </button>
+                
+                <AnimatePresence>
+                  {showLockedBadges && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                        {lockedBadges.map((badge) => (
+                          <div key={`locked-${badge.key}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-6 flex flex-col opacity-60 grayscale hover:grayscale-0 transition-all duration-300">
+                            <div className="flex gap-4 items-center">
+                              <div className="w-20 h-20 shrink-0 bg-black/50 border border-white/10 rounded-2xl flex items-center justify-center">
+                                <CustomBadgeIcon badgeKey={badge.key} defaultEmoteId={badge.defaultEmote} defaultFallback={badge.fallback} overrides={data.badgeOverrides} className="w-10 h-10" />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-xl font-bold text-white mb-1">{data.badgeOverrides?.[badge.key]?.name || badge.label}</h3>
+                                <p className="text-sm text-white/50">{badge.title}</p>
+                                <p className="text-xs text-white/30 font-bold mt-2">Locked</p>
+                              </div>
+                            </div>
+                            <BadgeProgress
+                              badgeKey={badge.key}
+                              count={0}
+                              overrides={data.badgeOverrides}
+                              dim
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'achievements' && (
+            <div className="flex flex-col gap-8">
+              
+              <div>
+                {unlockedAchievements.length > 0 ? (
+                  <div className="flex flex-col gap-3">
+                    {unlockedAchievements.map((ach) => {
+                      const isFeatured = data.featuredBadgeId === ach.id;
+                      const override = data.badgeOverrides?.[ach.id];
+                      const highlightColor = getHighlightColor(ach);
+                      return (
+                        <div
+                          key={ach.id}
+                          className={`bg-[#0a0a14]/80 border rounded-3xl p-4 flex flex-col transition-all ${isFeatured ? '' : 'border-white/10'}`}
+                          style={isFeatured ? { borderColor: highlightColor, boxShadow: `0 0 20px ${highlightColor}33` } : undefined}
+                        >
+                          <div className="flex gap-4 items-center">
+                            <div
+                              className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center shadow-inner"
+                              style={{
+                                background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                                borderColor: `${highlightColor}4d`,
+                              }}
+                            >
+                              <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                              <p className="text-xs font-bold" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
+                            </div>
+                            {isOwnProfile && (
+                              <button
+                                onClick={() => handleSetFeaturedBadge(isFeatured ? null : ach.id)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition shrink-0 ${isFeatured ? 'bg-indigo-600 text-white' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                              >
+                                {isFeatured ? 'Featured' : 'Feature'}
+                              </button>
+                            )}
+                          </div>
+                          {renderProgressBar(ach)}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-white/40 italic bg-white/[0.02] border border-white/5 rounded-3xl">
+                    No achievements unlocked yet. Keep collecting to earn them!
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <button 
+                  onClick={() => setShowLockedAchievements(!showLockedAchievements)}
+                  className="flex items-center gap-2 text-sm font-bold text-white/50 hover:text-white transition mb-4"
+                >
+                  <span className={`transform transition-transform ${showLockedAchievements ? 'rotate-90' : ''}`}>▶</span>
+                  Not yet unlocked ({lockedAchievements.length})
+                </button>
+                
+                <AnimatePresence>
+                  {showLockedAchievements && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="flex flex-col gap-3 pt-2">
+                        {lockedAchievements.map((ach) => {
+                          const override = data.badgeOverrides?.[ach.id];
+                          const highlightColor = getHighlightColor(ach);
+                          const hasProgress = !!ach.progress && !!ach.progress.nextTier;
+                          return (
+                            <div key={`locked-ach-${ach.id}`} className="bg-[#0a0a14]/40 border border-white/5 rounded-3xl p-4 flex flex-col opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all duration-300">
+                              <div className="flex gap-4 items-center">
+                                <div
+                                  className="w-14 h-14 shrink-0 border rounded-2xl flex items-center justify-center"
+                                  style={{
+                                    background: `linear-gradient(135deg, ${highlightColor}33, ${highlightColor}1a)`,
+                                    borderColor: `${highlightColor}4d`,
+                                  }}
+                                >
+                                  <CustomBadgeIcon badgeKey={ach.id} defaultEmoteId={null} defaultFallback="🏆" overrides={data.badgeOverrides} className="w-8 h-8" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-md font-bold text-white mb-1 break-words">{override?.name || ach.label}</h3>
+                                  <p className="text-xs font-bold mb-1" style={{ color: highlightColor }}>{ach.rarity} Collector</p>
+                                  {!hasProgress && <p className="text-xs text-white/30">Locked</p>}
+                                </div>
+                              </div>
+                              {renderProgressBar(ach, true)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+            </div>
+          )}
+
+        </motion.div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isEditingFavorites && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-[#0a0a14] border border-white/10 rounded-3xl p-6 w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl">
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Edit Showcase</h2>
+                  <p className="text-white/50 text-sm mt-1">Pick up to 8 commissions to display on your profile.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setIsEditingFavorites(false)} className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition">Cancel</button>
+                  <button onClick={handleSaveFavorites} disabled={isSavingFavorites} className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition disabled:opacity-50">{isSavingFavorites ? 'Saving...' : `Save (${tempFavorites.size}/8)`}</button>
+                </div>
+              </div>
+              <div className="overflow-y-auto flex-1 custom-scrollbar p-1">
+                {allCards.length === 0 ? <p className="text-white/50 text-center py-10">Loading cards...</p> : (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {allCards.map(card => {
+                      const isSelected = tempFavorites.has(card.name);
+                      return (
+                        <div key={card.name} className={`relative aspect-[0.718] rounded-xl overflow-hidden cursor-pointer transition-all ${isSelected ? 'ring-4 ring-indigo-500 scale-[0.98]' : 'hover:scale-[1.02] opacity-70 hover:opacity-100'}`} onClick={() => toggleFavorite(card.name)}>
+                          <img src={card.image} alt={card.name} className="w-full h-full object-cover" />
+                          {isSelected && <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center"><div className="w-10 h-10 bg-indigo-500 text-white rounded-full flex items-center justify-center text-xl shadow-lg border-2 border-white">✓</div></div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedCard && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setSelectedCard(null)}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center overflow-hidden" onClick={e => e.stopPropagation()}>
+              <img src={selectedCard.image} alt={selectedCard.name} className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isColorModalOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="bg-[#0a0a14] border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+              <h3 className="text-xl font-bold text-white mb-4">Choose Name Color</h3>
+              <p className="text-sm text-white/50 mb-6">This will create a cosmetic role in the Discord server to match your color.</p>
+              <div className="flex justify-center mb-6">
+                <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-24 h-24 rounded cursor-pointer bg-transparent border-0 p-0" />
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setIsColorModalOpen(false)} className="px-4 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition">Cancel</button>
+                <button onClick={handleSaveColor} disabled={savingColor} className="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 text-white font-medium transition disabled:opacity-50">{savingColor ? 'Saving...' : 'Save Color'}</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
