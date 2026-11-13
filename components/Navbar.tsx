@@ -7,6 +7,7 @@ import { motion } from "motion/react";
 import WarpText from "@/components/WarpText";
 import RarityModeToggle from "@/components/RarityModeToggle";
 import { useSession, signOut } from "next-auth/react";
+import { usePreviewMode } from "@/components/PreviewModeContext";
 
 type NavCollection = {
   internalSlug: string;
@@ -29,6 +30,21 @@ export default function Navbar() {
     const pathname = usePathname();
     const router = useRouter();
     const { data: session } = useSession();
+
+    const {
+        isRealAdmin,
+        isRealDarsubscriber,
+        adminViewEnabled,
+        subscribblerViewEnabled,
+        setAdminView,
+        setSubscribblerView,
+    } = usePreviewMode();
+
+    // True when the admin is previewing a state that doesn't match reality.
+    // Used for the little dot on the hamburger icon so they know at a glance.
+    const inPreviewMode =
+        isRealAdmin &&
+        (!adminViewEnabled || subscribblerViewEnabled !== isRealDarsubscriber);
 
     useEffect(() => {
         let cancelled = false;
@@ -122,25 +138,31 @@ export default function Navbar() {
                 )}
 
                 {/* RIGHT — Menu Button */}
-                <button 
-                    onClick={() => setIsOpen(true)} 
+                <button
+                    onClick={() => setIsOpen(true)}
                     className="relative z-10 text-white/60 hover:text-white transition-colors"
                     aria-label="Open Menu"
                 >
                     <MenuIcon size={28} className="active:scale-90 transition" />
+                    {inPreviewMode && (
+                        <span
+                            className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-fuchsia-400 shadow-[0_0_6px_rgba(232,121,249,0.9)]"
+                            aria-label="Preview mode active"
+                        />
+                    )}
                 </button>
             </motion.nav>
 
             {/* Full-Screen Menu Overlay */}
             <div
-                className={`fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center text-lg gap-6 transition-transform duration-400 ${
+                className={`fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex flex-col items-center justify-center text-lg gap-6 transition-transform duration-400 overflow-y-auto py-16 ${
                     isOpen ? "translate-x-0" : "-translate-x-full"
                 }`}
             >
                 <Link href="/" onClick={() => setIsOpen(false)} className="hover:text-pink-400 transition-colors">
                     Home
                 </Link>
-                
+
                 <Link href="/play" onClick={() => setIsOpen(false)} className="hover:text-pink-400 transition-colors text-pink-500 font-bold">
                     Play
                 </Link>
@@ -169,6 +191,65 @@ export default function Navbar() {
                 )}
 
                 <div className="w-12 h-px bg-white/20 my-4" />
+
+                {/* ADMIN PREVIEW TOGGLES */}
+                {session && isRealAdmin && (
+                    <>
+                        <div className="flex flex-col items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
+                                Admin Preview
+                            </span>
+                            <div className="flex flex-col gap-1.5 mt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setAdminView(!adminViewEnabled)}
+                                    role="switch"
+                                    aria-checked={adminViewEnabled}
+                                    className="flex items-center justify-between gap-6 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-colors min-w-[230px]"
+                                >
+                                    <span className="text-sm font-medium text-white/85">Admin view</span>
+                                    <span
+                                        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
+                                            adminViewEnabled ? 'bg-indigo-500' : 'bg-white/15'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`absolute top-[2px] left-[2px] w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${
+                                                adminViewEnabled ? 'translate-x-[14px]' : ''
+                                            }`}
+                                        />
+                                    </span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setSubscribblerView(!subscribblerViewEnabled)}
+                                    role="switch"
+                                    aria-checked={subscribblerViewEnabled}
+                                    className="flex items-center justify-between gap-6 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-colors min-w-[230px]"
+                                >
+                                    <span className="text-sm font-medium text-white/85">Subscribbler view</span>
+                                    <span
+                                        className={`relative w-8 h-[18px] rounded-full transition-colors shrink-0 ${
+                                            subscribblerViewEnabled ? 'bg-indigo-500' : 'bg-white/15'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`absolute top-[2px] left-[2px] w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${
+                                                subscribblerViewEnabled ? 'translate-x-[14px]' : ''
+                                            }`}
+                                        />
+                                    </span>
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-white/40 max-w-[240px] text-center leading-tight mt-1">
+                                Preview only — server permissions are unchanged.
+                            </p>
+                        </div>
+
+                        <div className="w-12 h-px bg-white/20 my-2" />
+                    </>
+                )}
 
                 {/* AUTH BUTTONS */}
                 <div className="flex flex-col items-center gap-4 mt-2">
