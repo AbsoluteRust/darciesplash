@@ -5,7 +5,6 @@ export type DarsubscriberFeature = {
   icon: string;
   title: string;
   description: string;
-  /** Short hint of where in the app the feature lives. Informational only. */
   location?: string;
 };
 
@@ -15,7 +14,7 @@ export const DARSUBSCRIBBLER_FEATURES: DarsubscriberFeature[] = [
     icon: '✨',
     title: 'Animated card pulls',
     description:
-      'Pull and collect cards with animated GIF artwork, and see them animate on every reveal. Non-subscribers can only pull the static version of each card.',
+      'Pull and collect cards with animated GIF artwork, and see them animate on every reveal. Without Darsubscribbler status, cards appear as static images only.',
     location: '/play',
   },
   {
@@ -45,9 +44,9 @@ export const DARSUBSCRIBBLER_FEATURES: DarsubscriberFeature[] = [
   {
     id: 'daily-bonus',
     icon: '💜',
-    title: 'Daily Darsubscriber bonus',
+    title: 'Daily Darsubscribbler bonus',
     description:
-      'Every day’s automatic points payout includes an extra Darsubscriber-only bonus on top of your streaks, guild bonus, and community servers.',
+      'Every day’s automatic points payout includes an extra Darsubscribbler-only bonus on top of your streaks, guild bonus, and community servers.',
     location: 'Profile → Streak breakdown',
   },
   {

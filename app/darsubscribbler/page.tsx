@@ -3,13 +3,14 @@ import { auth } from '@/auth';
 import { kv } from '@vercel/kv';
 import { DARSUBSCRIBBLER_FEATURES } from '@/lib/darsubscriber-features';
 import DarsubscriberStatus from './DarsubscriberStatus';
+import DarsubscriberCTA from './DarsubscriberCTA';
 import './page.css';
 
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
   title: 'Darsubscriber',
-  description: 'Everything you get as a Darsubscriber on Folly of Flora.',
+  description: 'Everything you get as a Darsubscribbler on Folly of Flora.',
 };
 
 const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
@@ -18,27 +19,27 @@ export default async function DarsubscriberPage() {
   const session = await auth();
   const userId = session?.user?.id ?? null;
 
-  let isDarsubscriber = false;
+  let realIsDarsubscriber = false;
   if (userId) {
     const roles = await kv.get(`account_roles:${userId}`).catch(() => null);
-    isDarsubscriber = !!(roles as any)?.darsubscribbler;
+    realIsDarsubscriber = !!(roles as any)?.darsubscribbler;
   }
 
   return (
     <main className="ds-page">
       <section className="ds-hero">
         <div className="ds-hero__inner">
-          <p className="ds-hero__eyebrow">Support the artist</p>
+          <p className="ds-hero__eyebrow">Support the studio</p>
           <h1 className="ds-hero__title">Darsubscriber</h1>
           <p className="ds-hero__subtitle">
             Every perk below is unlocked automatically the moment your
-            Ko-fi subscription becomes active. No codes, no waiting, no
+            Darsubscribbler status becomes active. No codes, no waiting, no
             extra signup.
           </p>
 
           <DarsubscriberStatus
             signedIn={!!userId}
-            isDarsubscriber={isDarsubscriber}
+            realIsDarsubscriber={realIsDarsubscriber}
             kofiUrl={KOFI_TIERS_URL}
           />
         </div>
@@ -62,28 +63,10 @@ export default async function DarsubscriberPage() {
         </div>
       </section>
 
-      <section className="ds-cta">
-        <div className="ds-cta__inner">
-          <h2 className="ds-cta__title">
-            {isDarsubscriber ? 'You’re all set.' : 'Ready to unlock everything?'}
-          </h2>
-          <p className="ds-cta__subtitle">
-            {isDarsubscriber
-              ? 'Every perk above is active on your account right now. Thank you for supporting the studio.'
-              : 'Subscriptions are managed through Ko-fi. Cancel any time — your perks stay active until your billing period ends.'}
-          </p>
-          {!isDarsubscriber && (
-            <a
-              className="ds-cta__button"
-              href={KOFI_TIERS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Subscribe on Ko-fi →
-            </a>
-          )}
-        </div>
-      </section>
+      <DarsubscriberCTA
+        realIsDarsubscriber={realIsDarsubscriber}
+        kofiUrl={KOFI_TIERS_URL}
+      />
     </main>
   );
 }

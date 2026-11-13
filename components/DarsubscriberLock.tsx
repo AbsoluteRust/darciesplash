@@ -20,8 +20,6 @@ export default function DarsubscriberLock({
   unlocked: boolean;
   children: React.ReactNode;
   variant?: 'overlay' | 'inline';
-  /** Which side of the badge the tooltip opens toward. Use `above` for
-   *  bottom-anchored UI (FABs, sticky action bars). */
   tooltipPlacement?: 'below' | 'above';
   kofiUrl?: string;
 }) {
@@ -83,7 +81,7 @@ export default function DarsubscriberLock({
       <button
         type="button"
         className="dsl-badge"
-        aria-label={`${feature} — Darsubscriber feature. Click for details.`}
+        aria-label={`${feature} — Darsubscribbler feature. Click for details.`}
         aria-expanded={open}
         aria-controls={open ? tooltipId : undefined}
         onClick={handleBadgeClick}
@@ -110,7 +108,7 @@ export default function DarsubscriberLock({
             target="_blank"
             rel="noopener noreferrer"
           >
-            Subscribe on Ko-fi →
+            Become a Darsubscribbler →
           </a>
           <div className="dsl-tooltip__hint">
             Darsubscribblers get this and every other perk on the{' '}

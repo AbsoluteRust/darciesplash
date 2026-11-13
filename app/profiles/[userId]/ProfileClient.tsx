@@ -138,7 +138,7 @@ type MajorAction = {
 
 const MAJOR_ACTIONS: MajorAction[] = [
   { id: 'referral',     label: 'Referral',     icon: '🍌', subtitle: 'Infinitely repeatable' },
-  { id: 'subscription', label: 'Subscription', icon: '💖', subtitle: 'Repeatable once per month', href: KOFI_TIERS_URL, hrefLabel: 'Subscribe on Ko-fi' },
+  { id: 'subscription', label: 'Darsubscribbler', icon: '💖', subtitle: 'Once per month', href: KOFI_TIERS_URL, hrefLabel: 'Sign up on Ko-fi' },
   { id: 'gift',         label: 'Gift',         icon: '🎁', subtitle: 'Infinitely repeatable' },
   { id: 'commission',   label: 'Commission',   icon: '✨', subtitle: 'Infinitely repeatable' },
 ];

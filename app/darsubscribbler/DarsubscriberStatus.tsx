@@ -1,23 +1,26 @@
-// app/darsubscribbler/darsubscribblerStatus.tsx
+// app/darsubscribbler/DarsubscriberStatus.tsx
 'use client';
 
 import { signIn } from 'next-auth/react';
+import { usePreviewMode } from '@/components/PreviewModeContext';
 
-export default function darsubscribblerStatus({
+export default function DarsubscriberStatus({
   signedIn,
-  isDarsubscriber,
+  realIsDarsubscriber,
   kofiUrl,
 }: {
   signedIn: boolean;
-  isDarsubscriber: boolean;
+  realIsDarsubscriber: boolean;
   kofiUrl: string;
 }) {
+  const { effectiveIsDarsubscriber } = usePreviewMode();
+
   if (!signedIn) {
     return (
       <div className="ds-status ds-status--signin">
         <p className="ds-status__title">Sign in to check your status</p>
         <p className="ds-status__body">
-          Already a darsubscribbler? Sign in to see every perk that&apos;s
+          Already a Darsubscribbler? Sign in to see every perk that&apos;s
           already unlocked on your account.
         </p>
         <button
@@ -31,7 +34,7 @@ export default function darsubscribblerStatus({
     );
   }
 
-  if (isDarsubscriber) {
+  if (effectiveIsDarsubscriber) {
     return (
       <div className="ds-status ds-status--active">
         <p className="ds-status__title">
@@ -47,14 +50,19 @@ export default function darsubscribblerStatus({
 
   return (
     <div className="ds-status ds-status--inactive">
-      <p className="ds-status__title">You are not currently subscribed</p>
+      <p className="ds-status__title">You are not currently a Darsubscribbler</p>
+      <p className="ds-status__body">
+        Become a Darsubscribbler on Ko-fi to unlock every perk on this page.
+        Darsubscribbler status is applied automatically — no codes to redeem,
+        no waiting.
+      </p>
       <a
         className="ds-status__button"
         href={kofiUrl}
         target="_blank"
         rel="noopener noreferrer"
       >
-        Subscribe on Ko-fi →
+        Become a Darsubscribbler →
       </a>
     </div>
   );
