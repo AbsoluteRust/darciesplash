@@ -9,7 +9,7 @@ import './page.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata = {
-  title: 'Darsubscriber',
+  title: 'Darsubscribbler',
   description: 'Everything you get as a Darsubscribbler on Folly of Flora.',
 };
 
@@ -29,8 +29,8 @@ export default async function DarsubscriberPage() {
     <main className="ds-page">
       <section className="ds-hero">
         <div className="ds-hero__inner">
-          <p className="ds-hero__eyebrow">Support the studio</p>
-          <h1 className="ds-hero__title">Darsubscriber</h1>
+          <p className="ds-hero__eyebrow">Support Darcie</p>
+          <h1 className="ds-hero__title">Darsubscribbler</h1>
           <p className="ds-hero__subtitle">
             Every perk below is unlocked automatically the moment your
             Darsubscribbler status becomes active. No codes, no waiting, no

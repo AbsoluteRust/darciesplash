@@ -20,7 +20,7 @@ export default function DarsubscriberCTA({
         </h2>
         <p className="ds-cta__subtitle">
           {effectiveIsDarsubscriber
-            ? 'Every perk above is active on your account right now. Thank you for supporting the studio.'
+            ? 'Every perk above is active on your account right now. Thank you for supporting Darcie.'
             : 'Darsubscribbler status is managed through Ko-fi. Cancel any time — your perks stay active until your billing period ends.'}
         </p>
         {!effectiveIsDarsubscriber && (

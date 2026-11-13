@@ -42,7 +42,7 @@ export default function DarsubscriberStatus({
         </p>
         <p className="ds-status__body">
           Every perk on this page is active on your account right now. Thank
-          you for supporting the studio.
+          you for supporting Darcie.
         </p>
       </div>
     );
