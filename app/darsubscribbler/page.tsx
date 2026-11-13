@@ -28,7 +28,7 @@ export default async function DarsubscriberPage() {
     <main className="ds-page">
       <section className="ds-hero">
         <div className="ds-hero__inner">
-          <p className="ds-hero__eyebrow">Support the studio</p>
+          <p className="ds-hero__eyebrow">Support the artist</p>
           <h1 className="ds-hero__title">Darsubscriber</h1>
           <p className="ds-hero__subtitle">
             Every perk below is unlocked automatically the moment your

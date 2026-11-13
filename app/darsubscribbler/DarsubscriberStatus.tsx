@@ -35,7 +35,7 @@ export default function DarsubscriberStatus({
     return (
       <div className="ds-status ds-status--active">
         <p className="ds-status__title">
-          <span aria-hidden="true">✦</span> You are a Darsubscriber
+          <span aria-hidden="true">✦</span> You are a Darsubscribbler
         </p>
         <p className="ds-status__body">
           Every perk on this page is active on your account right now. Thank
@@ -48,10 +48,6 @@ export default function DarsubscriberStatus({
   return (
     <div className="ds-status ds-status--inactive">
       <p className="ds-status__title">You are not currently subscribed</p>
-      <p className="ds-status__body">
-        Subscribe on Ko-fi to unlock every perk on this page. Subscriptions
-        are automatic — no codes to redeem, no waiting.
-      </p>
       <a
         className="ds-status__button"
         href={kofiUrl}
