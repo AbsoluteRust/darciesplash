@@ -89,7 +89,7 @@ export default function DarsubscriberLock({
         onBlur={scheduleClose}
       >
         <span className="dsl-badge__lock" aria-hidden="true">🔒</span>
-        <span className="dsl-badge__text">Darsubscriber</span>
+        <span className="dsl-badge__text">Darsubscribbler</span>
       </button>
 
       {open && (
@@ -112,7 +112,7 @@ export default function DarsubscriberLock({
           </a>
           <div className="dsl-tooltip__hint">
             Darsubscribblers get this and every other perk on the{' '}
-            <a href="/darsubscribbler">Darsubscriber page</a>.
+            <a href="/darsubscribbler">Darsubscribbler page</a>.
           </div>
         </div>
       )}
