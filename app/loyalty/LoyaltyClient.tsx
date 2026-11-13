@@ -191,6 +191,140 @@ function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
   return null;
 }
 
+/* ---------- scrubber dot sizing ---------- */
+
+function scrubberDotSize(tier: number): number {
+  if (tier === 100) return 10;
+  if (isMajorTier(tier)) return 7;
+  if (tier % 10 === 0) return 5;
+  if (tier % 5 === 0) return 4;
+  return 3;
+}
+
+/* ---------- tier scrubber ---------- */
+
+function TierScrubber({
+  positioned,
+  currentCenterTier,
+  compact,
+  onScrub,
+}: {
+  positioned: { tier: number }[];
+  currentCenterTier: number;
+  compact: boolean;
+  onScrub: (tier: number) => void;
+}) {
+  const scrubberRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const computeTierFromX = useCallback((clientX: number): number => {
+    const el = scrubberRef.current;
+    if (!el) return 1;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return 1;
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return Math.round(ratio * (TOTAL_TIERS - 1)) + 1;
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+    setDragging(true);
+    onScrub(computeTierFromX(e.clientX));
+  }, [computeTierFromX, onScrub]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    e.preventDefault();
+    onScrub(computeTierFromX(e.clientX));
+  }, [dragging, computeTierFromX, onScrub]);
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragging) return;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+    setDragging(false);
+  }, [dragging]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      e.stopPropagation();
+      onScrub(Math.max(1, currentCenterTier - 1));
+    } else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      e.stopPropagation();
+      onScrub(Math.min(TOTAL_TIERS, currentCenterTier + 1));
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      e.stopPropagation();
+      onScrub(1);
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      e.stopPropagation();
+      onScrub(TOTAL_TIERS);
+    }
+  }, [currentCenterTier, onScrub]);
+
+  // Clamp label percent to [8, 92] so it never clips at the edges on narrow screens.
+  const rawPct = ((currentCenterTier - 1) / (TOTAL_TIERS - 1)) * 100;
+  const labelPct = Math.max(8, Math.min(92, rawPct));
+
+  const visible = compact
+    ? positioned.filter(m => m.tier % 5 === 0 || isMajorTier(m.tier))
+    : positioned;
+
+  return (
+    <div
+      ref={scrubberRef}
+      className={`loyalty-scrubber${dragging ? ' is-dragging' : ''}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onKeyDown={handleKeyDown}
+      role="slider"
+      tabIndex={0}
+      aria-label="Tier track scrubber"
+      aria-valuemin={1}
+      aria-valuemax={TOTAL_TIERS}
+      aria-valuenow={currentCenterTier}
+      aria-valuetext={`Tier ${currentCenterTier} of ${TOTAL_TIERS}`}
+    >
+      <div className="loyalty-scrubber__track">
+        {visible.map(m => {
+          const size = scrubberDotSize(m.tier);
+          const isActive = m.tier <= currentCenterTier;
+          const isMajor = isMajorTier(m.tier);
+          const isCurrent = m.tier === currentCenterTier;
+          return (
+            <span
+              key={m.tier}
+              className={[
+                'loyalty-scrubber__dot',
+                isActive ? 'is-active' : '',
+                isMajor ? 'is-major' : '',
+                isCurrent ? 'is-current' : '',
+              ].filter(Boolean).join(' ')}
+              style={{ width: size, height: size }}
+              aria-hidden="true"
+            />
+          );
+        })}
+      </div>
+      {dragging && (
+        <div className="loyalty-scrubber__label" style={{ left: `${labelPct}%` }}>
+          Tier {currentCenterTier}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------- emote picker ---------- */
 
 type EmoteInfo = { id: string; name: string; animated: boolean; guildName: string; collections: string[]; ignored: boolean };
@@ -845,10 +979,6 @@ export default function LoyaltyClient({
   initialClaims: LoyaltyClaims;
   initialPendingPacks: PendingLoyaltyPack[];
 }) {
-  // The navbar's "Admin view" toggle lives in PreviewModeContext. When it's
-  // off, we hide all admin-only UI so an admin can see the page exactly as
-  // a non-admin would. Server-side mutations still require a real admin —
-  // this only controls rendering.
   const { effectiveIsAdmin } = usePreviewMode();
   const showAdminUI = isAdmin && effectiveIsAdmin;
 
@@ -905,9 +1035,6 @@ export default function LoyaltyClient({
 
   /* ---------- close admin modals when preview turns admin UI off ---------- */
 
-  // If an admin was mid-edit in any admin modal and then toggles "Admin view"
-  // off, close the modal so it doesn't linger invisible. Revert the theme
-  // preview if the theme editor was open with unsaved changes.
   const themeSnapshotRef = useRef(themeSnapshot);
   useEffect(() => { themeSnapshotRef.current = themeSnapshot; }, [themeSnapshot]);
 
@@ -986,6 +1113,27 @@ export default function LoyaltyClient({
 
   const effectiveStardust = previewStardust ?? (trackActive ? currentStardust : 0);
   const effectiveTier = tierForStardust(effectiveStardust);
+
+  /* ---------- scrubber ---------- */
+
+  // Reverse-map the current panOffset to the tier currently centered in the
+  // viewport. This drives the scrubber's filled-dot state, so the scrubber
+  // reflects wherever the user has scrolled or dragged to.
+  const currentCenterTier = useMemo(() => {
+    const centerX = panOffset + viewportSize.width / 2;
+    const ratio = (centerX - START_X) / (END_X - START_X);
+    const tier = Math.round(ratio * (TOTAL_TIERS - 1)) + 1;
+    return Math.max(1, Math.min(TOTAL_TIERS, tier));
+  }, [panOffset, viewportSize.width]);
+
+  const compactScrubber = viewportSize.width < 600;
+
+  const handleScrubToTier = useCallback((tier: number) => {
+    const clamped = Math.max(1, Math.min(TOTAL_TIERS, tier));
+    const ratio = (clamped - 1) / (TOTAL_TIERS - 1);
+    const tierX = START_X + ratio * (END_X - START_X);
+    setPanOffset(clampOffset(tierX - viewportSize.width / 2));
+  }, [viewportSize.width, clampOffset]);
 
   /* ---------- data loading ---------- */
 
@@ -1146,9 +1294,6 @@ export default function LoyaltyClient({
 
   const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
-    // Only open the tier-editing modal when admin UI is actually visible.
-    // When the preview toggle is off, clicking a star behaves exactly like
-    // it would for a non-admin — showing the reward info modal instead.
     if (adminMode && showAdminUI) {
       setEditing(t);
       loadEmotes().catch(() => {});
@@ -1402,8 +1547,15 @@ export default function LoyaltyClient({
           <div className="loyalty-edge-fade loyalty-edge-fade--right" />
         </div>
 
+        <TierScrubber
+          positioned={positioned}
+          currentCenterTier={currentCenterTier}
+          compact={compactScrubber}
+          onScrub={handleScrubToTier}
+        />
+
         <div className="loyalty-hint">
-          {adminMode && showAdminUI ? 'Click any star to edit its reward or icon' : 'Drag or use arrow keys to pan'}
+          {adminMode && showAdminUI ? 'Click any star to edit its reward or icon' : 'Drag, scroll, or use the scrubber below to browse'}
         </div>
       </div>
 

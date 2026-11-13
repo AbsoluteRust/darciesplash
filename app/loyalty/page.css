@@ -1081,3 +1081,103 @@
   color: var(--lt-accent);
   font-weight: 700;
 }
+
+/* ---------- tier scrubber ---------- */
+
+.loyalty-scrubber {
+  flex-shrink: 0;
+  position: relative;
+  margin: 0 1.5rem;
+  padding: 0.75rem 0 0.5rem;
+  z-index: 6;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  outline: none;
+}
+
+.loyalty-scrubber:active,
+.loyalty-scrubber.is-dragging {
+  cursor: grabbing;
+}
+
+.loyalty-scrubber:focus-visible {
+  outline: 2px solid var(--lt-accent);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.loyalty-scrubber__track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 12px;
+  pointer-events: none;
+}
+
+.loyalty-scrubber__dot {
+  border-radius: 50%;
+  background: var(--lt-accent-20);
+  flex-shrink: 0;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.loyalty-scrubber.is-dragging .loyalty-scrubber__dot {
+  transition: background 0.05s ease;
+}
+
+.loyalty-scrubber__dot.is-major {
+  background: var(--lt-accent-40);
+}
+
+.loyalty-scrubber__dot.is-active {
+  background: var(--lt-accent);
+}
+
+.loyalty-scrubber__dot.is-active.is-major {
+  background: var(--lt-accent);
+  box-shadow: 0 0 6px var(--lt-accent-60);
+}
+
+.loyalty-scrubber__dot.is-current {
+  box-shadow:
+    0 0 0 2px var(--lt-accent-30),
+    0 0 10px var(--lt-accent);
+}
+
+.loyalty-scrubber__dot.is-current.is-major {
+  box-shadow:
+    0 0 0 3px var(--lt-accent-30),
+    0 0 14px var(--lt-accent);
+}
+
+.loyalty-scrubber__label {
+  position: absolute;
+  top: 2px;
+  transform: translate(-50%, -100%);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--lt-accent-text);
+  background: var(--lt-accent);
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 8px var(--lt-accent-40);
+  animation: loyaltyScrubberLabelIn 120ms ease-out;
+  z-index: 1;
+}
+
+@keyframes loyaltyScrubberLabelIn {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(0.9); }
+  to   { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+}
+
+@media (max-width: 768px) {
+  .loyalty-scrubber {
+    margin: 0 0.75rem;
+    padding: 0.5rem 0 0.35rem;
+  }
+}
