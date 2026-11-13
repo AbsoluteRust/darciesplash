@@ -38,6 +38,50 @@ const PADDING = 300;
 const DECO_POINTS = 100;
 const MAIN_POINTS = 120;
 
+/* ---------- overlay close helper ----------
+ *
+ * The naïve pattern `overlay onClick={onClose}` breaks when the user
+ * highlights text inside a modal and releases the pointer over the
+ * backdrop — the click event fires on the overlay (their common
+ * ancestor) and closes the modal mid-selection.
+ *
+ * `useOverlayClose` only triggers `onClose` when:
+ *   1. the pointerdown started on the overlay itself (not on a child),
+ *   2. the pointer moved less than 5px between down and up, and
+ *   3. the click target is the overlay itself.
+ *
+ * That handles the drag-to-select bug, click-inside-modal, and genuine
+ * backdrop clicks cleanly.
+ */
+function useOverlayClose(onClose: () => void) {
+  const downOnOverlayRef = useRef(false);
+  const movedRef = useRef(false);
+  const startRef = useRef({ x: 0, y: 0 });
+
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      downOnOverlayRef.current = e.target === e.currentTarget;
+      movedRef.current = false;
+      startRef.current = { x: e.clientX, y: e.clientY };
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!downOnOverlayRef.current) return;
+      const dx = Math.abs(e.clientX - startRef.current.x);
+      const dy = Math.abs(e.clientY - startRef.current.y);
+      if (dx > 5 || dy > 5) movedRef.current = true;
+    },
+    onClick: (e: React.MouseEvent) => {
+      if (
+        downOnOverlayRef.current &&
+        !movedRef.current &&
+        e.target === e.currentTarget
+      ) {
+        onClose();
+      }
+    },
+  };
+}
+
 /* ---------- wave math ---------- */
 
 function mainStringY(x: number, t: number, height: number): number {
@@ -114,9 +158,6 @@ function drawMainWave(
 
 /* ---------- star tier helpers ---------- */
 
-// 13 major tiers: every 4th tier + the final tier 50. That matches the
-// original 100-tier track's 13 majors (every 8th + tier 100), but with
-// 3 filler tiers between majors instead of 7.
 function isMajorTier(tier: number): boolean {
   if (tier === 50) return true;
   if (tier > 0 && tier % 4 === 0) return true;
@@ -276,8 +317,6 @@ function TierScrubber({
   const rawPct = ((currentCenterTier - 1) / (TOTAL_TIERS - 1)) * 100;
   const labelPct = Math.max(8, Math.min(92, rawPct));
 
-  // On compact screens, thin out to 10-multiples + majors so each dot has
-  // room to breathe. 50 tiers is still readable all-in on wider screens.
   const visible = compact
     ? positioned.filter(m => m.tier % 10 === 0 || isMajorTier(m.tier))
     : positioned;
@@ -419,6 +458,8 @@ function PackEditorModal({
   onClose: () => void;
   saving: boolean;
 }) {
+  const overlay = useOverlayClose(onClose);
+
   const [name, setName] = useState(pack?.name ?? '');
   const [cardCount, setCardCount] = useState(pack?.cardCount ?? 5);
   const initialRarityMode = pack?.rarityFilter.mode ?? 'all';
@@ -485,7 +526,7 @@ function PackEditorModal({
   }
 
   return (
-    <div className="loyalty-modal-overlay" onClick={onClose}>
+    <div className="loyalty-modal-overlay" {...overlay}>
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
@@ -609,8 +650,10 @@ function PackManagerModal({
   packs: CustomPack[]; loading: boolean; onRefresh: () => void;
   onCreate: () => void; onEdit: (p: CustomPack) => void; onClose: () => void;
 }) {
+  const overlay = useOverlayClose(onClose);
+
   return (
-    <div className="loyalty-modal-overlay" onClick={onClose}>
+    <div className="loyalty-modal-overlay" {...overlay}>
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
@@ -679,6 +722,8 @@ function EditTierModal({
   onSave: (updated: MergedTier) => void;
   onClose: () => void;
 }) {
+  const overlay = useOverlayClose(onClose);
+
   const initial = useMemo(() => parseTierIcon(tier.icon), [tier.icon]);
   const [iconMode, setIconMode] = useState<'emoji' | 'emote'>(initial.type === 'emote' ? 'emote' : 'emoji');
   const [emojiValue, setEmojiValue] = useState(initial.type === 'emoji' ? initial.value : '⭐');
@@ -712,8 +757,6 @@ function EditTierModal({
   function handleSave() {
     if (!form.title.trim()) return setError('Title is required');
     if (!form.reward.trim()) return setError('Reward display text is required');
-    // Icon is optional — if left empty, the tier falls back to the
-    // default ⭐ from getDefaultTier(). No validation.
     const icon = iconMode === 'emoji' ? emojiValue.trim() : emoteValue.trim();
 
     let rewardKind: RewardKind | undefined;
@@ -741,7 +784,7 @@ function EditTierModal({
   }
 
   return (
-    <div className="loyalty-modal-overlay" onClick={onClose}>
+    <div className="loyalty-modal-overlay" {...overlay}>
       <div className="loyalty-modal loyalty-modal--edit" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
@@ -871,6 +914,8 @@ function EditThemeModal({
   onSave: (t: LoyaltyTheme) => void;
   onClose: () => void;
 }) {
+  const overlay = useOverlayClose(onClose);
+
   const [draft, setDraft] = useState<LoyaltyTheme>(theme);
   const [error, setError] = useState<string | null>(null);
 
@@ -889,7 +934,7 @@ function EditThemeModal({
   }
 
   return (
-    <div className="loyalty-modal-overlay" onClick={onClose}>
+    <div className="loyalty-modal-overlay" {...overlay}>
       <div className="loyalty-modal loyalty-modal--theme" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body" style={{ textAlign: 'left' }}>
@@ -938,8 +983,10 @@ function CardRevealModal({
   cards: { name: string; rarity: string; image?: string }[];
   onClose: () => void;
 }) {
+  const overlay = useOverlayClose(onClose);
+
   return (
-    <div className="loyalty-modal-overlay" onClick={onClose}>
+    <div className="loyalty-modal-overlay" {...overlay}>
       <div className="loyalty-modal loyalty-modal--theme" onClick={e => e.stopPropagation()}>
         <button className="loyalty-modal__close" onClick={onClose} aria-label="Close">×</button>
         <div className="loyalty-modal__body">
@@ -1128,8 +1175,6 @@ export default function LoyaltyClient({
     return Math.max(1, Math.min(TOTAL_TIERS, tier));
   }, [panOffset, viewportSize.width]);
 
-  // With 50 tiers, all dots fit comfortably down to ~500px. Below that,
-  // thin out to 10-multiples + majors for readable spacing.
   const compactScrubber = viewportSize.width < 500;
 
   const handleScrubToTier = useCallback((tier: number) => {
