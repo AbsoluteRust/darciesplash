@@ -350,7 +350,7 @@ export default function PlayHub({ signedIn }: { signedIn: boolean }) {
         <PackReveal
           cards={webRevealPack.cards}
           shortId={webRevealPack.shortId}
-          canReroll={false}
+          canReroll={!!webRevealPack.canReroll}
           onClose={() => {
             setClosedRevealShortIds(prev => {
               const next = prev.includes(webRevealPack.shortId)

@@ -95,7 +95,12 @@ export default function PlayButton({ disabled = false }: { disabled?: boolean })
       if (Array.isArray(data.cards) && data.cards.length > 0) {
         setReveal(data.cards);
         setShortId(data.shortId);
-        setCanReroll(data.allCommon);
+        // Bot returns canReroll = "no new cards in this pull". Fall back
+        // to allCommon only if talking to a bot build that predates the
+        // canReroll field — behavior degrades gracefully.
+        setCanReroll(
+          typeof data.canReroll === 'boolean' ? data.canReroll : !!data.allCommon
+        );
       }
     } catch (err) {
       setStatus('error');
