@@ -29,6 +29,7 @@ import {
   type RewardKind,
   type TierOverrides,
 } from '@/lib/loyalty-milestones';
+import { usePreviewMode } from '@/components/PreviewModeContext';
 
 const WORLD_WIDTH = 16000;
 const START_X = 2400;
@@ -844,6 +845,13 @@ export default function LoyaltyClient({
   initialClaims: LoyaltyClaims;
   initialPendingPacks: PendingLoyaltyPack[];
 }) {
+  // The navbar's "Admin view" toggle lives in PreviewModeContext. When it's
+  // off, we hide all admin-only UI so an admin can see the page exactly as
+  // a non-admin would. Server-side mutations still require a real admin —
+  // this only controls rendering.
+  const { effectiveIsAdmin } = usePreviewMode();
+  const showAdminUI = isAdmin && effectiveIsAdmin;
+
   const [overrides, setOverrides] = useState<TierOverrides>(initialOverrides);
   const tiers = useMemo(() => buildAllTiers(overrides), [overrides]);
 
@@ -894,6 +902,26 @@ export default function LoyaltyClient({
   useEffect(() => { themeRef.current = theme; }, [theme]);
   useEffect(() => { activeTierRef.current = activeTier; }, [activeTier]);
   useEffect(() => { editingRef.current = editing; }, [editing]);
+
+  /* ---------- close admin modals when preview turns admin UI off ---------- */
+
+  // If an admin was mid-edit in any admin modal and then toggles "Admin view"
+  // off, close the modal so it doesn't linger invisible. Revert the theme
+  // preview if the theme editor was open with unsaved changes.
+  const themeSnapshotRef = useRef(themeSnapshot);
+  useEffect(() => { themeSnapshotRef.current = themeSnapshot; }, [themeSnapshot]);
+
+  useEffect(() => {
+    if (showAdminUI) return;
+    setEditing(null);
+    setThemeOpen(false);
+    setPacksManagerOpen(false);
+    setPackEditorPack(null);
+    if (themeSnapshotRef.current) {
+      setTheme(themeSnapshotRef.current);
+      setThemeSnapshot(null);
+    }
+  }, [showAdminUI]);
 
   /* ---------- lock body scroll ---------- */
 
@@ -1118,9 +1146,16 @@ export default function LoyaltyClient({
 
   const handleNodeClick = useCallback((t: MergedTier) => {
     if (dragRef.current.moved > 5) return;
-    if (adminMode) { setEditing(t); loadEmotes().catch(() => {}); }
-    else setActiveTier(t);
-  }, [adminMode, loadEmotes]);
+    // Only open the tier-editing modal when admin UI is actually visible.
+    // When the preview toggle is off, clicking a star behaves exactly like
+    // it would for a non-admin — showing the reward info modal instead.
+    if (adminMode && showAdminUI) {
+      setEditing(t);
+      loadEmotes().catch(() => {});
+    } else {
+      setActiveTier(t);
+    }
+  }, [adminMode, showAdminUI, loadEmotes]);
 
   /* ---------- admin saves ---------- */
 
@@ -1221,8 +1256,6 @@ export default function LoyaltyClient({
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       if (data.claim) {
         setClaims(prev => ({ ...prev, [String(tier.tier)]: data.claim as LoyaltyClaim }));
-        // Pull the fresh pending pack metadata from the bot — no cards
-        // are included, so nothing sensitive crosses the wire.
         await fetchPendingPacks();
       }
     } catch (err: any) {
@@ -1303,7 +1336,7 @@ export default function LoyaltyClient({
           </div>
         )}
 
-        {isAdmin && (
+        {showAdminUI && (
           <div className="loyalty-admin-bar">
             <button type="button" className="loyalty-admin-toggle" onClick={handleThemeOpen}>🎨 Edit theme</button>
             <button
@@ -1332,7 +1365,7 @@ export default function LoyaltyClient({
 
         <div
           ref={viewportRef}
-          className={`loyalty-viewport ${adminMode ? 'is-editing' : ''}`}
+          className={`loyalty-viewport ${adminMode && showAdminUI ? 'is-editing' : ''}`}
           onPointerDown={handlePointerDown}
           onKeyDown={handleKeyDown}
           tabIndex={0} role="region" aria-label="Loyalty tier track"
@@ -1347,7 +1380,7 @@ export default function LoyaltyClient({
                 <button
                   key={m.tier}
                   type="button"
-                  className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode ? 'is-editable' : ''}`}
+                  className={`loyalty-node ${unlocked ? 'is-unlocked' : 'is-locked'} ${adminMode && showAdminUI ? 'is-editable' : ''}`}
                   style={{ left: m.x, top: 0, transform: 'translate(-50%, -50%)' }}
                   ref={el => { if (el) nodeRefs.current.set(m.tier, el); else nodeRefs.current.delete(m.tier); }}
                   onPointerEnter={() => { frozenRef.current = true; }}
@@ -1360,7 +1393,7 @@ export default function LoyaltyClient({
                     <TierIcon icon={m.icon} starSize={size} />
                   </span>
                   {showLabel && <span className="loyalty-node__label">{m.tier}</span>}
-                  {adminMode && <span className="loyalty-node__edit-badge">✎</span>}
+                  {adminMode && showAdminUI && <span className="loyalty-node__edit-badge">✎</span>}
                 </button>
               );
             })}
@@ -1370,11 +1403,11 @@ export default function LoyaltyClient({
         </div>
 
         <div className="loyalty-hint">
-          {adminMode ? 'Click any star to edit its reward or icon' : 'Drag or use arrow keys to pan'}
+          {adminMode && showAdminUI ? 'Click any star to edit its reward or icon' : 'Drag or use arrow keys to pan'}
         </div>
       </div>
 
-      {activeTier && !adminMode && (() => {
+      {activeTier && !(adminMode && showAdminUI) && (() => {
         const pending = pendingForTier(activeTier.tier);
         return (
           <div className="loyalty-modal-overlay" onClick={() => setActiveTier(null)}>
@@ -1442,7 +1475,7 @@ export default function LoyaltyClient({
         );
       })()}
 
-      {editing && (
+      {showAdminUI && editing && (
         <EditTierModal
           tier={editing}
           emoteData={emoteData}
@@ -1457,7 +1490,7 @@ export default function LoyaltyClient({
         />
       )}
 
-      {themeOpen && (
+      {showAdminUI && themeOpen && (
         <EditThemeModal
           theme={theme}
           onPreview={handleThemePreview}
@@ -1466,7 +1499,7 @@ export default function LoyaltyClient({
         />
       )}
 
-      {packsManagerOpen && (
+      {showAdminUI && packsManagerOpen && (
         <PackManagerModal
           packs={customPacks}
           loading={!customPacksLoaded}
@@ -1477,7 +1510,7 @@ export default function LoyaltyClient({
         />
       )}
 
-      {packEditorPack !== null && (
+      {showAdminUI && packEditorPack !== null && (
         <PackEditorModal
           pack={packEditorPack === 'new' ? null : packEditorPack}
           saving={savingPack}
