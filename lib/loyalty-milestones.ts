@@ -22,8 +22,9 @@ export const CARD_RARITIES = [
 ] as const;
 export type CardRarity = typeof CARD_RARITIES[number];
 
-// Rarities that can be rolled in a pack — mirrors PER_CARD_TIERS in
-// the bot's config.js. Mythic and Contraband are perCard: false.
+// Rarities that can actually be rolled inside a pack — matches
+// PER_CARD_TIERS in the bot's config.js (Mythic and Contraband are
+// perCard: false and are only ever granted via specific-card rewards).
 export const PACK_RARITIES = [
   'Common',
   'Uncommon',
@@ -132,16 +133,25 @@ export const WEEKLY_BONUSES = {
   pack16PlusDropPlusPuzzle: 660,
 } as const;
 
-export const TOTAL_TIERS = 100;
+export const TOTAL_TIERS = 50;
 export const TOTAL_TRACK_COST = 200_000;
 
+// Band structure preserved: 40% intro, 40% mid, 24% final stretch, plus
+// the two "big push" tiers at 49 and 50. Totals exactly 200,000.
+//
+//   1-20   @ 2,000  =  40,000  (40%)
+//   21-40  @ 4,000  =  80,000  (40%)
+//   41-48  @ 6,000  =  48,000  (24%)
+//   49     @ 14,000 =  14,000
+//   50     @ 18,000 =  18,000
 export const TIER_COSTS: number[] = (() => {
   const out: number[] = [];
   for (let i = 1; i <= TOTAL_TIERS; i++) {
-    if (i <= 39) out.push(1000);
-    else if (i <= 96) out.push(2500);
-    else if (i <= 99) out.push(4000);
-    else out.push(6500);
+    if (i <= 20) out.push(2_000);
+    else if (i <= 40) out.push(4_000);
+    else if (i <= 48) out.push(6_000);
+    else if (i <= 49) out.push(14_000);
+    else out.push(18_000);
   }
   return out;
 })();
@@ -170,30 +180,32 @@ export function isTrackActive(now = Date.now()): boolean {
   return now >= new Date(TRACK_START_DATE).getTime();
 }
 
+// Bands were originally tuned for 100 tiers. With 50, they scale to:
+//   intro: 1-16, early: 17-19, mid: 20-46, late: 47-49, final: 50
 function bandForTier(tier: number): TierBand {
-  if (tier <= 32) return 'intro';
-  if (tier <= 39) return 'early';
-  if (tier <= 96) return 'mid';
-  if (tier <= 99) return 'late';
+  if (tier <= 16) return 'intro';
+  if (tier <= 19) return 'early';
+  if (tier <= 46) return 'mid';
+  if (tier <= 49) return 'late';
   return 'final';
 }
 
 const NAMED_TIERS: Record<number, TierContent> = {
-  10:  { icon: '🥉', title: 'Bronze Badge',      description: 'Your first proper milestone.',                    reward: 'Bronze loyalty badge' },
-  20:  { icon: '✨', title: 'Shining',           description: 'Twenty tiers of loyalty.',                        reward: 'Custom emote slot' },
-  25:  { icon: '🌿', title: 'Sprout',            description: 'One quarter of the way.',                         reward: 'Extra profile decoration slot' },
-  32:  { icon: '🌱', title: 'First Chapter',     description: 'Complete the intro tier band.',                   reward: 'First major milestone reward' },
-  33:  { icon: '⭐', title: 'Rising Star',       description: 'Past the first milestone.',                       reward: 'Exclusive badge colour' },
-  39:  { icon: '🌙', title: 'Moon Walker',       description: 'End of the early tier band.',                     reward: 'Bronze profile accent' },
-  40:  { icon: '🌠', title: 'Grind Begins',      description: 'Entering the long stretch.',                      reward: 'Star trail effect on profile' },
-  50:  { icon: '💫', title: 'Halfway',           description: 'Halfway through the loyalty journey.',            reward: 'Cosmic profile border' },
-  75:  { icon: '🌟', title: 'Nebula',            description: 'Three quarters of the way.',                      reward: 'Nebula profile theme' },
-  90:  { icon: '🔆', title: 'Almost There',      description: 'Ten tiers from the top of the grind band.',       reward: 'Cosmic aura effect' },
-  96:  { icon: '🪐', title: 'Loyal Constellation', description: 'Completed the hard grind band.',                reward: 'Loyalty Card II (silver) + gold loyalty badge' },
-  97:  { icon: '🔭', title: 'Celestial',         description: 'Entering the highest tier band.',                 reward: 'Exclusive emote pack' },
-  98:  { icon: '✨', title: 'Astral Traveler',   description: 'Nearly to the end of the track.',                 reward: 'Animated profile decoration' },
-  99:  { icon: '🌠', title: 'Star Walker',       description: 'The penultimate tier.',                           reward: 'Loyalty Card III (gold) + platinum loyalty badge' },
-  100: { icon: '🌌', title: 'Cosmic Ascendant',  description: 'The final tier. You have walked among the stars.', reward: 'Loyalty Card IV (platinum) + permanent place in the credits' },
+  5:  { icon: '🥉', title: 'Bronze Badge',      description: 'Your first proper milestone.',                    reward: 'Bronze loyalty badge' },
+  10: { icon: '✨', title: 'Shining',           description: 'Ten tiers of loyalty.',                           reward: 'Custom emote slot' },
+  13: { icon: '🌿', title: 'Sprout',            description: 'One quarter of the way.',                         reward: 'Extra profile decoration slot' },
+  16: { icon: '🌱', title: 'First Chapter',     description: 'Complete the intro tier band.',                   reward: 'First major milestone reward' },
+  17: { icon: '⭐', title: 'Rising Star',       description: 'Past the first milestone.',                       reward: 'Exclusive badge colour' },
+  19: { icon: '🌙', title: 'Moon Walker',       description: 'End of the early tier band.',                     reward: 'Bronze profile accent' },
+  20: { icon: '🌠', title: 'Grind Begins',      description: 'Entering the long stretch.',                      reward: 'Star trail effect on profile' },
+  25: { icon: '💫', title: 'Halfway',           description: 'Halfway through the loyalty journey.',            reward: 'Cosmic profile border' },
+  38: { icon: '🌟', title: 'Nebula',            description: 'Three quarters of the way.',                      reward: 'Nebula profile theme' },
+  45: { icon: '🔆', title: 'Almost There',      description: 'Five tiers from the top of the track.',           reward: 'Cosmic aura effect' },
+  46: { icon: '🪐', title: 'Loyal Constellation', description: 'Completed the hard grind band.',                reward: 'Loyalty Card II (silver) + gold loyalty badge' },
+  47: { icon: '🔭', title: 'Celestial',         description: 'Entering the highest tier band.',                 reward: 'Exclusive emote pack' },
+  48: { icon: '✨', title: 'Astral Traveler',   description: 'Nearly to the end of the track.',                 reward: 'Animated profile decoration' },
+  49: { icon: '🌠', title: 'Star Walker',       description: 'The penultimate tier.',                           reward: 'Loyalty Card III (gold) + platinum loyalty badge' },
+  50: { icon: '🌌', title: 'Cosmic Ascendant',  description: 'The final tier. You have walked among the stars.', reward: 'Loyalty Card IV (platinum) + permanent place in the credits' },
 };
 
 export function getDefaultTier(tier: number): MergedTier {
@@ -318,8 +330,8 @@ export const THEME_GROUPS: { name: string; keys: { key: keyof LoyaltyTheme; labe
     { key: 'starRegular', label: 'Regular (unlocked)' },
     { key: 'starFive',    label: '5-multiples' },
     { key: 'starTen',     label: '10-multiples' },
-    { key: 'starMajor',   label: 'Major (every 8th)' },
-    { key: 'starFinal',   label: 'Tier 100' },
+    { key: 'starMajor',   label: 'Major (every 4th)' },
+    { key: 'starFinal',   label: 'Tier 50' },
   ]},
   { name: 'Background strings', keys: [
     { key: 'deco1', label: 'String 1' },

@@ -114,14 +114,17 @@ function drawMainWave(
 
 /* ---------- star tier helpers ---------- */
 
+// 13 major tiers: every 4th tier + the final tier 50. That matches the
+// original 100-tier track's 13 majors (every 8th + tier 100), but with
+// 3 filler tiers between majors instead of 7.
 function isMajorTier(tier: number): boolean {
-  if (tier === 100) return true;
-  if (tier > 0 && tier % 8 === 0) return true;
+  if (tier === 50) return true;
+  if (tier > 0 && tier % 4 === 0) return true;
   return false;
 }
 
 function starSize(tier: number): number {
-  if (tier === 100) return 96;
+  if (tier === 50) return 96;
   if (isMajorTier(tier)) return 78;
   if (tier % 10 === 0) return 68;
   if (tier % 5 === 0) return 58;
@@ -134,7 +137,7 @@ function starPalette(tier: number, unlocked: boolean, theme: LoyaltyTheme) {
     fill: hexToRgba(theme.starLocked, 0.15),
     halo: 'transparent',
   };
-  if (tier === 100) return {
+  if (tier === 50) return {
     stroke: hexToRgba(theme.starFinal, 0.98),
     fill: hexToRgba(theme.starFinal, 0.4),
     halo: hexToRgba(theme.starFinal, 0.28),
@@ -194,7 +197,7 @@ function TierIcon({ icon, starSize }: { icon: string; starSize: number }) {
 /* ---------- scrubber dot sizing ---------- */
 
 function scrubberDotSize(tier: number): number {
-  if (tier === 100) return 10;
+  if (tier === 50) return 10;
   if (isMajorTier(tier)) return 7;
   if (tier % 10 === 0) return 5;
   if (tier % 5 === 0) return 4;
@@ -270,12 +273,13 @@ function TierScrubber({
     }
   }, [currentCenterTier, onScrub]);
 
-  // Clamp label percent to [8, 92] so it never clips at the edges on narrow screens.
   const rawPct = ((currentCenterTier - 1) / (TOTAL_TIERS - 1)) * 100;
   const labelPct = Math.max(8, Math.min(92, rawPct));
 
+  // On compact screens, thin out to 10-multiples + majors so each dot has
+  // room to breathe. 50 tiers is still readable all-in on wider screens.
   const visible = compact
-    ? positioned.filter(m => m.tier % 5 === 0 || isMajorTier(m.tier))
+    ? positioned.filter(m => m.tier % 10 === 0 || isMajorTier(m.tier))
     : positioned;
 
   return (
@@ -708,8 +712,9 @@ function EditTierModal({
   function handleSave() {
     if (!form.title.trim()) return setError('Title is required');
     if (!form.reward.trim()) return setError('Reward display text is required');
+    // Icon is optional — if left empty, the tier falls back to the
+    // default ⭐ from getDefaultTier(). No validation.
     const icon = iconMode === 'emoji' ? emojiValue.trim() : emoteValue.trim();
-    if (!icon) return setError('Icon is required');
 
     let rewardKind: RewardKind | undefined;
     if (kindType === 'pack_points') {
@@ -756,7 +761,7 @@ function EditTierModal({
                 </div>
               </div>
               {iconMode === 'emoji' ? (
-                <input type="text" maxLength={32} value={emojiValue} onChange={e => setEmojiValue(e.target.value)} className="loyalty-field__icon loyalty-icon-section__input" placeholder="⭐" />
+                <input type="text" maxLength={32} value={emojiValue} onChange={e => setEmojiValue(e.target.value)} className="loyalty-field__icon loyalty-icon-section__input" placeholder="⭐ (leave blank for default)" />
               ) : (
                 <EmotePicker
                   emotes={emoteData?.emotes || []}
@@ -1116,9 +1121,6 @@ export default function LoyaltyClient({
 
   /* ---------- scrubber ---------- */
 
-  // Reverse-map the current panOffset to the tier currently centered in the
-  // viewport. This drives the scrubber's filled-dot state, so the scrubber
-  // reflects wherever the user has scrolled or dragged to.
   const currentCenterTier = useMemo(() => {
     const centerX = panOffset + viewportSize.width / 2;
     const ratio = (centerX - START_X) / (END_X - START_X);
@@ -1126,7 +1128,9 @@ export default function LoyaltyClient({
     return Math.max(1, Math.min(TOTAL_TIERS, tier));
   }, [panOffset, viewportSize.width]);
 
-  const compactScrubber = viewportSize.width < 600;
+  // With 50 tiers, all dots fit comfortably down to ~500px. Below that,
+  // thin out to 10-multiples + majors for readable spacing.
+  const compactScrubber = viewportSize.width < 500;
 
   const handleScrubToTier = useCallback((tier: number) => {
     const clamped = Math.max(1, Math.min(TOTAL_TIERS, tier));
