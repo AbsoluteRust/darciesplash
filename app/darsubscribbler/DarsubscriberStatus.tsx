@@ -1,9 +1,9 @@
-// app/darsubscribbler/DarsubscriberStatus.tsx
+// app/darsubscribbler/darsubscribblerStatus.tsx
 'use client';
 
 import { signIn } from 'next-auth/react';
 
-export default function DarsubscriberStatus({
+export default function darsubscribblerStatus({
   signedIn,
   isDarsubscriber,
   kofiUrl,
@@ -17,7 +17,7 @@ export default function DarsubscriberStatus({
       <div className="ds-status ds-status--signin">
         <p className="ds-status__title">Sign in to check your status</p>
         <p className="ds-status__body">
-          Already a Darsubscriber? Sign in to see every perk that&apos;s
+          Already a darsubscribbler? Sign in to see every perk that&apos;s
           already unlocked on your account.
         </p>
         <button
