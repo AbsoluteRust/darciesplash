@@ -4,12 +4,24 @@ import './ProfileCard.css';
 const DEFAULT_INNER_GRADIENT = 'linear-gradient(145deg,#60496e8c 0%,#71C4FF44 100%)';
 const OPTIMIZE_WIDTHS = [256, 384, 640, 828, 1080, 1200];
 
-// Helper function that returns raw URLs for GIFs to keep them animated.
+// Extensions/markers that indicate an animated image. Next.js's auto-detection
+// for animated files is "best-effort" and frequently misses WebP / APNG —
+// especially when the source is a custom CDN or R2 — so we skip the optimizer
+// entirely for these formats and let the browser animate the raw asset.
+function isAnimatedUrl(url) {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower.includes('.gif?') || lower.includes('.webp?') || lower.includes('.apng?')) return true;
+  if (lower.endsWith('.gif') || lower.endsWith('.webp') || lower.endsWith('.apng')) return true;
+  return false;
+}
+
+// Helper function that returns raw URLs for animated images to keep them
+// animating instead of being flattened to their first frame by the optimizer.
 function optimizedUrl(url, width) {
   if (!url) return url;
 
-  // Do not run Next.js image optimization on GIFs (it turns them into static WebPs)
-  if (url.toLowerCase().endsWith('.gif') || url.toLowerCase().includes('.gif?')) {
+  if (isAnimatedUrl(url)) {
     return url;
   }
 
@@ -21,6 +33,7 @@ function optimizedUrl(url, width) {
 
 function optimizedSrcSet(url) {
   if (!url) return undefined;
+  if (isAnimatedUrl(url)) return undefined;
   if (!url.startsWith('/') && !url.includes('.public.blob.vercel-storage.com')) {
     return undefined;
   }

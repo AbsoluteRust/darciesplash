@@ -23,6 +23,17 @@ const RARITY_COLORS: Record<string, string> = {
   Contraband: "#000000",
 };
 
+// A URL is considered animated if it points at a GIF, WebP, or APNG file.
+// Query strings are tolerated because R2 / Discord CDN URLs commonly carry
+// `?v=...` cache-busters or `?size=...` modifiers.
+function isAnimatedUrl(url: string | undefined | null): boolean {
+  if (!url) return false;
+  const lower = String(url).toLowerCase();
+  if (lower.includes('.gif?') || lower.includes('.webp?') || lower.includes('.apng?')) return true;
+  if (lower.endsWith('.gif') || lower.endsWith('.webp') || lower.endsWith('.apng')) return true;
+  return false;
+}
+
 export default function StandardCard({
   name,
   title,
@@ -69,6 +80,17 @@ export default function StandardCard({
   const effectiveType = type || title || "Emote";
   const isEmote = effectiveType.startsWith("Emote");
 
+  // Pick the source the card should actually render.
+  //
+  // The catalogue's `thumbUrl` is always a static, downscaled thumbnail (the
+  // bot generates it in `uploadWithThumbnail` from a single frame). If the
+  // full `image` is animated, prefer it over `thumbUrl` so the card animates.
+  // When the image is static, keep the fast thumbnail path.
+  const imageIsAnimated = isAnimatedUrl(image);
+  const resolvedSrc = imageIsAnimated && image
+    ? image
+    : (thumbUrl || image || "");
+
   // In the modal, non-emotes (splash art, mobile wallpaper, sticker) render as
   // a raw full-resolution <img> at natural aspect ratio, bypassing ProfileCard's
   // emote-shaped framing so the whole image shows uncropped. Emotes keep using
@@ -97,7 +119,7 @@ export default function StandardCard({
         handle={(name || "unknown").toLowerCase().replace(/\s+/g, "-")}
         status="Online"
         contactText="View"
-        avatarUrl={thumbUrl || image || ""}
+        avatarUrl={resolvedSrc}
         rarity={finalRarity}
         showUserInfo={false}
         enableTilt={enableTilt}
