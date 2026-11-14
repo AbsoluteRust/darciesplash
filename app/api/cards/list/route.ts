@@ -1,3 +1,4 @@
+// app/api/cards/list/route.ts
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 
@@ -10,13 +11,15 @@ function rank(name: string | undefined): number {
 }
 
 export async function GET() {
-  const [cardsRaw, highestPullRaw] = await Promise.all([
+  const [cardsRaw, highestPullRaw, overridesRaw] = await Promise.all([
     kv.get<any[]>("cards"),
     kv.hgetall("card_highest_pull"),
+    kv.hgetall("card_admin_overrides"),
   ]);
 
   const cards = cardsRaw || [];
   const highest = highestPullRaw || {};
+  const overrides = overridesRaw || {};
 
   const resolved = cards.map((c) => {
     const manual = c.rarity;
@@ -28,7 +31,22 @@ export async function GET() {
       display = highest[c.name] || "Common";
     }
 
-    return { ...c, rarity: display };
+    // Merge admin overrides (currently just thumbUrl; name and other
+    // fields will join this block when the rename feature ships).
+    let withOverrides = c;
+    const rawOverride = overrides[c.name];
+    if (rawOverride) {
+      try {
+        const o = typeof rawOverride === "string" ? JSON.parse(rawOverride) : rawOverride;
+        if (o?.thumbUrl) {
+          withOverrides = { ...c, thumbUrl: o.thumbUrl };
+        }
+      } catch {
+        // malformed override — ignore and use defaults
+      }
+    }
+
+    return { ...withOverrides, rarity: display };
   });
 
   return NextResponse.json(resolved);
