@@ -20,9 +20,8 @@ type Card = {
 
 type Crop = { left: number; top: number; width: number; height: number };
 
-const THUMB_W = 640;
-const THUMB_H = 896;
-const ASPECT = THUMB_W / THUMB_H;
+const THUMB_SIZE = 640;
+const ASPECT = 1; // square
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
@@ -103,7 +102,7 @@ export default function AdminCardThumbEditor() {
                 onClick={() => setSelected(card)}
                 className="group relative bg-white/[0.03] border border-white/10 rounded-xl overflow-hidden text-left hover:border-white/30 transition"
               >
-                <div className="aspect-[640/896] bg-black/50 overflow-hidden">
+                <div className="aspect-square bg-black/50 overflow-hidden">
                   <img
                     src={card.thumbUrl || card.image}
                     alt={card.name}
@@ -167,7 +166,6 @@ function CardEditorModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Drag state for crop window move/resize
   const dragRef = useRef<{
     mode: 'move' | 'nw' | 'ne' | 'sw' | 'se';
     startX: number;
@@ -175,7 +173,6 @@ function CardEditorModal({
     startCrop: Crop;
   } | null>(null);
 
-  // Wait for image load, then compute display dims and default crop if none saved
   const handleImgLoad = () => {
     const img = imgRef.current;
     if (!img) return;
@@ -184,33 +181,22 @@ function CardEditorModal({
     setSrcDims({ w, h });
     setImgLoaded(true);
 
-    // Fit source into a max container
     const maxW = 700;
     const maxH = 500;
     const scale = Math.min(maxW / w, maxH / h, 1);
     setDisplayDims({ w: Math.round(w * scale), h: Math.round(h * scale) });
 
-    // Initialize crop if not already set
     if (!crop) {
-      const sourceAspect = w / h;
-      let initW, initH;
-      if (sourceAspect > ASPECT) {
-        initH = h;
-        initW = Math.round(h * ASPECT);
-      } else {
-        initW = w;
-        initH = Math.round(w / ASPECT);
-      }
+      const side = Math.min(w, h);
       setCrop({
-        left: Math.round((w - initW) / 2),
-        top: Math.round((h - initH) / 2),
-        width: initW,
-        height: initH,
+        left: Math.round((w - side) / 2),
+        top: Math.round((h - side) / 2),
+        width: side,
+        height: side,
       });
     }
   };
 
-  // Debounced preview whenever crop or quality changes
   useEffect(() => {
     if (!imgLoaded || !crop) return;
     const t = setTimeout(async () => {
@@ -238,7 +224,6 @@ function CardEditorModal({
     return () => clearTimeout(t);
   }, [imgLoaded, crop, quality, card.name]);
 
-  // Drag handlers
   const startDrag = useCallback((mode: 'move' | 'nw' | 'ne' | 'sw' | 'se') =>
     (e: React.PointerEvent) => {
       if (!crop) return;
@@ -269,42 +254,35 @@ function CardEditorModal({
       next.left = Math.max(0, Math.min(srcDims.w - startCrop.width, startCrop.left + dx));
       next.top = Math.max(0, Math.min(srcDims.h - startCrop.height, startCrop.top + dy));
     } else {
-      // Aspect-locked resize. Each corner anchors the opposite corner.
-      const aspect = ASPECT;
-      let newW = startCrop.width;
-      let newH = startCrop.height;
+      // Aspect-locked (1:1) resize. Each corner anchors the opposite corner.
+      let newSide = startCrop.width;
       let newLeft = startCrop.left;
       let newTop = startCrop.top;
 
       if (mode === 'se') {
-        newW = Math.max(50, startCrop.width + dx);
-        newH = newW / aspect;
+        newSide = Math.max(50, startCrop.width + dx);
       } else if (mode === 'sw') {
-        newW = Math.max(50, startCrop.width - dx);
-        newH = newW / aspect;
-        newLeft = startCrop.left + startCrop.width - newW;
+        newSide = Math.max(50, startCrop.width - dx);
+        newLeft = startCrop.left + startCrop.width - newSide;
       } else if (mode === 'ne') {
-        newW = Math.max(50, startCrop.width + dx);
-        newH = newW / aspect;
-        newTop = startCrop.top + startCrop.height - newH;
+        newSide = Math.max(50, startCrop.width + dx);
+        newTop = startCrop.top + startCrop.height - newSide;
       } else if (mode === 'nw') {
-        newW = Math.max(50, startCrop.width - dx);
-        newH = newW / aspect;
-        newLeft = startCrop.left + startCrop.width - newW;
-        newTop = startCrop.top + startCrop.height - newH;
+        newSide = Math.max(50, startCrop.width - dx);
+        newLeft = startCrop.left + startCrop.width - newSide;
+        newTop = startCrop.top + startCrop.height - newSide;
       }
 
       // Clamp to source bounds
-      newLeft = Math.max(0, Math.min(srcDims.w - newW, newLeft));
-      newTop = Math.max(0, Math.min(srcDims.h - newH, newTop));
-      newW = Math.min(newW, srcDims.w - newLeft);
-      newH = newW / aspect;
+      newLeft = Math.max(0, Math.min(srcDims.w - newSide, newLeft));
+      newTop = Math.max(0, Math.min(srcDims.h - newSide, newTop));
+      newSide = Math.min(newSide, srcDims.w - newLeft, srcDims.h - newTop);
 
       next = {
         left: Math.round(newLeft),
         top: Math.round(newTop),
-        width: Math.round(newW),
-        height: Math.round(newH),
+        width: Math.round(newSide),
+        height: Math.round(newSide),
       };
     }
 
@@ -374,10 +352,9 @@ function CardEditorModal({
         </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* LEFT — crop editor */}
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-white/40 mb-2">
-              Crop position
+              Crop position (square)
             </div>
             <div
               ref={containerRef}
@@ -399,7 +376,6 @@ function CardEditorModal({
 
               {displayCrop && imgLoaded && (
                 <>
-                  {/* Overlays that dim everything outside the crop */}
                   <div className="absolute bg-black/60 pointer-events-none"
                        style={{ left: 0, top: 0, right: 0, height: displayCrop.top }} />
                   <div className="absolute bg-black/60 pointer-events-none"
@@ -409,7 +385,6 @@ function CardEditorModal({
                   <div className="absolute bg-black/60 pointer-events-none"
                        style={{ left: displayCrop.left + displayCrop.width, top: displayCrop.top, right: 0, height: displayCrop.height }} />
 
-                  {/* Crop window */}
                   <div
                     onPointerDown={startDrag('move')}
                     onPointerMove={onMove}
@@ -449,9 +424,13 @@ function CardEditorModal({
                 </>
               )}
             </div>
+            <p className="text-[10px] text-white/40 mt-2 leading-relaxed">
+              Drag the window or any corner to reposition the square crop. The
+              card frame crops to portrait at display time — this square is the
+              region that will be shown inside it.
+            </p>
           </div>
 
-          {/* RIGHT — quality + preview comparison */}
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-white/40 mb-2">
               Quality
@@ -480,7 +459,7 @@ function CardEditorModal({
                 <div className="text-[10px] font-bold text-white/40 uppercase mb-1">
                   Default (Q78)
                 </div>
-                <div className="aspect-[640/896] bg-white/5 rounded overflow-hidden flex items-center justify-center">
+                <div className="aspect-square bg-white/5 rounded overflow-hidden flex items-center justify-center">
                   {preview?.defaultDataUrl ? (
                     <img src={preview.defaultDataUrl} alt="Default preview" className="w-full h-full object-cover" />
                   ) : (
@@ -496,7 +475,7 @@ function CardEditorModal({
                 <div className="text-[10px] font-bold text-indigo-300 uppercase mb-1">
                   Yours (Q{quality})
                 </div>
-                <div className="aspect-[640/896] bg-white/5 rounded overflow-hidden flex items-center justify-center">
+                <div className="aspect-square bg-white/5 rounded overflow-hidden flex items-center justify-center">
                   {preview?.customDataUrl ? (
                     <img src={preview.customDataUrl} alt="Custom preview" className="w-full h-full object-cover" />
                   ) : (
