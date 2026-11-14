@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 
+// Mirrors constants from the bot's config.js. Update both if these change.
+const PUZZLE_BASE_GUESSES = 5;
+const PUZZLE_GUESSES_PER_DAY = 2;
+const PUZZLE_PARTICIPATION_STREAK = 10;
+const PUZZLE_PARTICIPATION_POINTS_PER_DAY = 100;
+const PUZZLE_PARTICIPATION_DAYS = 10;
+const PUZZLE_BONUS_RATE_PER_HOUR = 555;
+
 export default function PuzzleGame({
   state,
   allStaticEmotes,
@@ -23,7 +31,7 @@ export default function PuzzleGame({
 
     const used = state.guesses[userId] || 0;
     const daysSinceStart = Math.floor((Date.now() - state.startedAt) / (24 * 60 * 60 * 1000));
-    const totalBudget = 4 + Math.max(0, daysSinceStart);
+    const totalBudget = PUZZLE_BASE_GUESSES + Math.max(0, daysSinceStart) * PUZZLE_GUESSES_PER_DAY;
     const remaining = totalBudget - used;
 
     if (remaining > 0) {
@@ -73,8 +81,13 @@ export default function PuzzleGame({
   // Calculate user guesses
   const used = state.guesses[userId || ''] || 0;
   const daysSinceStart = Math.floor((Date.now() - state.startedAt) / (24 * 60 * 60 * 1000));
-  const totalBudget = 4 + Math.max(0, daysSinceStart);
+  const totalBudget = PUZZLE_BASE_GUESSES + Math.max(0, daysSinceStart) * PUZZLE_GUESSES_PER_DAY;
   const remaining = totalBudget - used;
+
+  // Reward math (mirrors games/puzzle.js exactly)
+  const hours = 2 * (width + height) - 4;
+  const dailyTotal = PUZZLE_PARTICIPATION_POINTS_PER_DAY * PUZZLE_PARTICIPATION_DAYS;
+  const hourlyTotal = PUZZLE_BONUS_RATE_PER_HOUR * hours;
 
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
@@ -225,6 +238,33 @@ export default function PuzzleGame({
         )}
       </div>
 
+      {/* Rewards */}
+      <div className="w-full max-w-lg p-4 bg-[#0a0a14] border border-green-500/20 rounded-2xl">
+        <p className="text-xs font-bold text-green-400 uppercase tracking-wider mb-3">Rewards</p>
+        <div className="space-y-3 text-sm">
+          <div>
+            <p className="text-white font-bold mb-0.5">Participation (any player who guesses)</p>
+            <p className="text-white/60 text-xs leading-relaxed">
+              <strong className="text-white">+{PUZZLE_PARTICIPATION_STREAK}</strong> streak score &middot;{' '}
+              <strong className="text-white">{PUZZLE_PARTICIPATION_POINTS_PER_DAY.toLocaleString()}</strong> points/day for{' '}
+              <strong className="text-white">{PUZZLE_PARTICIPATION_DAYS}</strong> days
+              ({dailyTotal.toLocaleString()} total)
+            </p>
+          </div>
+          <div>
+            <p className="text-white font-bold mb-0.5">Solve bonus (if the puzzle is solved this week)</p>
+            <p className="text-white/60 text-xs leading-relaxed">
+              <strong className="text-white">{PUZZLE_BONUS_RATE_PER_HOUR.toLocaleString()}</strong> points/hour for{' '}
+              <strong className="text-white">{hours} hours</strong>
+              ({hourlyTotal.toLocaleString()} total per player) &middot; the {width}&times;{height} grid grows next week
+            </p>
+          </div>
+        </div>
+        <p className="text-[10px] text-white/40 italic mt-3">
+          Rewards are paid out after the puzzle closes.
+        </p>
+      </div>
+
       {/* Revealed Emotes Counts */}
       {state.revealedCounts && Object.keys(state.revealedCounts).length > 0 && (
         <div className="w-full max-w-lg p-4 bg-[#0a0a14] border border-white/10 rounded-2xl flex flex-col gap-3">
@@ -305,7 +345,7 @@ export default function PuzzleGame({
           <>
             <p>Click an emote above, or post a static emote in the Discord thread.</p>
             <p>
-              Each player has <strong className="text-white">4</strong> guesses +<strong className="text-white">1 per day</strong>.
+              Each player has <strong className="text-white">{PUZZLE_BASE_GUESSES}</strong> guesses +<strong className="text-white">{PUZZLE_GUESSES_PER_DAY}</strong> per day.
             </p>
           </>
         )}
