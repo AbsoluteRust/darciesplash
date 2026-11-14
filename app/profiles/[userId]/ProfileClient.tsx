@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import ProfileCard from '@/components/ProfileCard';
 import PointsHelpTooltip from '@/components/PointsHelpTooltip';
 import DarsubscriberLock from '@/components/DarsubscriberLock';
+import ModalCloseButton from '@/components/ModalCloseButton';
 import { usePreviewMode } from '@/components/PreviewModeContext';
 
 type StreakSource = {
@@ -93,9 +94,6 @@ const KOFI_TIERS_URL = 'https://ko-fi.com/dardotdlc/tiers';
 const PACK_POINTS_CAP_BASE = 200_000;
 const PACK_POINTS_CAP_PREMIUM = 500_000;
 
-// Mirrors DAILY_DARSUBSCRIBBLER_BONUS from the bot config. Used only to
-// synthesize a preview row when an admin previews subscriber view while
-// not actually being a subscriber — the server data won't include this row.
 const PREVIEW_DARSUBSCRIBBLER_BONUS = 5_000;
 
 const RARITY_COLORS: Record<string, string> = {
@@ -473,13 +471,8 @@ export default function ProfileClient({ userId }: { userId: string }) {
   if (loading) return <div className="text-white/50 text-center animate-pulse mt-20">Loading profile...</div>;
   if (!data) return <div className="text-red-400 text-center mt-20">User not found.</div>;
 
-  // What cap / bonus display should reflect:
-  //   Your own profile → preview toggle (so admins can see subscriber view)
-  //   Someone else's → their real status
   const displayAsSubscriber = isOwnProfile ? effectiveIsDarsubscriber : (data.isDarsubscribbler ?? false);
 
-  // Payout rows: hide darsubscribbler row unless we're displaying subscriber
-  // state. Synthesize it when previewing subscriber view on a non-subscriber.
   const rawPayoutSources = data.stats?.streakBreakdown?.filter(s =>
     ['base', 'guild', 'commissioner', 'darsubscribbler', 'weekly-bonus', 'monthly-bonus', 'community'].includes(s.id)
   ) || [];
@@ -1224,8 +1217,21 @@ export default function ProfileClient({ userId }: { userId: string }) {
 
       <AnimatePresence>
         {selectedCard && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setSelectedCard(null)}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }} className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center overflow-hidden" onClick={e => e.stopPropagation()}>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+            onClick={() => setSelectedCard(null)}
+          >
+            <ModalCloseButton onClick={() => setSelectedCard(null)} label="Close card viewer" />
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
               <img src={selectedCard.image} alt={selectedCard.name} className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" />
             </motion.div>
           </motion.div>

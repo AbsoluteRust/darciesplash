@@ -6,6 +6,7 @@ import Iridescence from "../../../components/Iridescence";
 import StandardCard from "@/components/StandardCard";
 import LazyMount from "@/components/LazyMount";
 import RelatedCardMini from "@/components/RelatedCardMini";
+import ModalCloseButton from "@/components/ModalCloseButton";
 import { ITEMS } from "@/sections/AccordionGallery";
 import { useRouter } from "next/navigation";
 import Silk from "@/components/Silk";
@@ -267,9 +268,6 @@ export default function CollectionClient({
     ? { darsubscribbler: serverRoles.darsubscribbler, commissioner: serverRoles.commissioner }
     : roles;
 
-  // Build the roles object passed to the ownership check using the
-  // preview-aware subscriber status, so toggling "Subscribbler view"
-  // in the navbar flips the FAB between locked and active for owners.
   const effectiveRolesForEdit: AccountRoles = {
     darsubscribbler: effectiveIsDarsubscriber,
     commissioner: effectiveRoles?.commissioner ?? false,
@@ -281,9 +279,6 @@ export default function CollectionClient({
   );
   const canCopyEmotes = effectiveIsDarsubscriber;
 
-  // True when the current user is one of the designated owners of this
-  // collection, regardless of darsubscriber status. Used to show the edit
-  // FAB in a locked state to owners whose subscription has lapsed.
   const isOwner = useMemo(
     () => isCollectionOwner(effectiveUserId, id),
     [effectiveUserId, id]
@@ -1086,9 +1081,6 @@ export default function CollectionClient({
       ? getOwnedRarity(piece.name, myInv)
       : null;
 
-    // Copy-emote is a Darsubscriber-only feature and is hidden entirely
-    // from non-subscribers. No locked affordance — the button is simply
-    // absent for users who can't use it.
     let copyEmote: { name: string; url: string } | null = null;
     if (canCopyEmotes && piece.type === "Emote" && piece.image) {
       const origin = typeof window !== "undefined" ? window.location.origin : null;
@@ -1137,6 +1129,8 @@ export default function CollectionClient({
 
       {activeEmote && (
         <div className="emote-modal-overlay" onClick={closeModal}>
+          <ModalCloseButton onClick={closeModal} label="Close card viewer" />
+
           <div
             className={`emote-modal emote-layout${modalTransitionClass}`}
             onClick={e => e.stopPropagation()}
@@ -1458,11 +1452,6 @@ export default function CollectionClient({
         )}
       </div>
 
-      {/* Edit FAB: shown to collection owners regardless of subscription.
-          When they are not a Darsubscriber, it renders locked with a
-          tooltip explaining the feature and how to unlock it. Non-owners
-          never see this FAB, because subscription alone doesn't grant
-          ownership — only the fixed COLLECTION_OWNERS list does. */}
       {isOwner && !editMode && (
         canEdit ? (
           <button
