@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import StandardCard from '@/components/StandardCard';
 import RelatedCardMini from '@/components/RelatedCardMini';
+import ModalCloseButton from '@/components/ModalCloseButton';
 
 function normalizeType(t: string | undefined): string {
   if (!t) return "Emote";
@@ -66,6 +67,8 @@ export default function CardInspectModal({
 
   return (
     <div className="emote-modal-overlay" onClick={onClose}>
+      <ModalCloseButton onClick={onClose} label="Close card viewer" />
+
       <div
         className="emote-modal emote-layout"
         onClick={e => e.stopPropagation()}
