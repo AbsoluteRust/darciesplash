@@ -4,9 +4,6 @@ import { useState, useEffect } from 'react';
 import StandardCard from '@/components/StandardCard';
 import CardInspectModal from './CardInspectModal';
 
-// Mirrors GAME_GUESS_POINTS from the bot's config.js.
-const DROP_GUESS_POINTS = 400;
-
 export default function DropGame({ 
   state, 
   nextDropAt, 
@@ -142,22 +139,22 @@ export default function DropGame({
         ) : null}
       </div>
 
-      {/* Rewards */}
+      {/* Rewards — single source of truth is games/drop.js grantDropGuessRewards.
+          If the reward shape changes there, update the two lines below to match. */}
       <div className="w-full max-w-sm p-3 bg-[#0a0a14] border border-green-500/20 rounded-2xl shrink-0">
         <p className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-2">Rewards</p>
         <div className="space-y-1.5 text-xs">
           <div className="flex items-start gap-2">
-            <span className="shrink-0">💰</span>
+            <span className="shrink-0">🎟️</span>
             <p className="text-white/70 leading-relaxed">
-              <strong className="text-white">{DROP_GUESS_POINTS}</strong> pack points on your first guess.
+              <strong className="text-white">1 Lotto Ticket</strong> on your first guess.
             </p>
           </div>
           <div className="flex items-start gap-2">
             <span className="shrink-0">🏆</span>
             <p className="text-white/70 leading-relaxed">
               Correct guess &rarr;{' '}
-              <strong className="text-white">{state.cardName || 'the dropped card'}</strong>{' '}
-              added to your collection.
+              <strong className="text-white">Mini Pack containing {state.cardName || 'the dropped card'}</strong>.
             </p>
           </div>
         </div>
@@ -193,7 +190,7 @@ export default function DropGame({
             link: selectedCard.link,
             collection: selectedCard.collection,
           }} 
-          onClose={() => setSelectedCard(null)} 
+          onClose={() => setSelectedCard(null)}
         />
       )}
 
