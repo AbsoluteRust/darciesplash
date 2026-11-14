@@ -2,9 +2,16 @@
 
 .modal-close-btn {
   position: fixed;
-  top: 20px;
+  /* Positioned below the navbar so the button doesn't visually collide
+     with the home icon / menu icon. The navbar is roughly 72–96px tall
+     (py-4 to py-8 plus content), so 88px clears it on every viewport. */
+  top: 88px;
   right: 20px;
-  z-index: 200;
+
+  /* Sits above the navbar (z-50), the modal overlay, and any backdrop
+     blur pseudo-element. Portalled to <body>, so this competes at the
+     root stacking level — no ancestor clipping it. */
+  z-index: 9999;
 
   display: flex;
   align-items: center;
@@ -16,7 +23,7 @@
 
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.28);
-  background: rgba(10, 10, 20, 0.7);
+  background: rgba(10, 10, 20, 0.75);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: #fff;
@@ -32,7 +39,7 @@
 
 .modal-close-btn:hover,
 .modal-close-btn:focus-visible {
-  background: rgba(10, 10, 20, 0.92);
+  background: rgba(10, 10, 20, 0.95);
   border-color: rgba(255, 255, 255, 0.65);
   box-shadow: 0 6px 28px rgba(0, 0, 0, 0.6);
   outline: none;
@@ -49,7 +56,8 @@
 
 @media (max-width: 640px) {
   .modal-close-btn {
-    top: 12px;
+    /* Navbar is a bit shorter on mobile (py-4), so 72px still clears it. */
+    top: 72px;
     right: 12px;
     width: 40px;
     height: 40px;

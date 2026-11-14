@@ -1,6 +1,7 @@
-// components/ModalCloseButton.tsx
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './ModalCloseButton.css';
 
 export default function ModalCloseButton({
@@ -10,7 +11,20 @@ export default function ModalCloseButton({
   onClick: () => void;
   label?: string;
 }) {
-  return (
+  // Portals require document.body, which doesn't exist during SSR. Wait
+  // for mount, then render the button as a direct child of <body> so it
+  // lives outside any modal's stacking context. That makes its z-index
+  // compete at the root level — above the navbar (z-50) and above any
+  // backdrop-filter blur layer.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <button
       type="button"
       className="modal-close-btn"
@@ -36,6 +50,7 @@ export default function ModalCloseButton({
         <line x1="18" y1="6" x2="6" y2="18" />
         <line x1="6" y1="6" x2="18" y2="18" />
       </svg>
-    </button>
+    </button>,
+    document.body
   );
 }
