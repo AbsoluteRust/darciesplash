@@ -3,13 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useCollectionFilter } from '@/components/CollectionFilterContext';
 
-// Mirrors constants from the bot's config.js. Update both if these change.
+// Mirrors constants from the bot's config.js and games/puzzle.js. Update
+// both if these change.
 const PUZZLE_BASE_GUESSES = 5;
 const PUZZLE_GUESSES_PER_DAY = 2;
 const PUZZLE_PARTICIPATION_STREAK = 10;
-const PUZZLE_PARTICIPATION_POINTS_PER_DAY = 100;
-const PUZZLE_PARTICIPATION_DAYS = 10;
-const PUZZLE_BONUS_RATE_PER_HOUR = 555;
+const PUZZLE_POINTS_PER_TILE = 500;
 
 export default function PuzzleGame({
   state,
@@ -84,10 +83,9 @@ export default function PuzzleGame({
   const totalBudget = PUZZLE_BASE_GUESSES + Math.max(0, daysSinceStart) * PUZZLE_GUESSES_PER_DAY;
   const remaining = totalBudget - used;
 
-  // Reward math (mirrors games/puzzle.js exactly)
-  const hours = 2 * (width + height) - 4;
-  const dailyTotal = PUZZLE_PARTICIPATION_POINTS_PER_DAY * PUZZLE_PARTICIPATION_DAYS;
-  const hourlyTotal = PUZZLE_BONUS_RATE_PER_HOUR * hours;
+  // Reward math — 500 points per tile, flat, paid once when the puzzle closes.
+  const tileCount = width * height;
+  const pointsAward = PUZZLE_POINTS_PER_TILE * tileCount;
 
   // Helper to group multiple guesses by the same user
   const groupGuesses = (guesses: any[]) => {
@@ -238,30 +236,30 @@ export default function PuzzleGame({
         )}
       </div>
 
-      {/* Rewards */}
+      {/* Rewards — single source of truth is games/puzzle.js queuePuzzleRewards.
+          If the reward shape changes there, update this panel to match. */}
       <div className="w-full max-w-lg p-4 bg-[#0a0a14] border border-green-500/20 rounded-2xl">
         <p className="text-xs font-bold text-green-400 uppercase tracking-wider mb-3">Rewards</p>
-        <div className="space-y-3 text-sm">
-          <div>
-            <p className="text-white font-bold mb-0.5">Participation (any player who guesses)</p>
-            <p className="text-white/60 text-xs leading-relaxed">
-              <strong className="text-white">+{PUZZLE_PARTICIPATION_STREAK}</strong> streak score &middot;{' '}
-              <strong className="text-white">{PUZZLE_PARTICIPATION_POINTS_PER_DAY.toLocaleString()}</strong> points/day for{' '}
-              <strong className="text-white">{PUZZLE_PARTICIPATION_DAYS}</strong> days
-              ({dailyTotal.toLocaleString()} total)
+        <div className="space-y-2 text-sm">
+          <div className="flex items-start gap-2">
+            <span className="shrink-0">🎯</span>
+            <p className="text-white/70 text-xs leading-relaxed">
+              <strong className="text-white">+{PUZZLE_PARTICIPATION_STREAK}</strong> streak score per player.
             </p>
           </div>
-          <div>
-            <p className="text-white font-bold mb-0.5">Solve bonus (if the puzzle is solved this week)</p>
-            <p className="text-white/60 text-xs leading-relaxed">
-              <strong className="text-white">{PUZZLE_BONUS_RATE_PER_HOUR.toLocaleString()}</strong> points/hour for{' '}
-              <strong className="text-white">{hours} hours</strong>
-              ({hourlyTotal.toLocaleString()} total per player) &middot; the {width}&times;{height} grid grows next week
+          <div className="flex items-start gap-2">
+            <span className="shrink-0">💎</span>
+            <p className="text-white/70 text-xs leading-relaxed">
+              <strong className="text-white">{pointsAward.toLocaleString()}</strong> pack points per player
+              <span className="text-white/40">
+                {' '}({width}×{height} grid · {PUZZLE_POINTS_PER_TILE} pts/tile)
+              </span>
             </p>
           </div>
         </div>
         <p className="text-[10px] text-white/40 italic mt-3">
-          Rewards are paid out after the puzzle closes.
+          Paid out all at once when the puzzle closes — either on solve or at the end of the week,
+          whichever comes first. Only players who guess at least once receive rewards.
         </p>
       </div>
 
